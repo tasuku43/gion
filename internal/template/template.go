@@ -17,11 +17,7 @@ type File struct {
 }
 
 type Template struct {
-	Repos []TemplateRepo `yaml:"repos"`
-}
-
-type TemplateRepo struct {
-	Repo string `yaml:"repo"`
+	Repos []string `yaml:"repos"`
 }
 
 func Load(rootDir string) (File, error) {

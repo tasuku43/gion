@@ -126,7 +126,7 @@ func runTemplateAdd(ctx context.Context, rootDir string, args []string) error {
 		return fmt.Errorf("template already exists: %s", name)
 	}
 
-	var repos []template.TemplateRepo
+	var repos []string
 	for {
 		repoSpec, err := promptInput(reader, "repo (blank to finish)> ")
 		if err != nil {
@@ -135,7 +135,7 @@ func runTemplateAdd(ctx context.Context, rootDir string, args []string) error {
 		if strings.TrimSpace(repoSpec) == "" {
 			break
 		}
-		repos = append(repos, template.TemplateRepo{Repo: repoSpec})
+		repos = append(repos, repoSpec)
 	}
 	if len(repos) == 0 {
 		return fmt.Errorf("at least one repo is required")
@@ -468,12 +468,12 @@ func contains(values []string, target string) bool {
 
 func preflightTemplateRepos(ctx context.Context, rootDir string, tmpl template.Template) error {
 	var missing []string
-	for _, repoEntry := range tmpl.Repos {
-		if strings.TrimSpace(repoEntry.Repo) == "" {
+	for _, repoSpec := range tmpl.Repos {
+		if strings.TrimSpace(repoSpec) == "" {
 			return fmt.Errorf("template repo is empty")
 		}
-		if _, err := repo.Open(ctx, rootDir, repoEntry.Repo); err != nil {
-			missing = append(missing, repoEntry.Repo)
+		if _, err := repo.Open(ctx, rootDir, repoSpec); err != nil {
+			missing = append(missing, repoSpec)
 		}
 	}
 	if len(missing) > 0 {
@@ -483,8 +483,8 @@ func preflightTemplateRepos(ctx context.Context, rootDir string, tmpl template.T
 }
 
 func applyTemplate(ctx context.Context, rootDir, workspaceID string, tmpl template.Template, cfg config.Config) error {
-	for _, repoEntry := range tmpl.Repos {
-		if _, err := workspace.Add(ctx, rootDir, workspaceID, repoEntry.Repo, "", cfg); err != nil {
+	for _, repoSpec := range tmpl.Repos {
+		if _, err := workspace.Add(ctx, rootDir, workspaceID, repoSpec, "", cfg); err != nil {
 			return err
 		}
 	}

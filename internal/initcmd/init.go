@@ -122,18 +122,14 @@ func writeSettings(path string) error {
 
 type templatesFile struct {
 	Templates map[string]struct {
-		Repos []struct {
-			Repo string `yaml:"repo"`
-		} `yaml:"repos"`
+		Repos []string `yaml:"repos"`
 	} `yaml:"templates"`
 }
 
 func writeTemplates(path string) error {
 	file := templatesFile{
 		Templates: map[string]struct {
-			Repos []struct {
-				Repo string `yaml:"repo"`
-			} `yaml:"repos"`
+			Repos []string `yaml:"repos"`
 		}{},
 	}
 	data, err := yaml.Marshal(file)

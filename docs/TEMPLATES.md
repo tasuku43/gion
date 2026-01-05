@@ -11,8 +11,8 @@
 templates:
   webapp:
     repos:
-      - repo: github.com/org/frontend
-      - repo: github.com/org/backend
+      - github.com/org/frontend
+      - github.com/org/backend
 ```
 
 ルール:
