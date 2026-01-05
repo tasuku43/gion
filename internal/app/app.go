@@ -1,18 +1,17 @@
 package app
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/manifoldco/promptui"
 	"github.com/tasuku43/gws/internal/config"
 	"github.com/tasuku43/gws/internal/doctor"
 	"github.com/tasuku43/gws/internal/gc"
@@ -110,13 +109,9 @@ func runTemplateAdd(ctx context.Context, rootDir string, args []string) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: gws template add")
 	}
-	reader := bufio.NewReader(os.Stdin)
-	name, err := promptInput(reader, "template name> ")
+	name, err := promptText("template name", true)
 	if err != nil {
 		return err
-	}
-	if strings.TrimSpace(name) == "" {
-		return fmt.Errorf("template name is required")
 	}
 
 	file, err := template.Load(rootDir)
@@ -128,12 +123,19 @@ func runTemplateAdd(ctx context.Context, rootDir string, args []string) error {
 	}
 
 	var repos []string
+	knownRepos, repoWarnings, err := listRepoKeys(rootDir)
+	if err != nil {
+		return err
+	}
+	for _, warning := range repoWarnings {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", warning)
+	}
 	for {
-		repoSpec, err := promptInput(reader, "repo (blank to finish)> ")
+		repoSpec, err := promptRepoSelect(knownRepos)
 		if err != nil {
 			return err
 		}
-		if strings.TrimSpace(repoSpec) == "" {
+		if repoSpec == "" {
 			break
 		}
 		repos = append(repos, repoSpec)
@@ -414,57 +416,104 @@ func promptTemplateAndID(rootDir, templateName, workspaceID string) (string, str
 		return "", "", fmt.Errorf("no templates found in %s", filepath.Join(rootDir, template.FileName))
 	}
 
-	reader := bufio.NewReader(os.Stdin)
 	if templateName == "" {
-		fmt.Fprintln(os.Stdout, "available templates:")
-		for _, name := range names {
-			fmt.Fprintf(os.Stdout, " - %s\n", name)
+		selected, err := promptSelect("template", names)
+		if err != nil {
+			return "", "", err
 		}
-		for {
-			input, err := promptInput(reader, "template> ")
-			if err != nil {
-				return "", "", err
-			}
-			if contains(names, input) {
-				templateName = input
-				break
-			}
-			fmt.Fprintln(os.Stdout, "invalid template name")
-		}
+		templateName = selected
 	}
 
 	if workspaceID == "" {
-		for {
-			input, err := promptInput(reader, "workspace id> ")
-			if err != nil {
-				return "", "", err
-			}
-			if strings.TrimSpace(input) != "" {
-				workspaceID = input
-				break
-			}
+		input, err := promptText("workspace id", true)
+		if err != nil {
+			return "", "", err
 		}
+		workspaceID = input
 	}
 
 	return templateName, workspaceID, nil
 }
 
-func promptInput(reader *bufio.Reader, label string) (string, error) {
-	fmt.Fprint(os.Stdout, label)
-	line, err := reader.ReadString('\n')
-	if err != nil && err != io.EOF {
+func promptText(label string, required bool) (string, error) {
+	validate := func(input string) error {
+		if required && strings.TrimSpace(input) == "" {
+			return fmt.Errorf("required")
+		}
+		return nil
+	}
+	prompt := promptui.Prompt{
+		Label:    label,
+		Validate: validate,
+	}
+	value, err := prompt.Run()
+	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(line), nil
+	return strings.TrimSpace(value), nil
 }
 
-func contains(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
+func promptSelect(label string, items []string) (string, error) {
+	if len(items) == 0 {
+		return "", fmt.Errorf("no items to select")
 	}
-	return false
+	sel := promptui.Select{
+		Label: label,
+		Items: items,
+		Size:  min(10, len(items)),
+	}
+	_, result, err := sel.Run()
+	if err != nil {
+		return "", err
+	}
+	return result, nil
+}
+
+func promptRepoSelect(repos []string) (string, error) {
+	options := make([]string, 0, len(repos)+2)
+	seen := map[string]struct{}{}
+	for _, repo := range repos {
+		if strings.TrimSpace(repo) == "" {
+			continue
+		}
+		if _, ok := seen[repo]; ok {
+			continue
+		}
+		seen[repo] = struct{}{}
+		options = append(options, repo)
+	}
+	options = append(options, "manual entry", "done")
+	selected, err := promptSelect("repo", options)
+	if err != nil {
+		return "", err
+	}
+	switch selected {
+	case "done":
+		return "", nil
+	case "manual entry":
+		return promptText("repo", true)
+	default:
+		return selected, nil
+	}
+}
+
+func listRepoKeys(rootDir string) ([]string, []error, error) {
+	entries, warnings, err := repo.List(rootDir)
+	if err != nil {
+		return nil, warnings, err
+	}
+	var repos []string
+	for _, entry := range entries {
+		repos = append(repos, entry.RepoKey)
+	}
+	return repos, warnings, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func preflightTemplateRepos(ctx context.Context, rootDir string, tmpl template.Template) error {
