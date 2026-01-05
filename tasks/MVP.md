@@ -19,7 +19,7 @@
 | MVP-030 | gws ws new | Done |
 | MVP-031 | manifest read/write library | Done |
 | MVP-032 | gws ws add (worktree add) | Done |
-| MVP-033 | gws ws ls | To Do |
+| MVP-033 | gws ws ls | Done |
 | MVP-034 | gws ws status | To Do |
 | MVP-035 | gws ws rm | To Do |
 | MVP-040 | gws gc --dry-run | To Do |
