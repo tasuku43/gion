@@ -109,9 +109,24 @@ func resolveBaseRef(ctx context.Context, storePath string, cfg config.Config) (s
 		return base, nil
 	}
 
-	ref, err := detectDefaultRemoteRef(ctx, storePath)
-	if err == nil && ref != "" {
-		return ref, nil
+	localHead, err := detectLocalHeadRef(ctx, storePath)
+	if err == nil && localHead != "" {
+		return localHead, nil
+	}
+
+	remoteHead, err := detectDefaultRemoteRef(ctx, storePath)
+	if err == nil && remoteHead != "" {
+		return remoteHead, nil
+	}
+
+	for _, candidate := range []string{"main", "master", "develop"} {
+		exists, err := localRefExists(ctx, storePath, candidate)
+		if err != nil {
+			return "", err
+		}
+		if exists {
+			return fmt.Sprintf("refs/heads/%s", candidate), nil
+		}
 	}
 
 	for _, candidate := range []string{"origin/main", "origin/master", "origin/develop"} {
@@ -130,11 +145,32 @@ func resolveBaseRef(ctx context.Context, storePath string, cfg config.Config) (s
 	return "", fmt.Errorf("cannot detect default base ref; set defaults.base_ref")
 }
 
+func detectLocalHeadRef(ctx context.Context, storePath string) (string, error) {
+	res, err := gitcmd.Run(ctx, []string{"symbolic-ref", "--quiet", "HEAD"}, gitcmd.Options{Dir: storePath})
+	if err != nil {
+		if res.ExitCode == 1 {
+			return "", nil
+		}
+		if strings.TrimSpace(res.Stderr) != "" {
+			return "", fmt.Errorf("git symbolic-ref HEAD failed: %w: %s", err, strings.TrimSpace(res.Stderr))
+		}
+		return "", err
+	}
+	ref := strings.TrimSpace(res.Stdout)
+	if ref == "" {
+		return "", nil
+	}
+	return ref, nil
+}
+
 func detectDefaultRemoteRef(ctx context.Context, storePath string) (string, error) {
 	res, err := gitcmd.Run(ctx, []string{"symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"}, gitcmd.Options{Dir: storePath})
 	if err != nil {
 		if res.ExitCode == 1 {
 			return "", nil
+		}
+		if strings.TrimSpace(res.Stderr) != "" {
+			return "", fmt.Errorf("git symbolic-ref origin/HEAD failed: %w: %s", err, strings.TrimSpace(res.Stderr))
 		}
 		return "", err
 	}
@@ -145,14 +181,29 @@ func detectDefaultRemoteRef(ctx context.Context, storePath string) (string, erro
 	return strings.TrimPrefix(ref, "refs/remotes/"), nil
 }
 
+func localRefExists(ctx context.Context, storePath, name string) (bool, error) {
+	fullRef := fmt.Sprintf("refs/heads/%s", name)
+	return refExists(ctx, storePath, fullRef)
+}
+
 func remoteRefExists(ctx context.Context, storePath, ref string) (bool, error) {
 	fullRef := fmt.Sprintf("refs/remotes/%s", ref)
+	return refExists(ctx, storePath, fullRef)
+}
+
+func refExists(ctx context.Context, storePath, fullRef string) (bool, error) {
 	res, err := gitcmd.Run(ctx, []string{"show-ref", "--verify", fullRef}, gitcmd.Options{Dir: storePath})
 	if err == nil {
 		return true, nil
 	}
 	if res.ExitCode == 1 {
 		return false, nil
+	}
+	if res.ExitCode == 128 && strings.Contains(res.Stderr, "not a valid ref") {
+		return false, nil
+	}
+	if strings.TrimSpace(res.Stderr) != "" {
+		return false, fmt.Errorf("git show-ref failed: %w: %s", err, strings.TrimSpace(res.Stderr))
 	}
 	return false, err
 }
@@ -164,6 +215,9 @@ func branchExistsInStore(ctx context.Context, storePath, branch string) (bool, e
 		return true, nil
 	}
 	if res.ExitCode == 1 {
+		return false, nil
+	}
+	if res.ExitCode == 128 && strings.Contains(res.Stderr, "not a valid ref") {
 		return false, nil
 	}
 	return false, err
