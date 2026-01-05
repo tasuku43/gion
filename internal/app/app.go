@@ -446,6 +446,7 @@ func promptText(label string, required bool) (string, error) {
 		}
 		return nil
 	}
+	funcMap := cloneFuncMap(promptui.FuncMap)
 	prompt := promptui.Prompt{
 		Label:    label,
 		Validate: validate,
@@ -454,11 +455,7 @@ func promptText(label string, required bool) (string, error) {
 			Valid:   "{{ . }}: ",
 			Invalid: "{{ . }}: ",
 			Success: "{{ . }}",
-			FuncMap: texttmpl.FuncMap{
-				"faint": func(v string) string { return v },
-				"bold":  func(v string) string { return v },
-				"red":   func(v string) string { return v },
-			},
+			FuncMap: funcMap,
 		},
 	}
 	value, err := prompt.Run()
@@ -478,6 +475,10 @@ func promptSelect(label string, items []string) (string, error) {
 		}
 		return strings.TrimSuffix(value, ".git")
 	}
+	funcMap := cloneFuncMap(promptui.FuncMap)
+	funcMap["trimGit"] = func(item string) string {
+		return displayItem(item)
+	}
 	sel := promptui.Select{
 		Label: label,
 		Items: items,
@@ -493,11 +494,7 @@ func promptSelect(label string, items []string) (string, error) {
 			Active:   "> {{ . | trimGit }}",
 			Inactive: "  {{ . | trimGit }}",
 			Selected: "{{ . | trimGit }}",
-			FuncMap: texttmpl.FuncMap{
-				"trimGit": func(item string) string {
-					return displayItem(item)
-				},
-			},
+			FuncMap:  funcMap,
 		},
 	}
 	_, result, err := sel.Run()
@@ -505,6 +502,14 @@ func promptSelect(label string, items []string) (string, error) {
 		return "", err
 	}
 	return result, nil
+}
+
+func cloneFuncMap(src texttmpl.FuncMap) texttmpl.FuncMap {
+	dest := texttmpl.FuncMap{}
+	for key, value := range src {
+		dest[key] = value
+	}
+	return dest
 }
 
 func promptRepoSelect(repos []string) (string, []string, error) {
