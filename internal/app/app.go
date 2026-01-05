@@ -449,6 +449,12 @@ func promptText(label string, required bool) (string, error) {
 	prompt := promptui.Prompt{
 		Label:    label,
 		Validate: validate,
+		Templates: &promptui.PromptTemplates{
+			Prompt:  "{{ . }}: ",
+			Valid:   "{{ . }}: ",
+			Invalid: "{{ . }}: ",
+			Success: "{{ . }}",
+		},
 	}
 	value, err := prompt.Run()
 	if err != nil {
