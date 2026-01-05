@@ -15,7 +15,7 @@
 - `--quiet`: 最低限の出力
 
 ### ルート解決
-`--root` > `GWS_ROOT` > `~/.config/gws/config.yaml` の root > `~/gws`
+`--root` > `GWS_ROOT` > `~/gws`
 
 ## コマンド一覧（MVP）
 

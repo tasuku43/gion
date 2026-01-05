@@ -7,45 +7,35 @@ import (
 )
 
 func TestLoadMissingReturnsDefault(t *testing.T) {
-	temp := t.TempDir()
-	t.Setenv("HOME", temp)
-
-	cfg, err := Load("")
+	rootDir := t.TempDir()
+	cfg, err := Load(rootDir)
 	if err != nil {
 		t.Fatalf("Load error: %v", err)
 	}
 	if cfg.Defaults.BaseRef != "" {
 		t.Fatalf("expected default base_ref to be empty, got %q", cfg.Defaults.BaseRef)
 	}
-	if cfg.Paths.WsDir != "ws" {
-		t.Fatalf("expected ws dir default, got %q", cfg.Paths.WsDir)
+	if cfg.Repo.DefaultHost != "github.com" {
+		t.Fatalf("expected default host, got %q", cfg.Repo.DefaultHost)
 	}
 }
 
 func TestLoadConfigRoot(t *testing.T) {
-	temp := t.TempDir()
-	t.Setenv("HOME", temp)
-	configDir := filepath.Join(temp, ".config", "gws")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	configPath := filepath.Join(configDir, "config.yaml")
-	data := []byte("root: /tmp/custom-root\n")
+	rootDir := t.TempDir()
+	configPath := filepath.Join(rootDir, "settings.yaml")
+	data := []byte("defaults:\n  ttl_days: 10\nrepo:\n  default_host: example.com\n")
 	if err := os.WriteFile(configPath, data, 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
-	cfg, err := Load("")
+	cfg, err := Load(rootDir)
 	if err != nil {
 		t.Fatalf("Load error: %v", err)
 	}
-	if cfg.Root != "/tmp/custom-root" {
-		t.Fatalf("expected /tmp/custom-root, got %s", cfg.Root)
+	if cfg.Defaults.TTLDays != 10 {
+		t.Fatalf("expected ttl_days=10, got %d", cfg.Defaults.TTLDays)
 	}
-	if cfg.Paths.ReposDir != "bare" {
-		t.Fatalf("expected repos dir default, got %q", cfg.Paths.ReposDir)
-	}
-	if cfg.Paths.SrcDir != "src" {
-		t.Fatalf("expected src dir default, got %q", cfg.Paths.SrcDir)
+	if cfg.Repo.DefaultHost != "example.com" {
+		t.Fatalf("expected default_host=example.com, got %q", cfg.Repo.DefaultHost)
 	}
 }

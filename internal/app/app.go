@@ -287,7 +287,7 @@ func runWorkspaceNew(ctx context.Context, rootDir string, args []string, noPromp
 		}
 	}
 
-	cfg, err := config.Load("")
+	cfg, err := config.Load(rootDir)
 	if err != nil {
 		return err
 	}
@@ -326,7 +326,7 @@ func runWorkspaceAdd(ctx context.Context, rootDir string, args []string) error {
 	}
 	workspaceID := args[0]
 	repoSpec := args[1]
-	cfg, err := config.Load("")
+	cfg, err := config.Load(rootDir)
 	if err != nil {
 		return err
 	}

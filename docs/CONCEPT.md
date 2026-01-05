@@ -45,12 +45,13 @@ gws は、作業場を workspace（タスク単位ディレクトリ）へ昇格
 - `$GWS_ROOT/src/`  : human working tree
 - `$GWS_ROOT/ws/`    : workspace 群（タスク単位）
 - `$GWS_ROOT/templates.yaml` : workspace templates
+- `$GWS_ROOT/settings.yaml` : settings
 
 ## 4. 設定（Config）
 
 ### 4.1 設定ファイル
 ユーザー設定:
-- `~/.config/gws/config.yaml`
+`$GWS_ROOT/settings.yaml`
 
 workspace ローカル:
 - `$GWS_ROOT/ws/<WORKSPACE_ID>/.gws/manifest.yaml`
@@ -58,7 +59,7 @@ workspace ローカル:
 ### 4.2 設定の優先順位
 1. CLI フラグ（例: `--root`）
 2. 環境変数（`GWS_ROOT`）
-3. ユーザー設定ファイル（`~/.config/gws/config.yaml`）
+3. ユーザー設定ファイル（`$GWS_ROOT/settings.yaml`）
 4. デフォルト（`~/gws`）
 
 ## 5. Workspace ID とブランチ名（確定ルール）

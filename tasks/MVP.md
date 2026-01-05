@@ -69,7 +69,6 @@ Goal:
 Acceptance:
 - `gws --root /tmp/x ...` が root を上書きする
 - env `GWS_ROOT` が反映される
-- config.yaml の root が読める
 - 未指定時は `~/gws`
 
 Files:
@@ -78,7 +77,7 @@ Files:
 
 ### MVP-011: Implement config loader
 Goal:
-- `~/.config/gws/config.yaml` をロードし、デフォルト値を埋める
+- `$GWS_ROOT/settings.yaml` をロードし、デフォルト値を埋める
 
 Acceptance:
 - YAML が読める

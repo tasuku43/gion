@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -10,17 +11,9 @@ import (
 
 type Config struct {
 	Version  int            `yaml:"version"`
-	Root     string         `yaml:"root"`
-	Paths    PathsConfig    `yaml:"paths"`
 	Defaults DefaultsConfig `yaml:"defaults"`
 	Naming   NamingConfig   `yaml:"naming"`
 	Repo     RepoConfig     `yaml:"repo"`
-}
-
-type PathsConfig struct {
-	ReposDir string `yaml:"repos_dir"`
-	SrcDir   string `yaml:"src_dir"`
-	WsDir    string `yaml:"ws_dir"`
 }
 
 type DefaultsConfig struct {
@@ -38,23 +31,9 @@ type RepoConfig struct {
 	DefaultProtocol string `yaml:"default_protocol"`
 }
 
-func DefaultPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".config", "gws", "config.yaml"), nil
-}
-
 func DefaultConfig() Config {
 	return Config{
 		Version: 1,
-		Root:    "",
-		Paths: PathsConfig{
-			ReposDir: "bare",
-			SrcDir:   "src",
-			WsDir:    "ws",
-		},
 		Defaults: DefaultsConfig{
 			BaseRef: "",
 			TTLDays: 30,
@@ -70,17 +49,14 @@ func DefaultConfig() Config {
 	}
 }
 
-func Load(path string) (Config, error) {
+func Load(rootDir string) (Config, error) {
 	cfg := DefaultConfig()
 
-	if path == "" {
-		var err error
-		path, err = DefaultPath()
-		if err != nil {
-			return Config{}, err
-		}
+	if rootDir == "" {
+		return Config{}, fmt.Errorf("root directory is required")
 	}
 
+	path := filepath.Join(rootDir, "settings.yaml")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

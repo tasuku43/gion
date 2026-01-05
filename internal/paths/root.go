@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/tasuku43/gws/internal/config"
 )
 
 const defaultRootDir = "gws"
@@ -18,14 +16,6 @@ func ResolveRoot(flagRoot string) (string, error) {
 	envRoot := os.Getenv("GWS_ROOT")
 	if envRoot != "" {
 		return normalizeRoot(envRoot)
-	}
-
-	cfg, err := config.Load("")
-	if err != nil {
-		return "", err
-	}
-	if cfg.Root != "" {
-		return normalizeRoot(cfg.Root)
 	}
 
 	home, err := os.UserHomeDir()

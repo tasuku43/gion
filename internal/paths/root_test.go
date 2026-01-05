@@ -1,7 +1,6 @@
 package paths
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -25,27 +24,6 @@ func TestResolveRootEnvOverridesConfig(t *testing.T) {
 	}
 	if root != "/tmp/env-root" {
 		t.Fatalf("expected /tmp/env-root, got %s", root)
-	}
-}
-
-func TestResolveRootConfig(t *testing.T) {
-	temp := t.TempDir()
-	t.Setenv("HOME", temp)
-	configDir := filepath.Join(temp, ".config", "gws")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	configPath := filepath.Join(configDir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("root: /tmp/config-root\n"), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	root, err := ResolveRoot("")
-	if err != nil {
-		t.Fatalf("ResolveRoot error: %v", err)
-	}
-	if root != "/tmp/config-root" {
-		t.Fatalf("expected /tmp/config-root, got %s", root)
 	}
 }
 
