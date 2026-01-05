@@ -43,6 +43,10 @@ func TestRepoGetWorkspaceAddRemove(t *testing.T) {
 	if err != nil {
 		t.Fatalf("repo.Get error: %v", err)
 	}
+	expectedStore := filepath.Join(rootDir, "bare", "example.com", "owner", "repo.git")
+	if store.StorePath != expectedStore {
+		t.Fatalf("expected store path %s, got %s", expectedStore, store.StorePath)
+	}
 	if _, err := os.Stat(store.StorePath); err != nil {
 		t.Fatalf("store path missing: %v", err)
 	}

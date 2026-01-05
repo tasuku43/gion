@@ -5,7 +5,7 @@
 - 無ければ `~/gws`
 
 ## 配下構造（固定）
-- `$GWS_ROOT/repos/`  : repo store（bare repo）
+- `$GWS_ROOT/bare/`   : repo store（bare repo）
 - `$GWS_ROOT/ws/`     : workspace
 - `$GWS_ROOT/ws/<ID>/`:
     - `<alias>/`        : worktree 作業ディレクトリ
@@ -17,5 +17,5 @@
 - `$GWS_ROOT/ws/<ID>/.gws/lock`（workspace ロック）
 
 ## repo store のパス
-- `$GWS_ROOT/repos/<host>/<owner>/<repo>.git`
-- `$GWS_ROOT/repos/<host>/<owner>/<repo>.git/.gws/lock`（repo ロック）
+- `$GWS_ROOT/bare/<host>/<owner>/<repo>.git`
+- `$GWS_ROOT/bare/<host>/<owner>/<repo>.git/.gws/lock`（repo ロック）

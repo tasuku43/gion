@@ -22,7 +22,7 @@ func Get(ctx context.Context, rootDir string, repo string) (Store, error) {
 		return Store{}, err
 	}
 
-	storePath := filepath.Join(rootDir, "repos", spec.Host, spec.Owner, spec.Repo+".git")
+	storePath := filepath.Join(rootDir, "bare", spec.Host, spec.Owner, spec.Repo+".git")
 
 	exists, err := pathExists(storePath)
 	if err != nil {
@@ -55,7 +55,7 @@ func Open(ctx context.Context, rootDir string, repo string) (Store, error) {
 		return Store{}, err
 	}
 
-	storePath := filepath.Join(rootDir, "repos", spec.Host, spec.Owner, spec.Repo+".git")
+	storePath := filepath.Join(rootDir, "bare", spec.Host, spec.Owner, spec.Repo+".git")
 
 	exists, err := pathExists(storePath)
 	if err != nil {

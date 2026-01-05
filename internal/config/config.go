@@ -50,7 +50,7 @@ func DefaultConfig() Config {
 		Version: 1,
 		Root:    "",
 		Paths: PathsConfig{
-			ReposDir: "repos",
+			ReposDir: "bare",
 			WsDir:    "ws",
 		},
 		Defaults: DefaultsConfig{

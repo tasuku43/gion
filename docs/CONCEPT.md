@@ -41,7 +41,7 @@ gws は、作業場を workspace（タスク単位ディレクトリ）へ昇格
 - 未指定の場合のデフォルトは `~/gws`
 
 `$GWS_ROOT` 配下の固定構造（v0.1）:
-- `$GWS_ROOT/repos/` : repo store（bare repo）
+- `$GWS_ROOT/bare/`  : repo store（bare repo）
 - `$GWS_ROOT/ws/`    : workspace 群（タスク単位）
 
 ## 4. 設定（Config）
@@ -83,7 +83,7 @@ workspace ローカル:
 
 ### 6.2 repo store のパス規約
 repo store の物理パスは下記を基本とする（正規化後）:
-- `$GWS_ROOT/repos/<host>/<owner>/<repo>.git`
+- `$GWS_ROOT/bare/<host>/<owner>/<repo>.git`
 
 正規化:
 - 末尾 `.git` を除去して repo 名を決定

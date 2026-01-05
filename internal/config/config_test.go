@@ -42,7 +42,7 @@ func TestLoadConfigRoot(t *testing.T) {
 	if cfg.Root != "/tmp/custom-root" {
 		t.Fatalf("expected /tmp/custom-root, got %s", cfg.Root)
 	}
-	if cfg.Paths.ReposDir != "repos" {
+	if cfg.Paths.ReposDir != "bare" {
 		t.Fatalf("expected repos dir default, got %q", cfg.Paths.ReposDir)
 	}
 }

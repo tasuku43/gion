@@ -12,7 +12,7 @@ version: 1
 root: ""
 
 paths:
-  repos_dir: "repos"
+  repos_dir: "bare"
   ws_dir: "ws"
 
 defaults:

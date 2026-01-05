@@ -12,7 +12,7 @@ type Entry struct {
 }
 
 func List(rootDir string) ([]Entry, []error, error) {
-	reposRoot := filepath.Join(rootDir, "repos")
+	reposRoot := filepath.Join(rootDir, "bare")
 	info, err := os.Stat(reposRoot)
 	if err != nil {
 		if os.IsNotExist(err) {

@@ -23,7 +23,7 @@ repos:
   - alias: "backend"
     repo_spec: "git@github.com:org/backend.git"
     repo_key: "github.com/org/backend"
-    store_path: "/home/user/gws/repos/github.com/org/backend.git"
+    store_path: "/home/user/gws/bare/github.com/org/backend.git"
     worktree_path: "/home/user/gws/ws/PROJ-1234/backend"
     branch: "PROJ-1234"
     base_ref: "origin/main"
