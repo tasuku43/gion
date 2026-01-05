@@ -6,8 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/tasuku43/gws/internal/config"
+	"github.com/tasuku43/gws/internal/gc"
 	"github.com/tasuku43/gws/internal/paths"
 	"github.com/tasuku43/gws/internal/repo"
 	"github.com/tasuku43/gws/internal/workspace"
@@ -36,6 +40,8 @@ func Run() error {
 
 	ctx := context.Background()
 	switch args[0] {
+	case "gc":
+		return runGC(ctx, rootDir, jsonFlag, args[1:])
 	case "repo":
 		return runRepo(ctx, rootDir, jsonFlag, args[1:])
 	case "new":
@@ -51,6 +57,49 @@ func Run() error {
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}
+}
+
+func runGC(ctx context.Context, rootDir string, jsonFlag bool, args []string) error {
+	gcFlags := flag.NewFlagSet("gc", flag.ContinueOnError)
+	var dryRun bool
+	var older string
+	gcFlags.BoolVar(&dryRun, "dry-run", false, "only list candidates")
+	gcFlags.StringVar(&older, "older", "", "older than duration (e.g. 30d, 720h)")
+	if err := gcFlags.Parse(args); err != nil {
+		return err
+	}
+	if gcFlags.NArg() != 0 {
+		return fmt.Errorf("usage: gws gc [--dry-run] [--older <duration>]")
+	}
+
+	olderThan, err := parseOlder(older)
+	if err != nil {
+		return err
+	}
+
+	opts := gc.Options{OlderThan: olderThan}
+	now := time.Now().UTC()
+	if dryRun {
+		result, err := gc.DryRun(ctx, rootDir, opts, now)
+		if err != nil {
+			return err
+		}
+		if jsonFlag {
+			return writeGCJSON(result, true, older)
+		}
+		writeGCText(result, true, older)
+		return nil
+	}
+
+	result, err := gc.Run(ctx, rootDir, opts, now)
+	if err != nil {
+		return err
+	}
+	if jsonFlag {
+		return writeGCJSON(result, false, older)
+	}
+	writeGCText(result, false, older)
+	return nil
 }
 
 func runRepo(ctx context.Context, rootDir string, jsonFlag bool, args []string) error {
@@ -323,4 +372,85 @@ func writeRepoListText(entries []repo.Entry, warnings []error) {
 	for _, warning := range warnings {
 		fmt.Fprintf(os.Stderr, "warning: %v\n", warning)
 	}
+}
+
+type gcJSON struct {
+	SchemaVersion int               `json:"schema_version"`
+	Command       string            `json:"command"`
+	DryRun        bool              `json:"dry_run"`
+	Older         string            `json:"older,omitempty"`
+	Candidates    []gcCandidateJSON `json:"candidates"`
+}
+
+type gcCandidateJSON struct {
+	WorkspaceID   string `json:"workspace_id"`
+	WorkspacePath string `json:"workspace_path"`
+	LastUsedAt    string `json:"last_used_at"`
+	Reason        string `json:"reason"`
+}
+
+func writeGCJSON(result gc.Result, dryRun bool, older string) error {
+	out := gcJSON{
+		SchemaVersion: 1,
+		Command:       "gc",
+		DryRun:        dryRun,
+		Older:         strings.TrimSpace(older),
+	}
+	for _, candidate := range result.Candidates {
+		out.Candidates = append(out.Candidates, gcCandidateJSON{
+			WorkspaceID:   candidate.WorkspaceID,
+			WorkspacePath: candidate.WorkspacePath,
+			LastUsedAt:    candidate.LastUsedAt,
+			Reason:        candidate.Reason,
+		})
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(out); err != nil {
+		return err
+	}
+	for _, warning := range result.Warnings {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", warning)
+	}
+	return nil
+}
+
+func writeGCText(result gc.Result, dryRun bool, older string) {
+	action := "gc"
+	if dryRun {
+		action = "gc --dry-run"
+	}
+	if strings.TrimSpace(older) != "" {
+		fmt.Fprintf(os.Stdout, "%s (older=%s)\n", action, older)
+	}
+	fmt.Fprintln(os.Stdout, "id\tlast_used_at\treason\tpath")
+	for _, candidate := range result.Candidates {
+		fmt.Fprintf(os.Stdout, "%s\t%s\t%s\t%s\n", candidate.WorkspaceID, candidate.LastUsedAt, candidate.Reason, candidate.WorkspacePath)
+	}
+	for _, warning := range result.Warnings {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", warning)
+	}
+}
+
+func parseOlder(value string) (time.Duration, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0, nil
+	}
+	if strings.HasSuffix(trimmed, "d") {
+		raw := strings.TrimSuffix(trimmed, "d")
+		days, err := strconv.Atoi(raw)
+		if err != nil {
+			return 0, fmt.Errorf("invalid --older value: %s", value)
+		}
+		if days < 0 {
+			return 0, fmt.Errorf("invalid --older value: %s", value)
+		}
+		return time.Duration(days) * 24 * time.Hour, nil
+	}
+	parsed, err := time.ParseDuration(trimmed)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --older value: %s", value)
+	}
+	return parsed, nil
 }
