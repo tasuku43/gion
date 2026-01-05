@@ -26,6 +26,7 @@
 - `gws rm <ID>`
 - `gws gc [--dry-run] [--older <duration>]`
 - `gws doctor [--fix]`
+- `gws init`
 - `gws repo get <repo>`
 - `gws repo ls`
 - `gws src get <repo>`
@@ -71,6 +72,16 @@ MVP出力:
 ### gws template ls
 目的:
 - `$GWS_ROOT/templates.yaml` に定義されたテンプレート名を一覧する
+
+## init
+
+### gws init
+目的:
+- `$GWS_ROOT` 配下に必要なディレクトリ/設定ファイルを作成する
+
+挙動:
+- `bare/`, `src/`, `ws/` を作成（既存ならスキップ）
+- `settings.yaml` と `templates.yaml` を作成（既存ならスキップ）
 
 ## workspace
 

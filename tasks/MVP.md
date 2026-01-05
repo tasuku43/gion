@@ -30,6 +30,7 @@
 | MVP-060 | Basic Makefile or justfile | To Do |
 | MVP-070 | src get/ls (human working tree) | To Do |
 | MVP-080 | template (workspace templates) | To Do |
+| MVP-090 | init (bootstrap) | To Do |
 
 ## MVP Definition of Done (全体)
 - コマンド:
@@ -258,3 +259,15 @@ Acceptance:
 - `gws new --template <name> <id>` で template の repos が `ws` に追加される
 - template 未指定時は対話で template と workspace id を入力できる
 - repo get 未実行の repo があればエラーで中断する
+
+---
+
+## EP9: Init
+
+### MVP-090: init
+Goal:
+- `gws init` で `$GWS_ROOT` 配下を初期化する
+
+Acceptance:
+- `bare/`, `src/`, `ws/` を作成する（既存ならスキップ）
+- `settings.yaml` と `templates.yaml` を作成する（既存ならスキップ）

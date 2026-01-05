@@ -16,6 +16,7 @@ import (
 	"github.com/tasuku43/gws/internal/config"
 	"github.com/tasuku43/gws/internal/doctor"
 	"github.com/tasuku43/gws/internal/gc"
+	"github.com/tasuku43/gws/internal/initcmd"
 	"github.com/tasuku43/gws/internal/paths"
 	"github.com/tasuku43/gws/internal/repo"
 	"github.com/tasuku43/gws/internal/src"
@@ -48,6 +49,8 @@ func Run() error {
 
 	ctx := context.Background()
 	switch args[0] {
+	case "init":
+		return runInit(rootDir, jsonFlag, args[1:])
 	case "doctor":
 		return runDoctor(ctx, rootDir, jsonFlag, args[1:])
 	case "gc":
@@ -71,6 +74,21 @@ func Run() error {
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}
+}
+
+func runInit(rootDir string, jsonFlag bool, args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("usage: gws init")
+	}
+	result, err := initcmd.Run(rootDir)
+	if err != nil {
+		return err
+	}
+	if jsonFlag {
+		return writeInitJSON(result)
+	}
+	writeInitText(result)
+	return nil
 }
 
 func runTemplate(ctx context.Context, rootDir string, jsonFlag bool, args []string) error {
@@ -643,6 +661,47 @@ func writeTemplateListJSON(names []string) error {
 func writeTemplateListText(names []string) {
 	for _, name := range names {
 		fmt.Fprintln(os.Stdout, name)
+	}
+}
+
+type initJSON struct {
+	SchemaVersion int      `json:"schema_version"`
+	Command       string   `json:"command"`
+	RootDir       string   `json:"root_dir"`
+	CreatedDirs   []string `json:"created_dirs"`
+	CreatedFiles  []string `json:"created_files"`
+	SkippedDirs   []string `json:"skipped_dirs"`
+	SkippedFiles  []string `json:"skipped_files"`
+}
+
+func writeInitJSON(result initcmd.Result) error {
+	out := initJSON{
+		SchemaVersion: 1,
+		Command:       "init",
+		RootDir:       result.RootDir,
+		CreatedDirs:   result.CreatedDirs,
+		CreatedFiles:  result.CreatedFiles,
+		SkippedDirs:   result.SkippedDirs,
+		SkippedFiles:  result.SkippedFiles,
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(out)
+}
+
+func writeInitText(result initcmd.Result) {
+	fmt.Fprintf(os.Stdout, "root: %s\n", result.RootDir)
+	for _, dir := range result.CreatedDirs {
+		fmt.Fprintf(os.Stdout, "created\t%s\n", dir)
+	}
+	for _, file := range result.CreatedFiles {
+		fmt.Fprintf(os.Stdout, "created\t%s\n", file)
+	}
+	for _, dir := range result.SkippedDirs {
+		fmt.Fprintf(os.Stdout, "exists\t%s\n", dir)
+	}
+	for _, file := range result.SkippedFiles {
+		fmt.Fprintf(os.Stdout, "exists\t%s\n", file)
 	}
 }
 
