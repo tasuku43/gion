@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/tasuku43/gws/internal/config"
 	"github.com/tasuku43/gws/internal/paths"
 	"github.com/tasuku43/gws/internal/workspace"
 )
@@ -34,11 +35,77 @@ func Run() error {
 
 	ctx := context.Background()
 	switch args[0] {
+	case "new":
+		return runWorkspaceNew(ctx, rootDir, args[1:])
+	case "add":
+		return runWorkspaceAdd(ctx, rootDir, args[1:])
+	case "ls":
+		return runWorkspaceList(ctx, rootDir, jsonFlag, args[1:])
 	case "status":
 		return runWorkspaceStatus(ctx, rootDir, jsonFlag, args[1:])
+	case "rm":
+		return runWorkspaceRemove(ctx, rootDir, args[1:])
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}
+}
+
+func runWorkspaceNew(ctx context.Context, rootDir string, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: gws new <WORKSPACE_ID>")
+	}
+	cfg, err := config.Load("")
+	if err != nil {
+		return err
+	}
+	wsDir, err := workspace.New(ctx, rootDir, args[0], cfg)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stdout, wsDir)
+	return nil
+}
+
+func runWorkspaceAdd(ctx context.Context, rootDir string, args []string) error {
+	addFlags := flag.NewFlagSet("add", flag.ContinueOnError)
+	var alias string
+	addFlags.StringVar(&alias, "alias", "", "worktree alias")
+	if err := addFlags.Parse(args); err != nil {
+		return err
+	}
+	if addFlags.NArg() != 2 {
+		return fmt.Errorf("usage: gws add <WORKSPACE_ID> <repo> --alias <name>")
+	}
+	workspaceID := addFlags.Arg(0)
+	repoSpec := addFlags.Arg(1)
+	if alias == "" {
+		return fmt.Errorf("alias is required")
+	}
+	cfg, err := config.Load("")
+	if err != nil {
+		return err
+	}
+	repoEntry, err := workspace.Add(ctx, rootDir, workspaceID, repoSpec, alias, cfg)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stdout, "%s\t%s\n", repoEntry.Alias, repoEntry.WorktreePath)
+	return nil
+}
+
+func runWorkspaceList(ctx context.Context, rootDir string, jsonFlag bool, args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("usage: gws ls")
+	}
+	entries, warnings, err := workspace.List(rootDir)
+	if err != nil {
+		return err
+	}
+	if jsonFlag {
+		return writeWorkspaceListJSON(entries, warnings)
+	}
+	writeWorkspaceListText(entries, warnings)
+	return nil
 }
 
 func runWorkspaceStatus(ctx context.Context, rootDir string, jsonFlag bool, args []string) error {
@@ -56,6 +123,13 @@ func runWorkspaceStatus(ctx context.Context, rootDir string, jsonFlag bool, args
 	}
 	writeWorkspaceStatusText(result)
 	return nil
+}
+
+func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: gws rm <WORKSPACE_ID>")
+	}
+	return workspace.Remove(ctx, rootDir, args[0])
 }
 
 type workspaceStatusJSON struct {
@@ -105,5 +179,68 @@ func writeWorkspaceStatusText(result workspace.StatusResult) {
 		if repo.Error != nil {
 			fmt.Fprintf(os.Stderr, "warning: %s: %v\n", repo.Alias, repo.Error)
 		}
+	}
+}
+
+type workspaceListJSON struct {
+	SchemaVersion int                      `json:"schema_version"`
+	Command       string                   `json:"command"`
+	Workspaces    []workspaceListEntryJSON `json:"workspaces"`
+}
+
+type workspaceListEntryJSON struct {
+	WorkspaceID   string `json:"workspace_id"`
+	WorkspacePath string `json:"workspace_path"`
+	ManifestPath  string `json:"manifest_path"`
+	RepoCount     int    `json:"repo_count"`
+	Warning       string `json:"warning,omitempty"`
+}
+
+func writeWorkspaceListJSON(entries []workspace.Entry, warnings []error) error {
+	out := workspaceListJSON{
+		SchemaVersion: 1,
+		Command:       "ls",
+	}
+	for _, entry := range entries {
+		repoCount := 0
+		if entry.Manifest != nil {
+			repoCount = len(entry.Manifest.Repos)
+		}
+		item := workspaceListEntryJSON{
+			WorkspaceID:   entry.WorkspaceID,
+			WorkspacePath: entry.WorkspacePath,
+			ManifestPath:  entry.ManifestPath,
+			RepoCount:     repoCount,
+		}
+		if entry.Warning != nil {
+			item.Warning = entry.Warning.Error()
+		}
+		out.Workspaces = append(out.Workspaces, item)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(out); err != nil {
+		return err
+	}
+	for _, warning := range warnings {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", warning)
+	}
+	return nil
+}
+
+func writeWorkspaceListText(entries []workspace.Entry, warnings []error) {
+	fmt.Fprintln(os.Stdout, "id\tpath\trepos")
+	for _, entry := range entries {
+		repoCount := 0
+		if entry.Manifest != nil {
+			repoCount = len(entry.Manifest.Repos)
+		}
+		fmt.Fprintf(os.Stdout, "%s\t%s\t%d\n", entry.WorkspaceID, entry.WorkspacePath, repoCount)
+		if entry.Warning != nil {
+			fmt.Fprintf(os.Stderr, "warning: %s: %v\n", entry.WorkspaceID, entry.Warning)
+		}
+	}
+	for _, warning := range warnings {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", warning)
 	}
 }
