@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/tasuku43/gws/internal/config"
 	"github.com/tasuku43/gws/internal/gitcmd"
 	"github.com/tasuku43/gws/internal/repospec"
 )
@@ -21,6 +23,11 @@ func Get(ctx context.Context, rootDir string, repo string) (Store, error) {
 	if err != nil {
 		return Store{}, err
 	}
+	cfg, err := config.Load(rootDir)
+	if err != nil {
+		return Store{}, err
+	}
+	remoteURL := resolveRemoteURL(repo, spec, cfg)
 
 	storePath := filepath.Join(rootDir, "bare", spec.Host, spec.Owner, spec.Repo+".git")
 
@@ -33,7 +40,7 @@ func Get(ctx context.Context, rootDir string, repo string) (Store, error) {
 		if err := os.MkdirAll(filepath.Dir(storePath), 0o755); err != nil {
 			return Store{}, fmt.Errorf("create repo store dir: %w", err)
 		}
-		if _, err := gitcmd.Run(ctx, []string{"clone", "--bare", repo, storePath}, gitcmd.Options{}); err != nil {
+		if _, err := gitcmd.Run(ctx, []string{"clone", "--bare", remoteURL, storePath}, gitcmd.Options{}); err != nil {
 			return Store{}, err
 		}
 	} else {
@@ -42,14 +49,14 @@ func Get(ctx context.Context, rootDir string, repo string) (Store, error) {
 		}
 	}
 
-	if err := ensureSrc(ctx, rootDir, spec, storePath, repo); err != nil {
+	if err := ensureSrc(ctx, rootDir, spec, storePath, remoteURL); err != nil {
 		return Store{}, err
 	}
 
 	return Store{
 		RepoKey:   spec.RepoKey,
 		StorePath: storePath,
-		RemoteURL: repo,
+		RemoteURL: remoteURL,
 	}, nil
 }
 
@@ -58,6 +65,11 @@ func Open(ctx context.Context, rootDir string, repo string) (Store, error) {
 	if err != nil {
 		return Store{}, err
 	}
+	cfg, err := config.Load(rootDir)
+	if err != nil {
+		return Store{}, err
+	}
+	remoteURL := resolveRemoteURL(repo, spec, cfg)
 
 	storePath := filepath.Join(rootDir, "bare", spec.Host, spec.Owner, spec.Repo+".git")
 
@@ -76,11 +88,11 @@ func Open(ctx context.Context, rootDir string, repo string) (Store, error) {
 	return Store{
 		RepoKey:   spec.RepoKey,
 		StorePath: storePath,
-		RemoteURL: repo,
+		RemoteURL: remoteURL,
 	}, nil
 }
 
-func ensureSrc(ctx context.Context, rootDir string, spec repospec.Spec, storePath, repoSpec string) error {
+func ensureSrc(ctx context.Context, rootDir string, spec repospec.Spec, storePath, remoteURL string) error {
 	srcPath := filepath.Join(rootDir, "src", spec.Host, spec.Owner, spec.Repo)
 	if exists, err := pathExists(srcPath); err != nil {
 		return err
@@ -97,8 +109,30 @@ func ensureSrc(ctx context.Context, rootDir string, spec repospec.Spec, storePat
 	if _, err := gitcmd.Run(ctx, []string{"clone", storePath, srcPath}, gitcmd.Options{}); err != nil {
 		return err
 	}
-	_, _ = gitcmd.Run(ctx, []string{"remote", "set-url", "origin", repoSpec}, gitcmd.Options{Dir: srcPath})
+	_, _ = gitcmd.Run(ctx, []string{"remote", "set-url", "origin", remoteURL}, gitcmd.Options{Dir: srcPath})
 	return nil
+}
+
+func resolveRemoteURL(input string, spec repospec.Spec, cfg config.Config) string {
+	trimmed := strings.TrimSpace(input)
+	if strings.HasPrefix(trimmed, "git@") || strings.HasPrefix(trimmed, "https://") || strings.HasPrefix(trimmed, "http://") {
+		return trimmed
+	}
+	proto := strings.TrimSpace(cfg.Repo.DefaultProtocol)
+	if proto == "" {
+		proto = "https"
+	}
+	host := spec.Host
+	if host == "" {
+		host = strings.TrimSpace(cfg.Repo.DefaultHost)
+		if host == "" {
+			host = "github.com"
+		}
+	}
+	if proto == "ssh" {
+		return fmt.Sprintf("git@%s:%s/%s.git", host, spec.Owner, spec.Repo)
+	}
+	return fmt.Sprintf("https://%s/%s/%s.git", host, spec.Owner, spec.Repo)
 }
 
 func pathExists(path string) (bool, error) {

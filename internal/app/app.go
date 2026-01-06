@@ -282,6 +282,7 @@ func runWorkspaceNew(ctx context.Context, rootDir string, args []string, noPromp
 		if noPrompt {
 			return fmt.Errorf("repo get required for: %s", strings.Join(missing, ", "))
 		}
+		printRepoGetHint(missing)
 		confirm, err := promptConfirm(fmt.Sprintf("repo get required for %d repos. run now?", len(missing)))
 		if err != nil {
 			return err
@@ -438,6 +439,17 @@ func promptConfirm(label string) (bool, error) {
 		return false, err
 	}
 	return result == "yes", nil
+}
+
+func printRepoGetHint(repos []string) {
+	fmt.Fprintln(os.Stdout, "missing repos:")
+	for _, repoSpec := range repos {
+		fmt.Fprintf(os.Stdout, "  - %s\n", repoSpec)
+	}
+	fmt.Fprintln(os.Stdout, "commands:")
+	for _, repoSpec := range repos {
+		fmt.Fprintf(os.Stdout, "  gws repo get %s\n", repoSpec)
+	}
 }
 
 func cloneFuncMap(src texttmpl.FuncMap) texttmpl.FuncMap {
