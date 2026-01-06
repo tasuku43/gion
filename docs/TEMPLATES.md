@@ -25,3 +25,7 @@ templates:
 
 repo get の補助:
 - 未取得 repo がある場合は `gws new` が対話で `repo get` を実行するか確認する
+
+repo 形式:
+- `git@github.com:owner/repo.git`
+- `https://github.com/owner/repo.git`

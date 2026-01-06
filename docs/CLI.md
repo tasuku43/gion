@@ -42,6 +42,10 @@
 - ある: `git -C <store> fetch --prune`
 - `src/<host>/<owner>/<repo>` に作業ツリーを作成（既存なら fetch）
 
+入力形式:
+- `git@github.com:owner/repo.git`
+- `https://github.com/owner/repo.git`
+
 成功条件:
 - `<store>` が存在し、`fetch` が成功している
 

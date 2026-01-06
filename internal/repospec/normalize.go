@@ -31,7 +31,7 @@ func Normalize(input string) (Spec, error) {
 		}
 		host = trimmed[at+1 : colon]
 		path = trimmed[colon+1:]
-	case strings.HasPrefix(trimmed, "https://") || strings.HasPrefix(trimmed, "http://"):
+	case strings.HasPrefix(trimmed, "https://"):
 		u, err := url.Parse(trimmed)
 		if err != nil {
 			return Spec{}, fmt.Errorf("invalid https repo spec: %q", input)
@@ -39,12 +39,7 @@ func Normalize(input string) (Spec, error) {
 		host = u.Hostname()
 		path = strings.TrimPrefix(u.Path, "/")
 	default:
-		parts := strings.SplitN(trimmed, "/", 4)
-		if len(parts) < 3 {
-			return Spec{}, fmt.Errorf("invalid repo spec: %q", input)
-		}
-		host = parts[0]
-		path = strings.Join(parts[1:], "/")
+		return Spec{}, fmt.Errorf("repo spec must be ssh or https: %q", input)
 	}
 
 	owner, repo, err := splitOwnerRepo(path)

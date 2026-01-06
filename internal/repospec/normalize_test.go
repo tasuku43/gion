@@ -22,7 +22,7 @@ func TestNormalize(t *testing.T) {
 		{
 			name:    "shorthand",
 			input:   "github.com/org/repo.git",
-			wantKey: "github.com/org/repo",
+			wantErr: true,
 		},
 		{
 			name:    "invalid",
