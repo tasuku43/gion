@@ -51,6 +51,10 @@ func (r *Renderer) Result(text string) {
 	r.writeLine(output.Indent + text)
 }
 
+func (r *Renderer) Warn(text string) {
+	r.writeLine(output.Indent + r.style(text, r.theme.Warn))
+}
+
 func (r *Renderer) TreeLine(prefix, name string) {
 	r.writeLine(output.Indent + prefix + name)
 }

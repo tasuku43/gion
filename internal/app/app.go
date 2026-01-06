@@ -1025,12 +1025,18 @@ func writeRepoListJSON(entries []repo.Entry, warnings []error) error {
 }
 
 func writeRepoListText(entries []repo.Entry, warnings []error) {
-	fmt.Fprintln(os.Stdout, "repo_key\tstore_path")
+	theme := ui.DefaultTheme()
+	useColor := isatty.IsTerminal(os.Stdout.Fd())
+	renderer := ui.NewRenderer(os.Stdout, theme, useColor)
+
+	renderer.Header("gws repo ls")
+	renderer.Blank()
+	renderer.Section("Result")
 	for _, entry := range entries {
-		fmt.Fprintf(os.Stdout, "%s\t%s\n", entry.RepoKey, entry.StorePath)
+		renderer.Result(fmt.Sprintf("%s\t%s", entry.RepoKey, entry.StorePath))
 	}
 	for _, warning := range warnings {
-		fmt.Fprintf(os.Stderr, "warning: %v\n", warning)
+		renderer.Warn(fmt.Sprintf("warning: %v", warning))
 	}
 }
 
