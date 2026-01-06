@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 )
 
@@ -36,12 +37,26 @@ func Run(ctx context.Context, args []string, opts Options) (Result, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
+	fmt.Fprintf(os.Stderr, "git %v\n", args)
 	err := cmd.Run()
 	result := Result{
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
 		ExitCode: exitCode(err),
 	}
+	if result.Stdout != "" {
+		fmt.Fprintf(os.Stderr, "stdout:\n%s", result.Stdout)
+		if result.Stdout[len(result.Stdout)-1] != '\n' {
+			fmt.Fprintln(os.Stderr)
+		}
+	}
+	if result.Stderr != "" {
+		fmt.Fprintf(os.Stderr, "stderr:\n%s", result.Stderr)
+		if result.Stderr[len(result.Stderr)-1] != '\n' {
+			fmt.Fprintln(os.Stderr)
+		}
+	}
+	fmt.Fprintf(os.Stderr, "exit: %d\n", result.ExitCode)
 	if err != nil {
 		return result, fmt.Errorf("git %v failed: %w", args, err)
 	}
