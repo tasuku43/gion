@@ -55,6 +55,18 @@ func (r *Renderer) TreeLine(prefix, name string) {
 	r.writeLine(output.Indent + prefix + name)
 }
 
+func (r *Renderer) TreeLineBranch(prefix, name, branch string) {
+	line := output.Indent + prefix + name
+	if strings.TrimSpace(branch) != "" {
+		suffix := fmt.Sprintf(" (branch: %s)", branch)
+		if r.useColor {
+			suffix = r.style(suffix, r.theme.Accent)
+		}
+		line += suffix
+	}
+	r.writeLine(line)
+}
+
 func (r *Renderer) style(text string, style lipgloss.Style) string {
 	if !r.useColor {
 		return text

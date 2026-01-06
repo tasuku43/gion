@@ -66,6 +66,7 @@ Steps
 - warn: yellow
 - error: red
 - muted/log: low-contrast gray
+- accent/meta: cyan (for metadata like branch)
 
 ## Components (Bubble Tea)
 - Text input: Bubbles textinput
@@ -89,7 +90,7 @@ Steps
 
 Result
   /Users/me/gws/ws/SREP-123
-    └─ helmfiles
+    └─ helmfiles (branch: SREP-123)
 ```
 
 ### gws new (non-interactive)

@@ -9,6 +9,7 @@ type Theme struct {
 	Warn         lipgloss.Style
 	Error        lipgloss.Style
 	Muted        lipgloss.Style
+	Accent       lipgloss.Style
 }
 
 func DefaultTheme() Theme {
@@ -19,5 +20,6 @@ func DefaultTheme() Theme {
 		Warn:         lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
 		Error:        lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
 		Muted:        lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
+		Accent:       lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
 	}
 }

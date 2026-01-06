@@ -736,6 +736,15 @@ func printWorkspaceTree(wsDir string, r *ui.Renderer) error {
 	if err != nil {
 		return fmt.Errorf("read workspace dir: %w", err)
 	}
+	branches := map[string]string{}
+	manifestPath := filepath.Join(wsDir, ".gws", "manifest.yaml")
+	if manifest, err := workspace.LoadManifest(manifestPath); err == nil {
+		for _, repo := range manifest.Repos {
+			if repo.Alias != "" && repo.Branch != "" {
+				branches[repo.Alias] = repo.Branch
+			}
+		}
+	}
 	names := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -764,10 +773,15 @@ func printWorkspaceTree(wsDir string, r *ui.Renderer) error {
 		if i == len(names)-1 {
 			prefix = "└─ "
 		}
+		branch := branches[name]
 		if r != nil {
-			r.TreeLine(prefix, name)
+			r.TreeLineBranch(prefix, name, branch)
 		} else {
-			fmt.Fprintf(os.Stdout, "%s%s%s\n", output.Indent, prefix, name)
+			line := fmt.Sprintf("%s%s%s", output.Indent, prefix, name)
+			if strings.TrimSpace(branch) != "" {
+				line += fmt.Sprintf(" (branch: %s)", branch)
+			}
+			fmt.Fprintln(os.Stdout, line)
 		}
 	}
 	return nil
