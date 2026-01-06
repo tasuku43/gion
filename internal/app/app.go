@@ -15,6 +15,7 @@ import (
 	"github.com/tasuku43/gws/internal/config"
 	"github.com/tasuku43/gws/internal/doctor"
 	"github.com/tasuku43/gws/internal/gc"
+	"github.com/tasuku43/gws/internal/gitcmd"
 	"github.com/tasuku43/gws/internal/initcmd"
 	"github.com/tasuku43/gws/internal/paths"
 	"github.com/tasuku43/gws/internal/repo"
@@ -29,12 +30,16 @@ func Run() error {
 	var rootFlag string
 	var jsonFlag bool
 	var noPrompt bool
+	verboseFlag := envBool("GWS_VERBOSE")
 	fs.StringVar(&rootFlag, "root", "", "override gws root")
 	fs.BoolVar(&jsonFlag, "json", false, "machine readable output")
 	fs.BoolVar(&noPrompt, "no-prompt", false, "disable interactive prompt")
+	fs.BoolVar(&verboseFlag, "verbose", verboseFlag, "show detailed logs")
+	fs.BoolVar(&verboseFlag, "v", verboseFlag, "show detailed logs")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		return err
 	}
+	gitcmd.SetVerbose(verboseFlag)
 
 	args := fs.Args()
 	if len(args) == 0 {
@@ -86,6 +91,19 @@ func runInit(rootDir string, jsonFlag bool, args []string) error {
 	}
 	writeInitText(result)
 	return nil
+}
+
+func envBool(key string) bool {
+	val := strings.TrimSpace(os.Getenv(key))
+	if val == "" {
+		return false
+	}
+	switch strings.ToLower(val) {
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return true
+	}
 }
 
 func runTemplate(ctx context.Context, rootDir string, jsonFlag bool, args []string) error {
@@ -302,6 +320,7 @@ func runWorkspaceNew(ctx context.Context, rootDir string, args []string, noPromp
 		return err
 	}
 
+	fmt.Fprintln(os.Stdout)
 	if err := applyTemplate(ctx, rootDir, workspaceID, tmpl, cfg); err != nil {
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("apply template failed: %w (rollback failed: %v)", err, rollbackErr)
@@ -309,7 +328,11 @@ func runWorkspaceNew(ctx context.Context, rootDir string, args []string, noPromp
 		return err
 	}
 
-	fmt.Fprintln(os.Stdout, wsDir)
+	fmt.Fprintln(os.Stdout)
+	fmt.Fprintf(os.Stdout, "\x1b[32mWorkspace ready!\x1b[0m\n\n")
+	if err := printWorkspaceTree(wsDir); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -358,6 +381,36 @@ func promptTemplateAndID(rootDir, templateName, workspaceID string) (string, str
 	}
 
 	return templateName, workspaceID, nil
+}
+
+func printWorkspaceTree(wsDir string) error {
+	entries, err := os.ReadDir(wsDir)
+	if err != nil {
+		return fmt.Errorf("read workspace dir: %w", err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if entry.Name() == ".gws" {
+			continue
+		}
+		names = append(names, entry.Name())
+	}
+	if len(names) == 0 {
+		fmt.Fprintf(os.Stdout, "\x1b[33m%s\x1b[0m\n", wsDir)
+		return nil
+	}
+	fmt.Fprintf(os.Stdout, "\x1b[33m%s\x1b[0m\n", wsDir)
+	for i, name := range names {
+		prefix := "├─ "
+		if i == len(names)-1 {
+			prefix = "└─ "
+		}
+		fmt.Fprintf(os.Stdout, "\x1b[33m%s%s\x1b[0m\n", prefix, name)
+	}
+	return nil
 }
 
 func promptText(label string, required bool) (string, error) {

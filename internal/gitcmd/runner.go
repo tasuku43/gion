@@ -18,6 +18,8 @@ type Result struct {
 
 type Options struct {
 	Dir string
+	// ShowOutput prints stdout/stderr even when verbose is off.
+	ShowOutput bool
 }
 
 func Run(ctx context.Context, args []string, opts Options) (Result, error) {
@@ -38,26 +40,32 @@ func Run(ctx context.Context, args []string, opts Options) (Result, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	fmt.Fprintf(os.Stderr, "\x1b[36m$ git %s\x1b[0m\n", strings.Join(args, " "))
+	if verbose {
+		fmt.Fprintf(os.Stderr, "\x1b[36m$ git %s\x1b[0m\n", strings.Join(args, " "))
+	}
 	err := cmd.Run()
 	result := Result{
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
 		ExitCode: exitCode(err),
 	}
-	if result.Stdout != "" {
-		fmt.Fprintf(os.Stderr, "stdout:\n%s", result.Stdout)
-		if result.Stdout[len(result.Stdout)-1] != '\n' {
-			fmt.Fprintln(os.Stderr)
+	if verbose || opts.ShowOutput {
+		if result.Stdout != "" {
+			fmt.Fprint(os.Stderr, result.Stdout)
+			if result.Stdout[len(result.Stdout)-1] != '\n' {
+				fmt.Fprintln(os.Stderr)
+			}
+		}
+		if result.Stderr != "" {
+			fmt.Fprint(os.Stderr, result.Stderr)
+			if result.Stderr[len(result.Stderr)-1] != '\n' {
+				fmt.Fprintln(os.Stderr)
+			}
+		}
+		if verbose {
+			fmt.Fprintf(os.Stderr, "exit: %d\n", result.ExitCode)
 		}
 	}
-	if result.Stderr != "" {
-		fmt.Fprintf(os.Stderr, "stderr:\n%s", result.Stderr)
-		if result.Stderr[len(result.Stderr)-1] != '\n' {
-			fmt.Fprintln(os.Stderr)
-		}
-	}
-	fmt.Fprintf(os.Stderr, "exit: %d\n", result.ExitCode)
 	if err != nil {
 		return result, fmt.Errorf("git %v failed: %w", args, err)
 	}

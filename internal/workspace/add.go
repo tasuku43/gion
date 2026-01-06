@@ -73,11 +73,13 @@ func Add(ctx context.Context, rootDir, workspaceID, repoSpec, alias string, cfg 
 
 	var createdBranch bool
 	if branchExists {
-		if _, err := gitcmd.Run(ctx, []string{"worktree", "add", worktreePath, branch}, gitcmd.Options{Dir: store.StorePath}); err != nil {
+		gitcmd.Logf("git worktree add %s %s", worktreePath, branch)
+		if _, err := gitcmd.Run(ctx, []string{"worktree", "add", worktreePath, branch}, gitcmd.Options{Dir: store.StorePath, ShowOutput: true}); err != nil {
 			return Repo{}, err
 		}
 	} else {
-		if _, err := gitcmd.Run(ctx, []string{"worktree", "add", "-b", branch, worktreePath, baseRef}, gitcmd.Options{Dir: store.StorePath}); err != nil {
+		gitcmd.Logf("git worktree add -b %s %s %s", branch, worktreePath, baseRef)
+		if _, err := gitcmd.Run(ctx, []string{"worktree", "add", "-b", branch, worktreePath, baseRef}, gitcmd.Options{Dir: store.StorePath, ShowOutput: true}); err != nil {
 			return Repo{}, err
 		}
 		createdBranch = true

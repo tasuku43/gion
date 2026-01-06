@@ -35,12 +35,13 @@ func Get(ctx context.Context, rootDir string, repo string) (Store, error) {
 		if err := os.MkdirAll(filepath.Dir(storePath), 0o755); err != nil {
 			return Store{}, fmt.Errorf("create repo store dir: %w", err)
 		}
+		gitcmd.Logf("git clone --bare %s %s", remoteURL, storePath)
 		if _, err := gitcmd.Run(ctx, []string{"clone", "--bare", remoteURL, storePath}, gitcmd.Options{}); err != nil {
 			return Store{}, err
 		}
 	}
 
-	if err := normalizeStore(ctx, storePath); err != nil {
+	if err := normalizeStore(ctx, storePath, spec.RepoKey); err != nil {
 		return Store{}, err
 	}
 
@@ -72,7 +73,7 @@ func Open(ctx context.Context, rootDir string, repo string) (Store, error) {
 		return Store{}, fmt.Errorf("repo store not found, run: gws repo get %s", repo)
 	}
 
-	if err := normalizeStore(ctx, storePath); err != nil {
+	if err := normalizeStore(ctx, storePath, spec.RepoKey); err != nil {
 		return Store{}, err
 	}
 
@@ -88,6 +89,7 @@ func ensureSrc(ctx context.Context, rootDir string, spec repospec.Spec, storePat
 	if exists, err := pathExists(srcPath); err != nil {
 		return err
 	} else if exists {
+		gitcmd.Logf("git fetch --prune")
 		if _, err := gitcmd.Run(ctx, []string{"fetch", "--prune"}, gitcmd.Options{Dir: srcPath}); err != nil {
 			return err
 		}
@@ -97,6 +99,7 @@ func ensureSrc(ctx context.Context, rootDir string, spec repospec.Spec, storePat
 	if err := os.MkdirAll(filepath.Dir(srcPath), 0o755); err != nil {
 		return fmt.Errorf("create src dir: %w", err)
 	}
+	gitcmd.Logf("git clone %s %s", storePath, srcPath)
 	if _, err := gitcmd.Run(ctx, []string{"clone", storePath, srcPath}, gitcmd.Options{}); err != nil {
 		return err
 	}
@@ -121,7 +124,7 @@ func storePathForSpec(rootDir string, spec repospec.Spec) string {
 	return filepath.Join(rootDir, "bare", spec.Host, spec.Owner, spec.Repo+".git")
 }
 
-func normalizeStore(ctx context.Context, storePath string) error {
+func normalizeStore(ctx context.Context, storePath, display string) error {
 	if _, err := gitcmd.Run(ctx, []string{"config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"}, gitcmd.Options{Dir: storePath}); err != nil {
 		return err
 	}
@@ -144,6 +147,7 @@ func normalizeStore(ctx context.Context, storePath string) error {
 		}
 	}
 	if needsFetch {
+		gitcmd.Logf("git fetch --prune")
 		if _, err := gitcmd.Run(ctx, []string{"fetch", "--prune"}, gitcmd.Options{Dir: storePath}); err != nil {
 			return err
 		}
