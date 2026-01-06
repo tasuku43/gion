@@ -69,6 +69,7 @@ var allowedSubcommands = map[string]struct{}{
 	"config":           {},
 	"fetch":            {},
 	"init":             {},
+	"ls-remote":        {},
 	"remote":           {},
 	"show-ref":         {},
 	"symbolic-ref":     {},

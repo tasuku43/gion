@@ -108,34 +108,80 @@ func normalizeStore(ctx context.Context, storePath string) error {
 	if _, err := gitcmd.Run(ctx, []string{"config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"}, gitcmd.Options{Dir: storePath}); err != nil {
 		return err
 	}
-	if _, err := gitcmd.Run(ctx, []string{"fetch", "--prune"}, gitcmd.Options{Dir: storePath}); err != nil {
-		return err
-	}
-	_, _ = gitcmd.Run(ctx, []string{"remote", "set-head", "origin", "-a"}, gitcmd.Options{Dir: storePath})
-
-	defaultBranch, err := defaultBranchFromOriginHead(ctx, storePath)
+	defaultBranch, remoteHash, err := defaultBranchFromRemote(ctx, storePath)
 	if err != nil {
 		return err
 	}
-	if defaultBranch == "" {
-		return nil
+	if defaultBranch != "" {
+		_, _ = gitcmd.Run(ctx, []string{"symbolic-ref", "refs/remotes/origin/HEAD", fmt.Sprintf("refs/remotes/origin/%s", defaultBranch)}, gitcmd.Options{Dir: storePath})
+	}
+
+	needsFetch := true
+	if defaultBranch != "" && remoteHash != "" {
+		localHash, err := localRemoteHash(ctx, storePath, defaultBranch)
+		if err != nil {
+			return err
+		}
+		if localHash == remoteHash {
+			needsFetch = false
+		}
+	}
+	if needsFetch {
+		if _, err := gitcmd.Run(ctx, []string{"fetch", "--prune"}, gitcmd.Options{Dir: storePath}); err != nil {
+			return err
+		}
 	}
 	return pruneLocalHeads(ctx, storePath, defaultBranch)
 }
 
-func defaultBranchFromOriginHead(ctx context.Context, storePath string) (string, error) {
-	res, err := gitcmd.Run(ctx, []string{"symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"}, gitcmd.Options{Dir: storePath})
+func defaultBranchFromRemote(ctx context.Context, storePath string) (string, string, error) {
+	res, err := gitcmd.Run(ctx, []string{"ls-remote", "--symref", "origin", "HEAD"}, gitcmd.Options{Dir: storePath})
 	if err != nil {
-		if res.ExitCode == 1 {
-			return "", nil
-		}
-		return "", err
+		return "", "", err
 	}
-	ref := strings.TrimSpace(res.Stdout)
-	if !strings.HasPrefix(ref, "refs/remotes/origin/") {
+	lines := strings.Split(strings.TrimSpace(res.Stdout), "\n")
+	var branch string
+	var hash string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "ref: ") && strings.HasSuffix(line, "\tHEAD") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				ref := parts[1]
+				ref = strings.TrimPrefix(ref, "refs/heads/")
+				if ref != "" {
+					branch = ref
+				}
+			}
+			continue
+		}
+		if strings.HasSuffix(line, "\tHEAD") {
+			fields := strings.Fields(line)
+			if len(fields) >= 1 {
+				hash = fields[0]
+			}
+		}
+	}
+	return branch, hash, nil
+}
+
+func localRemoteHash(ctx context.Context, storePath, branch string) (string, error) {
+	ref := fmt.Sprintf("refs/remotes/origin/%s", branch)
+	res, err := gitcmd.Run(ctx, []string{"show-ref", "--verify", ref}, gitcmd.Options{Dir: storePath})
+	if err == nil {
+		fields := strings.Fields(strings.TrimSpace(res.Stdout))
+		if len(fields) >= 1 {
+			return fields[0], nil
+		}
 		return "", nil
 	}
-	return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
+	if res.ExitCode == 1 || (res.ExitCode == 128 && strings.Contains(res.Stderr, "not a valid ref")) {
+		return "", nil
+	}
+	return "", err
 }
 
 func pruneLocalHeads(ctx context.Context, storePath, keepBranch string) error {
