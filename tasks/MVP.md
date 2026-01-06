@@ -30,6 +30,19 @@
 | MVP-060 | Basic Makefile or justfile | To Do |
 | MVP-080 | template (workspace templates) | To Do |
 | MVP-090 | init (bootstrap) | To Do |
+| MVP-100 | UI: gws new (Bubble Tea inputs + sectioned output) | Done |
+| MVP-101 | UI: gws repo get | To Do |
+| MVP-102 | UI: gws repo ls | To Do |
+| MVP-103 | UI: gws add | To Do |
+| MVP-104 | UI: gws ls | To Do |
+| MVP-105 | UI: gws status | To Do |
+| MVP-106 | UI: gws rm | To Do |
+| MVP-107 | UI: gws gc --dry-run | To Do |
+| MVP-108 | UI: gws gc (execute) | To Do |
+| MVP-109 | UI: gws doctor | To Do |
+| MVP-110 | UI: gws template ls | To Do |
+| MVP-111 | UI: gws init | To Do |
+| MVP-112 | UI: gws review | To Do |
 
 ## MVP Definition of Done (全体)
 - コマンド:
@@ -234,6 +247,105 @@ Acceptance:
 - go test が走る
 
 ---
+
+## EP7: UI (Bubble Tea / Lip Gloss)
+
+### MVP-100: UI: gws new (Bubble Tea inputs + sectioned output)
+Goal:
+- `gws new` の対話と出力を UI 基盤に統一する
+
+Acceptance:
+- Inputs/Steps/Result の順で表示される
+- 対話は 1 画面で template と workspace id を入力できる
+
+### MVP-101: UI: gws repo get
+Goal:
+- `gws repo get` を sectioned 出力に統一
+
+Acceptance:
+- Steps に git 実行ログが出る（淡色）
+- Result に repo と store path が出る
+
+### MVP-102: UI: gws repo ls
+Goal:
+- `gws repo ls` の一覧を整形して出力
+
+Acceptance:
+- 破損は warn スタイルで表示
+
+### MVP-103: UI: gws add
+Goal:
+- `gws add` の出力を統一
+
+Acceptance:
+- Steps に worktree add が出る
+- Result に workspace tree が出る
+
+### MVP-104: UI: gws ls
+Goal:
+- `gws ls` の一覧を整形して出力
+
+Acceptance:
+- Result で workspace 一覧が出る
+
+### MVP-105: UI: gws status
+Goal:
+- `gws status` の結果を整形
+
+Acceptance:
+- dirty/untracked の判定をわかりやすく表示
+
+### MVP-106: UI: gws rm
+Goal:
+- `gws rm` の出力を統一
+
+Acceptance:
+- Steps に worktree remove が出る
+- Result で削除した workspace を表示
+
+### MVP-107: UI: gws gc --dry-run
+Goal:
+- GC の候補出力を整形
+
+Acceptance:
+- Result に候補一覧が出る
+
+### MVP-108: UI: gws gc (execute)
+Goal:
+- GC 実行ログを整形
+
+Acceptance:
+- Steps に削除対象が出る
+- Result に削除結果が出る
+
+### MVP-109: UI: gws doctor
+Goal:
+- doctor の診断結果を整形
+
+Acceptance:
+- warn/error の色分けで表示
+
+### MVP-110: UI: gws template ls
+Goal:
+- template 一覧を整形
+
+Acceptance:
+- Result に template 名が出る
+
+### MVP-111: UI: gws init
+Goal:
+- init の初期化結果を整形
+
+Acceptance:
+- Steps に作成された項目が出る
+
+### MVP-112: UI: gws review
+Goal:
+- review の出力を統一
+
+Acceptance:
+- Steps に repo get / worktree add が出る
+- Result に workspace tree が出る
 
 ## EP8: Templates
 
