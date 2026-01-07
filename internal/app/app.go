@@ -616,19 +616,29 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 		return fmt.Errorf("cannot determine repo url for PR")
 	}
 
-	theme := ui.DefaultTheme()
-	useColor := isatty.IsTerminal(os.Stdout.Fd())
-
 	_, exists, err := repo.Exists(rootDir, repoURL)
 	if err != nil {
 		return err
 	}
+	workspaceID := fmt.Sprintf("REVIEW-PR-%d", info.Number)
+
+	theme := ui.DefaultTheme()
+	useColor := isatty.IsTerminal(os.Stdout.Fd())
+	renderer := ui.NewRenderer(os.Stdout, theme, useColor)
+	output.SetStepLogger(renderer)
+	defer output.SetStepLogger(nil)
+
+	header := fmt.Sprintf("gws review (pr: %s, workspace id: %s)", prURL, workspaceID)
+	renderer.Header(header)
+	renderer.Blank()
+	renderer.Section("Steps")
+
 	if !exists {
 		if noPrompt {
 			return fmt.Errorf("repo get required for: %s", repoURL)
 		}
-		fmt.Fprintf(os.Stdout, "%srepo get required for 1 repo.\n", output.Indent)
-		printRepoGetCommands([]string{repoURL})
+		output.Step("repo get required for 1 repo")
+		output.Log(fmt.Sprintf("gws repo get %s", repoURL))
 		confirm, err := ui.PromptConfirmInline("run now?", theme, useColor)
 		if err != nil {
 			return err
@@ -636,12 +646,12 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 		if !confirm {
 			return fmt.Errorf("repo get required for: %s", repoURL)
 		}
+		output.Step(fmt.Sprintf("repo get %s", repoURL))
 		if _, err := repo.Get(ctx, rootDir, repoURL); err != nil {
 			return err
 		}
 	}
 
-	workspaceID := fmt.Sprintf("REVIEW-PR-%d", info.Number)
 	wsDir, err := workspace.New(ctx, rootDir, workspaceID, cfg)
 	if err != nil {
 		return err
@@ -651,11 +661,17 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 	if err != nil {
 		return err
 	}
+	output.Step(fmt.Sprintf("fetch PR head %s", info.HeadRefName))
 	if err := fetchPRHead(ctx, store.StorePath, info.HeadRefName); err != nil {
 		return err
 	}
 
 	baseRef := fmt.Sprintf("refs/remotes/origin/%s", info.HeadRefName)
+	display := repoURL
+	if spec, err := repospec.Normalize(repoURL); err == nil && spec.Repo != "" {
+		display = spec.Repo
+	}
+	output.Step(fmt.Sprintf("worktree add %s", display))
 	if _, err := workspace.AddWithBranch(ctx, rootDir, workspaceID, repoURL, "", info.HeadRefName, baseRef, cfg, false); err != nil {
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("review failed: %w (rollback failed: %v)", err, rollbackErr)
@@ -663,11 +679,10 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 		return err
 	}
 
-	fmt.Fprintln(os.Stdout)
-	fmt.Fprintf(os.Stdout, "%s\x1b[32mWorkspace ready!\x1b[0m\n\n", output.Indent)
-	if err := printWorkspaceTree(wsDir, nil); err != nil {
-		return err
-	}
+	renderer.Blank()
+	renderer.Section("Result")
+	repos, _ := loadWorkspaceRepos(wsDir)
+	renderWorkspaceBlock(renderer, workspaceID, repos)
 	return nil
 }
 
@@ -805,18 +820,6 @@ func promptTemplateAndID(rootDir, templateName, workspaceID string, theme ui.The
 		return "", "", err
 	}
 	return templateName, workspaceID, nil
-}
-
-func printWorkspaceTree(wsDir string, r *ui.Renderer) error {
-	repos, err := loadWorkspaceRepos(wsDir)
-	if err != nil {
-		return err
-	}
-	if r == nil {
-		fmt.Fprintf(os.Stdout, "%s%s\n", output.Indent, wsDir)
-	}
-	renderWorkspaceRepos(r, repos, "")
-	return nil
 }
 
 func renderWorkspaceRepos(r *ui.Renderer, repos []workspace.Repo, extraIndent string) {
