@@ -607,6 +607,10 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 	header := fmt.Sprintf("gws review (pr: %s, workspace id: %s)", truncateMiddle(prURL, 80), workspaceID)
 	renderer.Header(header)
 	renderer.Blank()
+	renderer.Section("Info")
+	renderer.Bullet("requires: gh (authenticated)")
+	renderer.Bullet("fork PRs are not supported")
+	renderer.Blank()
 	renderer.Section("Steps")
 
 	if !exists {
@@ -1006,15 +1010,31 @@ func truncateMiddle(value string, max int) string {
 }
 
 func renderSuggestion(r *ui.Renderer, useColor bool, path string) {
-	if !useColor {
+	if strings.TrimSpace(path) == "" {
 		return
 	}
-	if strings.TrimSpace(path) == "" {
+	renderSuggestions(r, useColor, []string{fmt.Sprintf("cd %s", path)})
+}
+
+func renderSuggestions(r *ui.Renderer, useColor bool, lines []string) {
+	if !useColor || r == nil {
+		return
+	}
+	var filtered []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	if len(filtered) == 0 {
 		return
 	}
 	r.Blank()
 	r.Section("Suggestion")
-	r.Bullet(fmt.Sprintf("cd %s", path))
+	for _, line := range filtered {
+		r.Bullet(line)
+	}
 }
 
 func repoSpecFromKey(repoKey string, cfg config.Config) string {
@@ -1530,6 +1550,12 @@ func writeInitText(result initcmd.Result) {
 		renderer.Bullet("already exists")
 		renderTreeLines(renderer, skipped, treeLineNormal)
 	}
+
+	renderSuggestions(renderer, useColor, []string{
+		"gws repo get <repo>",
+		"gws template ls",
+		"gws new --template <name> <id>",
+	})
 }
 func writeGCText(result gc.Result, dryRun bool, older string) {
 	action := "gc"
