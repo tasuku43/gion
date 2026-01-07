@@ -230,6 +230,7 @@ func localHeadHash(ctx context.Context, storePath, branch string) (string, error
 }
 
 func pruneLocalHeads(ctx context.Context, storePath, keepBranch string) error {
+	worktreeBranches, _ := worktreeBranchNames(ctx, storePath)
 	res, err := gitcmd.Run(ctx, []string{"show-ref", "--heads"}, gitcmd.Options{Dir: storePath})
 	if err != nil && res.ExitCode != 1 {
 		return err
@@ -251,9 +252,35 @@ func pruneLocalHeads(ctx context.Context, storePath, keepBranch string) error {
 		if name == keepBranch {
 			continue
 		}
+		if _, ok := worktreeBranches[name]; ok {
+			continue
+		}
 		_, _ = gitcmd.Run(ctx, []string{"update-ref", "-d", ref}, gitcmd.Options{Dir: storePath})
 	}
 	return nil
+}
+
+func worktreeBranchNames(ctx context.Context, storePath string) (map[string]struct{}, error) {
+	res, err := gitcmd.Run(ctx, []string{"worktree", "list", "--porcelain"}, gitcmd.Options{Dir: storePath})
+	if err != nil {
+		return nil, err
+	}
+	branches := make(map[string]struct{})
+	lines := strings.Split(strings.TrimSpace(res.Stdout), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "branch ") {
+			continue
+		}
+		ref := strings.TrimSpace(strings.TrimPrefix(line, "branch "))
+		if strings.HasPrefix(ref, "refs/heads/") {
+			name := strings.TrimPrefix(ref, "refs/heads/")
+			if name != "" {
+				branches[name] = struct{}{}
+			}
+		}
+	}
+	return branches, nil
 }
 
 func pathExists(path string) (bool, error) {

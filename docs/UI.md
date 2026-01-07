@@ -129,7 +129,8 @@ gws status (workspace id: PROJ-123)
 Result
   • api (branch: PROJ-123)
     ├─ head: 94a67ef
-    ├─ dirty: yes
+    ├─ staged: 1
+    ├─ unstaged: 2
     └─ untracked: 2
 ```
 

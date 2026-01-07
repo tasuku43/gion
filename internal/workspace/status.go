@@ -20,7 +20,11 @@ type RepoStatus struct {
 	Head           string
 	Dirty          bool
 	UntrackedCount int
+	StagedCount    int
+	UnstagedCount  int
+	UnmergedCount  int
 	WorktreePath   string
+	RawStatus      string
 	Error          error
 }
 
@@ -62,7 +66,8 @@ func Status(ctx context.Context, rootDir, workspaceID string) (StatusResult, err
 			continue
 		}
 
-		repoStatus.Branch, repoStatus.Head, repoStatus.Dirty, repoStatus.UntrackedCount = parseStatusPorcelainV2(statusOut, repoStatus.Branch)
+		repoStatus.RawStatus = statusOut
+		repoStatus.Branch, repoStatus.Head, repoStatus.Dirty, repoStatus.UntrackedCount, repoStatus.StagedCount, repoStatus.UnstagedCount, repoStatus.UnmergedCount = parseStatusPorcelainV2(statusOut, repoStatus.Branch)
 		result.Repos = append(result.Repos, repoStatus)
 	}
 
@@ -80,11 +85,14 @@ func gitStatusPorcelain(ctx context.Context, worktreePath string) (string, error
 	return res.Stdout, nil
 }
 
-func parseStatusPorcelainV2(output, fallbackBranch string) (string, string, bool, int) {
+func parseStatusPorcelainV2(output, fallbackBranch string) (string, string, bool, int, int, int, int) {
 	branch := fallbackBranch
 	var head string
 	var dirty bool
 	var untracked int
+	var staged int
+	var unstaged int
+	var unmerged int
 
 	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
 	for _, line := range lines {
@@ -115,10 +123,33 @@ func parseStatusPorcelainV2(output, fallbackBranch string) (string, string, bool
 			continue
 		}
 
+		if strings.HasPrefix(line, "u ") {
+			unmerged++
+			dirty = true
+			continue
+		}
+		if strings.HasPrefix(line, "1 ") || strings.HasPrefix(line, "2 ") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				xy := fields[1]
+				if len(xy) >= 2 {
+					if xy[0] != '.' {
+						staged++
+					}
+					if xy[1] != '.' {
+						unstaged++
+					}
+					if xy[0] != '.' || xy[1] != '.' {
+						dirty = true
+					}
+				}
+			}
+			continue
+		}
 		dirty = true
 	}
 
-	return branch, head, dirty, untracked
+	return branch, head, dirty, untracked, staged, unstaged, unmerged
 }
 
 func shortSHA(oid string) string {

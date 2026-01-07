@@ -38,7 +38,7 @@ func Remove(ctx context.Context, rootDir, workspaceID string) error {
 		if statusErr != nil {
 			return fmt.Errorf("check status for %q: %w", repo.Alias, statusErr)
 		}
-		_, _, dirty, _ := parseStatusPorcelainV2(statusOut, "")
+		_, _, dirty, _, _, _, _ := parseStatusPorcelainV2(statusOut, "")
 		if dirty {
 			return fmt.Errorf("workspace has dirty changes: %s", repo.Alias)
 		}

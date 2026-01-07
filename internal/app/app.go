@@ -936,15 +936,21 @@ func buildStatusDetails(repo workspace.RepoStatus) []statusDetail {
 	if head != "" {
 		details = append(details, statusDetail{text: fmt.Sprintf("head: %s", head)})
 	}
-	if repo.Dirty {
-		details = append(details, statusDetail{text: "dirty: yes", warn: true})
-	} else {
-		details = append(details, statusDetail{text: "dirty: no"})
+	if repo.StagedCount == 0 && repo.UnstagedCount == 0 && repo.UntrackedCount == 0 && repo.UnmergedCount == 0 {
+		details = append(details, statusDetail{text: "changes: clean"})
+		return details
+	}
+	if repo.StagedCount > 0 {
+		details = append(details, statusDetail{text: fmt.Sprintf("staged: %d", repo.StagedCount), warn: true})
+	}
+	if repo.UnstagedCount > 0 {
+		details = append(details, statusDetail{text: fmt.Sprintf("unstaged: %d", repo.UnstagedCount), warn: true})
 	}
 	if repo.UntrackedCount > 0 {
 		details = append(details, statusDetail{text: fmt.Sprintf("untracked: %d", repo.UntrackedCount), warn: true})
-	} else {
-		details = append(details, statusDetail{text: "untracked: 0"})
+	}
+	if repo.UnmergedCount > 0 {
+		details = append(details, statusDetail{text: fmt.Sprintf("unmerged: %d", repo.UnmergedCount), warn: true})
 	}
 	return details
 }
@@ -1049,10 +1055,63 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 		printRmHelp(os.Stdout)
 		return nil
 	}
-	if len(args) != 1 {
-		return fmt.Errorf("usage: gws rm <WORKSPACE_ID>")
+	if len(args) > 1 {
+		return fmt.Errorf("usage: gws rm [<WORKSPACE_ID>]")
 	}
-	return workspace.Remove(ctx, rootDir, args[0])
+	workspaceID := ""
+	if len(args) == 1 {
+		workspaceID = args[0]
+	}
+
+	showHeader := true
+	if workspaceID == "" {
+		workspaces, wsWarn, err := workspace.List(rootDir)
+		if err != nil {
+			return err
+		}
+		if len(wsWarn) > 0 {
+			// ignore warnings for selection
+		}
+		workspaceChoices := buildWorkspaceChoices(workspaces)
+		if len(workspaceChoices) == 0 {
+			return fmt.Errorf("no workspaces found")
+		}
+		theme := ui.DefaultTheme()
+		useColor := isatty.IsTerminal(os.Stdout.Fd())
+		workspaceID, err = ui.PromptWorkspace("gws rm", workspaceChoices, theme, useColor)
+		if err != nil {
+			return err
+		}
+		showHeader = false
+	}
+
+	theme := ui.DefaultTheme()
+	useColor := isatty.IsTerminal(os.Stdout.Fd())
+	renderer := ui.NewRenderer(os.Stdout, theme, useColor)
+	output.SetStepLogger(renderer)
+	defer output.SetStepLogger(nil)
+
+	header := "gws rm"
+	if strings.TrimSpace(workspaceID) != "" {
+		header = fmt.Sprintf("%s (workspace id: %s)", header, workspaceID)
+	}
+	if showHeader {
+		renderer.Header(header)
+		renderer.Blank()
+	} else {
+		renderer.Blank()
+	}
+	renderer.Section("Steps")
+	output.Step(fmt.Sprintf("remove workspace %s", workspaceID))
+
+	if err := workspace.Remove(ctx, rootDir, workspaceID); err != nil {
+		return err
+	}
+
+	renderer.Blank()
+	renderer.Section("Result")
+	renderer.Bullet(fmt.Sprintf("%s removed", workspaceID))
+	return nil
 }
 
 type workspaceStatusJSON struct {
@@ -1068,6 +1127,9 @@ type workspaceStatusRepoJSON struct {
 	Head           string `json:"head,omitempty"`
 	Dirty          bool   `json:"dirty"`
 	UntrackedCount int    `json:"untracked_count"`
+	StagedCount    int    `json:"staged_count,omitempty"`
+	UnstagedCount  int    `json:"unstaged_count,omitempty"`
+	UnmergedCount  int    `json:"unmerged_count,omitempty"`
 	Error          string `json:"error,omitempty"`
 }
 
@@ -1084,6 +1146,9 @@ func writeWorkspaceStatusJSON(result workspace.StatusResult) error {
 			Head:           repo.Head,
 			Dirty:          repo.Dirty,
 			UntrackedCount: repo.UntrackedCount,
+			StagedCount:    repo.StagedCount,
+			UnstagedCount:  repo.UnstagedCount,
+			UnmergedCount:  repo.UnmergedCount,
 		}
 		if repo.Error != nil {
 			repoOut.Error = repo.Error.Error()
