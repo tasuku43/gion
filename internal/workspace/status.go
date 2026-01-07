@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/tasuku43/gws/internal/gitcmd"
@@ -17,12 +18,15 @@ type StatusResult struct {
 type RepoStatus struct {
 	Alias          string
 	Branch         string
+	Upstream       string
 	Head           string
 	Dirty          bool
 	UntrackedCount int
 	StagedCount    int
 	UnstagedCount  int
 	UnmergedCount  int
+	AheadCount     int
+	BehindCount    int
 	WorktreePath   string
 	RawStatus      string
 	Error          error
@@ -67,7 +71,7 @@ func Status(ctx context.Context, rootDir, workspaceID string) (StatusResult, err
 		}
 
 		repoStatus.RawStatus = statusOut
-		repoStatus.Branch, repoStatus.Head, repoStatus.Dirty, repoStatus.UntrackedCount, repoStatus.StagedCount, repoStatus.UnstagedCount, repoStatus.UnmergedCount = parseStatusPorcelainV2(statusOut, repoStatus.Branch)
+		repoStatus.Branch, repoStatus.Upstream, repoStatus.Head, repoStatus.Dirty, repoStatus.UntrackedCount, repoStatus.StagedCount, repoStatus.UnstagedCount, repoStatus.UnmergedCount, repoStatus.AheadCount, repoStatus.BehindCount = parseStatusPorcelainV2(statusOut, repoStatus.Branch)
 		result.Repos = append(result.Repos, repoStatus)
 	}
 
@@ -85,14 +89,17 @@ func gitStatusPorcelain(ctx context.Context, worktreePath string) (string, error
 	return res.Stdout, nil
 }
 
-func parseStatusPorcelainV2(output, fallbackBranch string) (string, string, bool, int, int, int, int) {
+func parseStatusPorcelainV2(output, fallbackBranch string) (string, string, string, bool, int, int, int, int, int, int) {
 	branch := fallbackBranch
+	var upstream string
 	var head string
 	var dirty bool
 	var untracked int
 	var staged int
 	var unstaged int
 	var unmerged int
+	var ahead int
+	var behind int
 
 	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
 	for _, line := range lines {
@@ -112,6 +119,19 @@ func parseStatusPorcelainV2(output, fallbackBranch string) (string, string, bool
 			case "branch.head":
 				if fields[2] != "(detached)" && fields[2] != "(unknown)" {
 					branch = fields[2]
+				}
+			case "branch.upstream":
+				if fields[2] != "(unknown)" {
+					upstream = fields[2]
+				}
+			case "branch.ab":
+				for _, field := range fields[2:] {
+					if strings.HasPrefix(field, "+") {
+						ahead = parseCount(field[1:])
+					}
+					if strings.HasPrefix(field, "-") {
+						behind = parseCount(field[1:])
+					}
 				}
 			}
 			continue
@@ -149,7 +169,7 @@ func parseStatusPorcelainV2(output, fallbackBranch string) (string, string, bool
 		dirty = true
 	}
 
-	return branch, head, dirty, untracked, staged, unstaged, unmerged
+	return branch, upstream, head, dirty, untracked, staged, unstaged, unmerged, ahead, behind
 }
 
 func shortSHA(oid string) string {
@@ -157,4 +177,15 @@ func shortSHA(oid string) string {
 		return oid
 	}
 	return oid[:7]
+}
+
+func parseCount(value string) int {
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	if n < 0 {
+		return 0
+	}
+	return n
 }

@@ -1087,7 +1087,49 @@ func buildStatusDetails(repo workspace.RepoStatus) []statusDetail {
 	if repo.UnmergedCount > 0 {
 		details = append(details, statusDetail{text: fmt.Sprintf("unmerged: %d", repo.UnmergedCount), warn: true})
 	}
+	if repo.AheadCount > 0 {
+		details = append(details, statusDetail{text: fmt.Sprintf("ahead: %d", repo.AheadCount), warn: true})
+	}
+	if repo.BehindCount > 0 {
+		details = append(details, statusDetail{text: fmt.Sprintf("behind: %d", repo.BehindCount), warn: true})
+	}
 	return details
+}
+
+func collectRemoveWarnings(ctx context.Context, rootDir, workspaceID string) []string {
+	status, err := workspace.Status(ctx, rootDir, workspaceID)
+	if err != nil {
+		return []string{fmt.Sprintf("status check failed: %s", compactError(err))}
+	}
+	return buildRemoveWarnings(status)
+}
+
+func buildRemoveWarnings(status workspace.StatusResult) []string {
+	var warnings []string
+	for _, repo := range status.Repos {
+		name := strings.TrimSpace(repo.Alias)
+		if name == "" && strings.TrimSpace(repo.WorktreePath) != "" {
+			name = filepath.Base(repo.WorktreePath)
+		}
+		if name == "" {
+			name = "repo"
+		}
+		if repo.Error != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: status error (%s)", name, compactError(repo.Error)))
+			continue
+		}
+		if repo.AheadCount > 0 {
+			upstream := repo.Upstream
+			if strings.TrimSpace(upstream) == "" {
+				upstream = "upstream"
+			}
+			warnings = append(warnings, fmt.Sprintf("%s: ahead of %s by %d", name, upstream, repo.AheadCount))
+		}
+		if strings.TrimSpace(repo.Upstream) == "" {
+			warnings = append(warnings, fmt.Sprintf("%s: upstream not set", name))
+		}
+	}
+	return warnings
 }
 
 func issueDetails(issue doctor.Issue) []string {
@@ -1360,6 +1402,13 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 		renderer.Header(header)
 		renderer.Blank()
 	} else {
+		renderer.Blank()
+	}
+	removeWarnings := collectRemoveWarnings(ctx, rootDir, workspaceID)
+	if len(removeWarnings) > 0 {
+		renderer.Section("Info")
+		renderer.Bullet("possible unpushed commits")
+		renderTreeLines(renderer, removeWarnings, treeLineWarn)
 		renderer.Blank()
 	}
 	renderer.Section("Steps")
