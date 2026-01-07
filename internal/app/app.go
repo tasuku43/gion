@@ -514,27 +514,7 @@ func runWorkspaceAdd(ctx context.Context, rootDir string, args []string) error {
 		if len(wsWarn) > 0 {
 			// ignore warnings for selection
 		}
-		var workspaceChoices []ui.WorkspaceChoice
-		for _, entry := range workspaces {
-			choice := ui.WorkspaceChoice{ID: entry.WorkspaceID}
-			if entry.Manifest != nil {
-				for _, repoEntry := range entry.Manifest.Repos {
-					name := repoEntry.Alias
-					if strings.TrimSpace(name) == "" {
-						name = repoEntry.RepoKey
-					}
-					label := name
-					if strings.TrimSpace(repoEntry.Branch) != "" {
-						label = fmt.Sprintf("%s (branch: %s)", name, repoEntry.Branch)
-					}
-					choice.Repos = append(choice.Repos, ui.PromptChoice{
-						Label: label,
-						Value: displayRepoKey(repoEntry.RepoKey),
-					})
-				}
-			}
-			workspaceChoices = append(workspaceChoices, choice)
-		}
+		workspaceChoices := buildWorkspaceChoices(workspaces)
 		if len(workspaceChoices) == 0 {
 			return fmt.Errorf("no workspaces found")
 		}
@@ -891,6 +871,31 @@ func loadWorkspaceRepos(wsDir string) ([]workspace.Repo, error) {
 	return repos, nil
 }
 
+func buildWorkspaceChoices(entries []workspace.Entry) []ui.WorkspaceChoice {
+	var choices []ui.WorkspaceChoice
+	for _, entry := range entries {
+		choice := ui.WorkspaceChoice{ID: entry.WorkspaceID}
+		if entry.Manifest != nil {
+			for _, repoEntry := range entry.Manifest.Repos {
+				name := repoEntry.Alias
+				if strings.TrimSpace(name) == "" {
+					name = repoEntry.RepoKey
+				}
+				label := name
+				if strings.TrimSpace(repoEntry.Branch) != "" {
+					label = fmt.Sprintf("%s (branch: %s)", name, repoEntry.Branch)
+				}
+				choice.Repos = append(choice.Repos, ui.PromptChoice{
+					Label: label,
+					Value: displayRepoKey(repoEntry.RepoKey),
+				})
+			}
+		}
+		choices = append(choices, choice)
+	}
+	return choices
+}
+
 func displayRepoKey(repoKey string) string {
 	display := strings.TrimSuffix(repoKey, ".git")
 	display = strings.TrimSuffix(display, "/")
@@ -918,6 +923,30 @@ func printRepoGetCommands(repos []string) {
 	for _, repoSpec := range repos {
 		fmt.Fprintf(os.Stdout, "%sgws repo get %s\n", output.Indent+output.Indent, repoSpec)
 	}
+}
+
+type statusDetail struct {
+	text string
+	warn bool
+}
+
+func buildStatusDetails(repo workspace.RepoStatus) []statusDetail {
+	var details []statusDetail
+	head := strings.TrimSpace(repo.Head)
+	if head != "" {
+		details = append(details, statusDetail{text: fmt.Sprintf("head: %s", head)})
+	}
+	if repo.Dirty {
+		details = append(details, statusDetail{text: "dirty: yes", warn: true})
+	} else {
+		details = append(details, statusDetail{text: "dirty: no"})
+	}
+	if repo.UntrackedCount > 0 {
+		details = append(details, statusDetail{text: fmt.Sprintf("untracked: %d", repo.UntrackedCount), warn: true})
+	} else {
+		details = append(details, statusDetail{text: "untracked: 0"})
+	}
+	return details
 }
 
 func preflightTemplateRepos(ctx context.Context, rootDir string, tmpl template.Template) ([]string, error) {
@@ -975,10 +1004,34 @@ func runWorkspaceStatus(ctx context.Context, rootDir string, jsonFlag bool, args
 		printStatusHelp(os.Stdout)
 		return nil
 	}
-	if len(args) != 1 {
-		return fmt.Errorf("usage: gws status <WORKSPACE_ID>")
+	if len(args) > 1 {
+		return fmt.Errorf("usage: gws status [<WORKSPACE_ID>]")
 	}
-	workspaceID := args[0]
+	workspaceID := ""
+	if len(args) == 1 {
+		workspaceID = args[0]
+	}
+	showHeader := true
+	if workspaceID == "" {
+		workspaces, wsWarn, err := workspace.List(rootDir)
+		if err != nil {
+			return err
+		}
+		if len(wsWarn) > 0 {
+			// ignore warnings for selection
+		}
+		workspaceChoices := buildWorkspaceChoices(workspaces)
+		if len(workspaceChoices) == 0 {
+			return fmt.Errorf("no workspaces found")
+		}
+		theme := ui.DefaultTheme()
+		useColor := isatty.IsTerminal(os.Stdout.Fd())
+		workspaceID, err = ui.PromptWorkspace("gws status", workspaceChoices, theme, useColor)
+		if err != nil {
+			return err
+		}
+		showHeader = false
+	}
 	result, err := workspace.Status(ctx, rootDir, workspaceID)
 	if err != nil {
 		return err
@@ -987,7 +1040,7 @@ func runWorkspaceStatus(ctx context.Context, rootDir string, jsonFlag bool, args
 	if jsonFlag {
 		return writeWorkspaceStatusJSON(result)
 	}
-	writeWorkspaceStatusText(result)
+	writeWorkspaceStatusText(result, showHeader)
 	return nil
 }
 
@@ -1042,12 +1095,48 @@ func writeWorkspaceStatusJSON(result workspace.StatusResult) error {
 	return enc.Encode(out)
 }
 
-func writeWorkspaceStatusText(result workspace.StatusResult) {
-	fmt.Fprintln(os.Stdout, "alias\tbranch\thead\tdirty\tuntracked")
+func writeWorkspaceStatusText(result workspace.StatusResult, showHeader bool) {
+	theme := ui.DefaultTheme()
+	useColor := isatty.IsTerminal(os.Stdout.Fd())
+	renderer := ui.NewRenderer(os.Stdout, theme, useColor)
+
+	header := "gws status"
+	if strings.TrimSpace(result.WorkspaceID) != "" {
+		header = fmt.Sprintf("%s (workspace id: %s)", header, result.WorkspaceID)
+	}
+	if showHeader {
+		renderer.Header(header)
+		renderer.Blank()
+	} else {
+		renderer.Blank()
+	}
+	renderer.Section("Result")
+
 	for _, repo := range result.Repos {
-		fmt.Fprintf(os.Stdout, "%s\t%s\t%s\t%t\t%d\n", repo.Alias, repo.Branch, repo.Head, repo.Dirty, repo.UntrackedCount)
+		label := repo.Alias
+		if strings.TrimSpace(label) == "" {
+			label = filepath.Base(repo.WorktreePath)
+		}
+		if strings.TrimSpace(repo.Branch) != "" {
+			label = fmt.Sprintf("%s (branch: %s)", label, repo.Branch)
+		}
+		renderer.Bullet(label)
+
+		details := buildStatusDetails(repo)
+		for i, detail := range details {
+			prefix := "├─ "
+			if i == len(details)-1 {
+				prefix = "└─ "
+			}
+			prefix = output.Indent + prefix
+			if detail.warn {
+				renderer.TreeLineWarn(prefix, detail.text)
+			} else {
+				renderer.TreeLineBranchMuted(prefix, detail.text, "")
+			}
+		}
 		if repo.Error != nil {
-			fmt.Fprintf(os.Stderr, "warning: %s: %v\n", repo.Alias, repo.Error)
+			renderer.Warn(fmt.Sprintf("warning: %s: %v", repo.Alias, repo.Error))
 		}
 	}
 }

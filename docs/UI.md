@@ -122,6 +122,17 @@ Steps
   • run now? (y/n)
 ```
 
+### gws status
+```
+gws status (workspace id: PROJ-123)
+
+Result
+  • api (branch: PROJ-123)
+    ├─ head: 94a67ef
+    ├─ dirty: yes
+    └─ untracked: 2
+```
+
 ## Notes
 - Prefix token is a theme value and can be changed later.
 - All prompts and labels are English.

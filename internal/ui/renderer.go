@@ -86,6 +86,14 @@ func (r *Renderer) TreeLineBranchMuted(prefix, name, branch string) {
 	r.writeLine(line)
 }
 
+func (r *Renderer) TreeLineWarn(prefix, text string) {
+	line := output.Indent + prefix + text
+	if r.useColor {
+		line = r.style(line, r.theme.Warn)
+	}
+	r.writeLine(line)
+}
+
 func (r *Renderer) style(text string, style lipgloss.Style) string {
 	if !r.useColor {
 		return text

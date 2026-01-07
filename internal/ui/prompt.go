@@ -51,6 +51,20 @@ func PromptWorkspaceAndRepo(title string, workspaces []WorkspaceChoice, repos []
 	return strings.TrimSpace(final.workspaceID), strings.TrimSpace(final.repoSpec), nil
 }
 
+func PromptWorkspace(title string, workspaces []WorkspaceChoice, theme Theme, useColor bool) (string, error) {
+	model := newWorkspaceSelectModel(title, workspaces, theme, useColor)
+	prog := tea.NewProgram(model)
+	out, err := prog.Run()
+	if err != nil {
+		return "", err
+	}
+	final := out.(workspaceSelectModel)
+	if final.err != nil {
+		return "", final.err
+	}
+	return strings.TrimSpace(final.workspaceID), nil
+}
+
 func PromptConfirmInline(label string, theme Theme, useColor bool) (bool, error) {
 	model := newConfirmInlineModel(label, theme, useColor)
 	prog := tea.NewProgram(model)
@@ -389,11 +403,126 @@ func max(a, b int) int {
 	return b
 }
 
+type workspaceSelectModel struct {
+	title      string
+	workspaces []WorkspaceChoice
+	theme      Theme
+	useColor   bool
+
+	input    textinput.Model
+	filtered []WorkspaceChoice
+	cursor   int
+	err      error
+
+	workspaceID string
+}
+
+func newWorkspaceSelectModel(title string, workspaces []WorkspaceChoice, theme Theme, useColor bool) workspaceSelectModel {
+	input := textinput.New()
+	input.Prompt = ""
+	input.Placeholder = "search"
+	input.Focus()
+	if useColor {
+		input.PlaceholderStyle = theme.Muted
+	}
+	m := workspaceSelectModel{
+		title:      title,
+		workspaces: workspaces,
+		theme:      theme,
+		useColor:   useColor,
+		input:      input,
+	}
+	m.filtered = m.filterWorkspaces()
+	return m
+}
+
+func (m workspaceSelectModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m workspaceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			m.err = ErrPromptCanceled
+			return m, tea.Quit
+		case tea.KeyUp:
+			if m.cursor > 0 {
+				m.cursor--
+			}
+			return m, nil
+		case tea.KeyDown:
+			if m.cursor < len(m.filtered)-1 {
+				m.cursor++
+			}
+			return m, nil
+		case tea.KeyEnter:
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			m.workspaceID = m.filtered[m.cursor].ID
+			return m, tea.Quit
+		}
+	}
+
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	m.filtered = m.filterWorkspaces()
+	if m.cursor >= len(m.filtered) {
+		m.cursor = max(0, len(m.filtered)-1)
+	}
+	return m, cmd
+}
+
+func (m workspaceSelectModel) View() string {
+	var b strings.Builder
+	header := m.title
+	if strings.TrimSpace(m.workspaceID) != "" {
+		header = fmt.Sprintf("%s (workspace id: %s)", m.title, m.workspaceID)
+	}
+	if m.useColor {
+		header = m.theme.Header.Render(header)
+	}
+	b.WriteString(header)
+	b.WriteString("\n\n")
+
+	title := "Inputs"
+	if m.useColor {
+		title = m.theme.SectionTitle.Render(title)
+	}
+	b.WriteString(title)
+	b.WriteString("\n")
+
+	prefix := promptPrefix(m.theme, m.useColor)
+	label := promptLabel(m.theme, m.useColor, "workspace id")
+	line := fmt.Sprintf("%s%s %s: %s", output.Indent, prefix, label, m.input.View())
+	b.WriteString(line)
+	b.WriteString("\n")
+	renderWorkspaceChoiceList(&b, m.filtered, m.cursor, m.useColor, m.theme)
+	return b.String()
+}
+
+func (m workspaceSelectModel) filterWorkspaces() []WorkspaceChoice {
+	q := strings.ToLower(strings.TrimSpace(m.input.Value()))
+	if q == "" {
+		return append([]WorkspaceChoice(nil), m.workspaces...)
+	}
+	var out []WorkspaceChoice
+	for _, item := range m.workspaces {
+		if strings.Contains(strings.ToLower(item.ID), q) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
 type addInputsStage int
 
 const (
 	addStageWorkspace addInputsStage = iota
 	addStageRepo
+	addStageDone
 )
 
 type addInputsModel struct {
@@ -499,6 +628,7 @@ func (m addInputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				choice := m.repoFiltered[m.cursor]
 				m.repoSpec = choice.Value
 				m.repoLabel = choice.Label
+				m.stage = addStageDone
 				return m, tea.Quit
 			}
 		}
@@ -511,7 +641,7 @@ func (m addInputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.cursor >= len(m.wsFiltered) {
 			m.cursor = max(0, len(m.wsFiltered)-1)
 		}
-	} else {
+	} else if m.stage == addStageRepo {
 		m.repoInput, cmd = m.repoInput.Update(msg)
 		m.repoFiltered = m.filterRepos()
 		if m.cursor >= len(m.repoFiltered) {
@@ -574,6 +704,9 @@ func (m addInputsModel) View() string {
 func (m addInputsModel) maxCursor() int {
 	if m.stage == addStageWorkspace {
 		return max(0, len(m.wsFiltered)-1)
+	}
+	if m.stage == addStageRepo {
+		return max(0, len(m.repoFiltered)-1)
 	}
 	return max(0, len(m.repoFiltered)-1)
 }
