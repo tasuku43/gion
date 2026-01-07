@@ -137,3 +137,4 @@ Result
 ## Notes
 - Prefix token is a theme value and can be changed later.
 - All prompts and labels are English.
+- Inputs can include a “blocked” list (e.g. gws rm); blocked entries use warn color.

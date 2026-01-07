@@ -874,26 +874,31 @@ func loadWorkspaceRepos(wsDir string) ([]workspace.Repo, error) {
 func buildWorkspaceChoices(entries []workspace.Entry) []ui.WorkspaceChoice {
 	var choices []ui.WorkspaceChoice
 	for _, entry := range entries {
-		choice := ui.WorkspaceChoice{ID: entry.WorkspaceID}
-		if entry.Manifest != nil {
-			for _, repoEntry := range entry.Manifest.Repos {
-				name := repoEntry.Alias
-				if strings.TrimSpace(name) == "" {
-					name = repoEntry.RepoKey
-				}
-				label := name
-				if strings.TrimSpace(repoEntry.Branch) != "" {
-					label = fmt.Sprintf("%s (branch: %s)", name, repoEntry.Branch)
-				}
-				choice.Repos = append(choice.Repos, ui.PromptChoice{
-					Label: label,
-					Value: displayRepoKey(repoEntry.RepoKey),
-				})
-			}
-		}
-		choices = append(choices, choice)
+		choices = append(choices, buildWorkspaceChoice(entry))
 	}
 	return choices
+}
+
+func buildWorkspaceChoice(entry workspace.Entry) ui.WorkspaceChoice {
+	choice := ui.WorkspaceChoice{ID: entry.WorkspaceID}
+	if entry.Manifest == nil {
+		return choice
+	}
+	for _, repoEntry := range entry.Manifest.Repos {
+		name := repoEntry.Alias
+		if strings.TrimSpace(name) == "" {
+			name = repoEntry.RepoKey
+		}
+		label := name
+		if strings.TrimSpace(repoEntry.Branch) != "" {
+			label = fmt.Sprintf("%s (branch: %s)", name, repoEntry.Branch)
+		}
+		choice.Repos = append(choice.Repos, ui.PromptChoice{
+			Label: label,
+			Value: displayRepoKey(repoEntry.RepoKey),
+		})
+	}
+	return choice
 }
 
 func displayRepoKey(repoKey string) string {
@@ -953,6 +958,91 @@ func buildStatusDetails(repo workspace.RepoStatus) []statusDetail {
 		details = append(details, statusDetail{text: fmt.Sprintf("unmerged: %d", repo.UnmergedCount), warn: true})
 	}
 	return details
+}
+
+func classifyWorkspaceRemoval(ctx context.Context, rootDir string, entries []workspace.Entry) ([]ui.WorkspaceChoice, []ui.BlockedChoice) {
+	var removable []ui.WorkspaceChoice
+	var blocked []ui.BlockedChoice
+	for _, entry := range entries {
+		reason := workspaceRemoveReason(ctx, rootDir, entry)
+		if strings.TrimSpace(reason) == "" {
+			removable = append(removable, buildWorkspaceChoice(entry))
+			continue
+		}
+		blocked = append(blocked, ui.BlockedChoice{
+			Label: fmt.Sprintf("%s (%s)", entry.WorkspaceID, reason),
+		})
+	}
+	return removable, blocked
+}
+
+func workspaceRemoveReason(ctx context.Context, rootDir string, entry workspace.Entry) string {
+	if entry.Warning != nil {
+		return fmt.Sprintf("manifest: %s", compactError(entry.Warning))
+	}
+	status, err := workspace.Status(ctx, rootDir, entry.WorkspaceID)
+	if err != nil {
+		return fmt.Sprintf("status: %s", compactError(err))
+	}
+	return buildWorkspaceRemoveReason(status)
+}
+
+func buildWorkspaceRemoveReason(status workspace.StatusResult) string {
+	var dirtyRepos []string
+	var errorRepos []string
+	for _, repo := range status.Repos {
+		name := strings.TrimSpace(repo.Alias)
+		if name == "" {
+			name = "unknown"
+		}
+		if repo.Error != nil {
+			errorRepos = append(errorRepos, fmt.Sprintf("%s (%s)", name, compactError(repo.Error)))
+			continue
+		}
+		if repo.Dirty {
+			detail := formatDirtySummary(repo)
+			if detail == "" {
+				detail = "dirty"
+			}
+			dirtyRepos = append(dirtyRepos, fmt.Sprintf("%s (%s)", name, detail))
+		}
+	}
+	var reasons []string
+	if len(errorRepos) > 0 {
+		reasons = append(reasons, fmt.Sprintf("status error: %s", strings.Join(errorRepos, ", ")))
+	}
+	if len(dirtyRepos) > 0 {
+		reasons = append(reasons, fmt.Sprintf("dirty: %s", strings.Join(dirtyRepos, ", ")))
+	}
+	return strings.Join(reasons, "; ")
+}
+
+func formatDirtySummary(repo workspace.RepoStatus) string {
+	var parts []string
+	if repo.StagedCount > 0 {
+		parts = append(parts, fmt.Sprintf("staged=%d", repo.StagedCount))
+	}
+	if repo.UnstagedCount > 0 {
+		parts = append(parts, fmt.Sprintf("unstaged=%d", repo.UnstagedCount))
+	}
+	if repo.UntrackedCount > 0 {
+		parts = append(parts, fmt.Sprintf("untracked=%d", repo.UntrackedCount))
+	}
+	if repo.UnmergedCount > 0 {
+		parts = append(parts, fmt.Sprintf("unmerged=%d", repo.UnmergedCount))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func compactError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.TrimSpace(err.Error())
+	if msg == "" {
+		return "unknown error"
+	}
+	return strings.Join(strings.Fields(msg), " ")
 }
 
 func preflightTemplateRepos(ctx context.Context, rootDir string, tmpl template.Template) ([]string, error) {
@@ -1072,13 +1162,27 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 		if len(wsWarn) > 0 {
 			// ignore warnings for selection
 		}
-		workspaceChoices := buildWorkspaceChoices(workspaces)
-		if len(workspaceChoices) == 0 {
+		if len(workspaces) == 0 {
 			return fmt.Errorf("no workspaces found")
 		}
+		removable, blocked := classifyWorkspaceRemoval(ctx, rootDir, workspaces)
 		theme := ui.DefaultTheme()
 		useColor := isatty.IsTerminal(os.Stdout.Fd())
-		workspaceID, err = ui.PromptWorkspace("gws rm", workspaceChoices, theme, useColor)
+		if len(removable) == 0 {
+			renderer := ui.NewRenderer(os.Stdout, theme, useColor)
+			renderer.Header("gws rm")
+			renderer.Blank()
+			renderer.Section("Inputs")
+			renderer.Bullet("no removable workspaces")
+			if len(blocked) > 0 {
+				renderer.Bullet("blocked workspaces")
+				for _, item := range blocked {
+					renderer.TreeLineWarn(output.LogConnector+" ", item.Label)
+				}
+			}
+			return fmt.Errorf("no removable workspaces")
+		}
+		workspaceID, err = ui.PromptWorkspaceWithBlocked("gws rm", removable, blocked, theme, useColor)
 		if err != nil {
 			return err
 		}

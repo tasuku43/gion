@@ -23,6 +23,10 @@ type WorkspaceChoice struct {
 	Repos []PromptChoice
 }
 
+type BlockedChoice struct {
+	Label string
+}
+
 func PromptNewWorkspaceInputs(title string, templates []string, templateName string, workspaceID string, theme Theme, useColor bool) (string, string, error) {
 	model := newInputsModel(title, templates, templateName, workspaceID, theme, useColor)
 	prog := tea.NewProgram(model)
@@ -53,6 +57,20 @@ func PromptWorkspaceAndRepo(title string, workspaces []WorkspaceChoice, repos []
 
 func PromptWorkspace(title string, workspaces []WorkspaceChoice, theme Theme, useColor bool) (string, error) {
 	model := newWorkspaceSelectModel(title, workspaces, theme, useColor)
+	prog := tea.NewProgram(model)
+	out, err := prog.Run()
+	if err != nil {
+		return "", err
+	}
+	final := out.(workspaceSelectModel)
+	if final.err != nil {
+		return "", final.err
+	}
+	return strings.TrimSpace(final.workspaceID), nil
+}
+
+func PromptWorkspaceWithBlocked(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, theme Theme, useColor bool) (string, error) {
+	model := newWorkspaceSelectModelWithBlocked(title, workspaces, blocked, theme, useColor)
 	prog := tea.NewProgram(model)
 	out, err := prog.Run()
 	if err != nil {
@@ -406,6 +424,7 @@ func max(a, b int) int {
 type workspaceSelectModel struct {
 	title      string
 	workspaces []WorkspaceChoice
+	blocked    []BlockedChoice
 	theme      Theme
 	useColor   bool
 
@@ -418,6 +437,10 @@ type workspaceSelectModel struct {
 }
 
 func newWorkspaceSelectModel(title string, workspaces []WorkspaceChoice, theme Theme, useColor bool) workspaceSelectModel {
+	return newWorkspaceSelectModelWithBlocked(title, workspaces, nil, theme, useColor)
+}
+
+func newWorkspaceSelectModelWithBlocked(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, theme Theme, useColor bool) workspaceSelectModel {
 	input := textinput.New()
 	input.Prompt = ""
 	input.Placeholder = "search"
@@ -428,6 +451,7 @@ func newWorkspaceSelectModel(title string, workspaces []WorkspaceChoice, theme T
 	m := workspaceSelectModel{
 		title:      title,
 		workspaces: workspaces,
+		blocked:    blocked,
 		theme:      theme,
 		useColor:   useColor,
 		input:      input,
@@ -500,6 +524,12 @@ func (m workspaceSelectModel) View() string {
 	b.WriteString(line)
 	b.WriteString("\n")
 	renderWorkspaceChoiceList(&b, m.filtered, m.cursor, m.useColor, m.theme)
+	if len(m.blocked) > 0 {
+		b.WriteString("\n")
+		blockedLabel := promptLabel(m.theme, m.useColor, "blocked workspaces")
+		b.WriteString(fmt.Sprintf("%s%s %s:\n", output.Indent, prefix, blockedLabel))
+		renderBlockedChoiceList(&b, m.blocked, m.useColor, m.theme)
+	}
 	return b.String()
 }
 
@@ -829,6 +859,17 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 			b.WriteString(line)
 			b.WriteString("\n")
 		}
+	}
+}
+
+func renderBlockedChoiceList(b *strings.Builder, items []BlockedChoice, useColor bool, theme Theme) {
+	for _, item := range items {
+		line := fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), item.Label)
+		if useColor {
+			line = theme.Warn.Render(line)
+		}
+		b.WriteString(line)
+		b.WriteString("\n")
 	}
 }
 
