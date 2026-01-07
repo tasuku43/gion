@@ -29,22 +29,3 @@ gws add PROJ-1234 git@github.com:org/frontend.git --alias frontend
 gws status PROJ-1234
 
 ```
-
-## Shell integration (for `gws cd`)
-
-`gws cd` prints a workspace path to stdout. To actually change your shell directory,
-add a small wrapper function.
-
-Example for bash/zsh:
-
-```bash
-gws() {
-  if [ "$1" = "cd" ]; then
-    cd "$(command gws cd "${@:2}")"
-  else
-    command gws "$@"
-  fi
-}
-```
-
-See `docs/` for details.

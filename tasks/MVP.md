@@ -39,7 +39,6 @@
 | MVP-110 | UI: gws template ls | Done |
 | MVP-111 | UI: gws init | Done |
 | MVP-112 | UI: gws review | Done |
-| MVP-113 | gws cd (workspace chooser) | To Do |
 
 ## MVP Definition of Done (全体)
 - コマンド:
@@ -326,15 +325,6 @@ Goal:
 Acceptance:
 - Steps に repo get / worktree add が出る
 - Result に workspace tree が出る
-
-### MVP-113: gws cd (workspace chooser)
-Goal:
-- `gws cd` で workspace を選択し、パスのみ stdout に出力する
-
-Acceptance:
-- `gws cd <workspace_id>` で該当 workspace のパスを stdout に出力する
-- `gws cd` は `gws ls` と同じ表示の TUI で選択できる
-- 取消し時は非ゼロ終了で stdout は空
 
 ## EP8: Templates
 

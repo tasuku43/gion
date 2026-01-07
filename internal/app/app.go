@@ -172,7 +172,7 @@ func runTemplateList(ctx context.Context, rootDir string, jsonFlag bool, args []
 	if jsonFlag {
 		return writeTemplateListJSON(names)
 	}
-	writeTemplateListText(names)
+	writeTemplateListText(file, names)
 	return nil
 }
 
@@ -910,6 +910,18 @@ func displayRepoKey(repoKey string) string {
 	return display
 }
 
+func displayTemplateRepo(repoSpec string) string {
+	trimmed := strings.TrimSpace(repoSpec)
+	if trimmed == "" {
+		return ""
+	}
+	spec, err := repospec.Normalize(trimmed)
+	if err != nil {
+		return trimmed
+	}
+	return fmt.Sprintf("git@%s:%s/%s.git", spec.Host, spec.Owner, spec.Repo)
+}
+
 func repoSpecFromKey(repoKey string, cfg config.Config) string {
 	trimmed := strings.TrimSuffix(repoKey, ".git")
 	trimmed = strings.TrimSuffix(trimmed, "/")
@@ -1502,7 +1514,7 @@ func writeTemplateListJSON(names []string) error {
 	return enc.Encode(out)
 }
 
-func writeTemplateListText(names []string) {
+func writeTemplateListText(file template.File, names []string) {
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())
 	renderer := ui.NewRenderer(os.Stdout, theme, useColor)
@@ -1516,6 +1528,19 @@ func writeTemplateListText(names []string) {
 	}
 	for _, name := range names {
 		renderer.Bullet(name)
+		tmpl, ok := file.Templates[name]
+		if !ok {
+			continue
+		}
+		var repos []string
+		for _, repoSpec := range tmpl.Repos {
+			display := displayTemplateRepo(repoSpec)
+			if strings.TrimSpace(display) == "" {
+				continue
+			}
+			repos = append(repos, display)
+		}
+		renderTreeLines(renderer, repos, treeLineNormal)
 	}
 }
 
