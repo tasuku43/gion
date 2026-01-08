@@ -15,6 +15,11 @@
     - `gofmt -w .` (or `go fmt ./...` if you prefer)
     - `go test ./...`
 - If you change CLI behavior, update docs in `docs/` and task notes if needed.
+- Command specs live in `docs/specs/` (one file per subcommand, YAML frontmatter with `status`):
+    - `status: planned` means spec-first discussion; implement only after consensus and flip to `implemented`.
+    - New feature/CLI change flow: (1) draft/adjust spec in `docs/specs/<cmd>.md`, (2) review/agree, (3) implement, (4) update spec status, (5) run gofmt/go test.
+    - `docs/specs/README.md` indexes specs and describes metadata rules.
+    - Quick triage for agents: read only the frontmatter to know if work remains. If `pending` (array) is non-empty, there are unimplemented items even when `status: implemented`. Example to view metadata only: `rg --no-heading -n '^-{3}$' -C2 docs/specs/<cmd>.md` or `sed -n '1,20p' docs/specs/<cmd>.md`.
 
 ## Code conventions
 - Keep dependencies minimal; prefer Go standard library.

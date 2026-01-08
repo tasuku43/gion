@@ -156,7 +156,7 @@ gws rm MY-123
 
 ## Help and docs
 
-- `docs/CLI.md` for command details
+- `docs/specs/README.md` for command specs and status
 - `docs/TEMPLATES.md` for template format
 - `docs/DIRECTORY_LAYOUT.md` for the file layout
 - `docs/UI.md` for output conventions
