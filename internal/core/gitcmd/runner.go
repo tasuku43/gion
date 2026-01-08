@@ -125,6 +125,7 @@ var allowedSubcommands = map[string]struct{}{
 	"fetch":            {},
 	"init":             {},
 	"ls-remote":        {},
+	"rev-parse":        {},
 	"remote":           {},
 	"show-ref":         {},
 	"symbolic-ref":     {},
