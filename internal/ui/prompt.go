@@ -521,16 +521,6 @@ func (m templateRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m templateRepoSelectModel) View() string {
 	var b strings.Builder
-	header := m.title
-	if len(m.selected) > 0 {
-		header = fmt.Sprintf("%s (selected: %d)", m.title, len(m.selected))
-	}
-	if m.useColor {
-		header = m.theme.Header.Render(header)
-	}
-	b.WriteString(header)
-	b.WriteString("\n\n")
-
 	section := "Select repos"
 	if m.useColor {
 		section = m.theme.SectionTitle.Render(section)
