@@ -521,6 +521,7 @@ func (m templateRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m templateRepoSelectModel) View() string {
 	var b strings.Builder
+	b.WriteString("\n")
 	section := "Select repos"
 	if m.useColor {
 		section = m.theme.SectionTitle.Render(section)
