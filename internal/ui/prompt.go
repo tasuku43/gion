@@ -393,18 +393,19 @@ func (m confirmInlineModel) View() string {
 }
 
 // PromptTemplateRepos lets users pick one or more repos from a list with filtering.
-func PromptTemplateRepos(title string, choices []PromptChoice, theme Theme, useColor bool) ([]string, error) {
-	model := newTemplateRepoSelectModel(title, choices, theme, useColor)
+// It can also collect a template name when not provided.
+func PromptTemplateRepos(title string, templateName string, choices []PromptChoice, theme Theme, useColor bool) (string, []string, error) {
+	model := newTemplateRepoSelectModel(title, templateName, choices, theme, useColor)
 	prog := tea.NewProgram(model)
 	out, err := prog.Run()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	final := out.(templateRepoSelectModel)
 	if final.err != nil {
-		return nil, final.err
+		return "", nil, final.err
 	}
-	return append([]string(nil), final.selected...), nil
+	return strings.TrimSpace(final.templateName), append([]string(nil), final.selected...), nil
 }
 
 // PromptTemplateName asks for a template name via text input.
@@ -423,35 +424,65 @@ func PromptTemplateName(title string, defaultValue string, theme Theme, useColor
 }
 
 type templateRepoSelectModel struct {
-	title     string
-	choices   []PromptChoice
-	filtered  []PromptChoice
-	selected  []string
-	addedNote string
+	title        string
+	templateName string
+	choices      []PromptChoice
+	filtered     []PromptChoice
+	selected     []string
+	addedNote    string
 
 	theme    Theme
 	useColor bool
 
-	input     textinput.Model
+	nameInput textinput.Model
+	repoInput textinput.Model
+
+	stage     templateRepoStage
 	cursor    int
 	err       error
 	errorLine string
 }
 
-func newTemplateRepoSelectModel(title string, choices []PromptChoice, theme Theme, useColor bool) templateRepoSelectModel {
-	input := textinput.New()
-	input.Prompt = ""
-	input.Placeholder = "search"
-	input.Focus()
+type templateRepoStage int
+
+const (
+	stageTemplateName templateRepoStage = iota
+	stageRepoSelect
+)
+
+func newTemplateRepoSelectModel(title string, templateName string, choices []PromptChoice, theme Theme, useColor bool) templateRepoSelectModel {
+	repoInput := textinput.New()
+	repoInput.Prompt = ""
+	repoInput.Placeholder = "search"
 	if useColor {
-		input.PlaceholderStyle = theme.Muted
+		repoInput.PlaceholderStyle = theme.Muted
 	}
+
+	nameInput := textinput.New()
+	nameInput.Prompt = ""
+	nameInput.Placeholder = "template name"
+	nameInput.SetValue(templateName)
+	if useColor {
+		nameInput.PlaceholderStyle = theme.Muted
+	}
+
+	stage := stageRepoSelect
+	if strings.TrimSpace(templateName) == "" {
+		stage = stageTemplateName
+		nameInput.Focus()
+	} else {
+		repoInput.Focus()
+	}
+
 	m := templateRepoSelectModel{
-		title:    title,
-		choices:  choices,
-		theme:    theme,
-		useColor: useColor,
-		input:    input,
+		title:        title,
+		templateName: templateName,
+		choices:      choices,
+		theme:        theme,
+		useColor:     useColor,
+		nameInput:    nameInput,
+		repoInput:    repoInput,
+		stage:        stage,
 	}
 	m.filtered = m.filterChoices()
 	return m
@@ -469,6 +500,17 @@ func (m templateRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = ErrPromptCanceled
 			return m, tea.Quit
 		case tea.KeyCtrlD:
+			if m.stage == stageTemplateName {
+				if strings.TrimSpace(m.nameInput.Value()) == "" {
+					m.errorLine = "template name is required"
+					return m, nil
+				}
+				m.templateName = strings.TrimSpace(m.nameInput.Value())
+				m.stage = stageRepoSelect
+				m.repoInput.Focus()
+				m.errorLine = ""
+				return m, nil
+			}
 			if len(m.selected) == 0 {
 				m.errorLine = "select at least one repo"
 				return m, nil
@@ -485,7 +527,19 @@ func (m templateRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case tea.KeyEnter:
-			value := strings.TrimSpace(m.input.Value())
+			if m.stage == stageTemplateName {
+				value := strings.TrimSpace(m.nameInput.Value())
+				if value == "" {
+					m.errorLine = "template name is required"
+					return m, nil
+				}
+				m.templateName = value
+				m.stage = stageRepoSelect
+				m.repoInput.Focus()
+				m.errorLine = ""
+				return m, nil
+			}
+			value := strings.TrimSpace(m.repoInput.Value())
 			if value == "done" {
 				if len(m.selected) == 0 {
 					m.errorLine = "select at least one repo"
@@ -499,7 +553,7 @@ func (m templateRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			choice := m.filtered[m.cursor]
 			m.selected = append(m.selected, choice.Value)
 			m.choices = removeChoice(m.choices, choice.Value)
-			m.input.SetValue("")
+			m.repoInput.SetValue("")
 			m.filtered = m.filterChoices()
 			if m.cursor >= len(m.filtered) {
 				m.cursor = max(0, len(m.filtered)-1)
@@ -511,18 +565,24 @@ func (m templateRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.input, cmd = m.input.Update(msg)
-	m.filtered = m.filterChoices()
-	if m.cursor >= len(m.filtered) {
-		m.cursor = max(0, len(m.filtered)-1)
+	if m.stage == stageTemplateName {
+		m.nameInput, cmd = m.nameInput.Update(msg)
+		if strings.TrimSpace(m.nameInput.Value()) != "" {
+			m.errorLine = ""
+		}
+	} else {
+		m.repoInput, cmd = m.repoInput.Update(msg)
+		m.filtered = m.filterChoices()
+		if m.cursor >= len(m.filtered) {
+			m.cursor = max(0, len(m.filtered)-1)
+		}
 	}
 	return m, cmd
 }
 
 func (m templateRepoSelectModel) View() string {
 	var b strings.Builder
-	b.WriteString("\n")
-	section := "Select repos"
+	section := "Input"
 	if m.useColor {
 		section = m.theme.SectionTitle.Render(section)
 	}
@@ -530,8 +590,21 @@ func (m templateRepoSelectModel) View() string {
 	b.WriteString("\n")
 
 	prefix := promptPrefix(m.theme, m.useColor)
+	labelName := promptLabel(m.theme, m.useColor, "template name")
+	templateName := m.templateName
+	if m.stage == stageTemplateName {
+		templateName = m.nameInput.View()
+	}
+	lineName := fmt.Sprintf("%s%s %s: %s", output.Indent, prefix, labelName, templateName)
+	b.WriteString(lineName)
+	b.WriteString("\n")
+
 	label := promptLabel(m.theme, m.useColor, "repo")
-	line := fmt.Sprintf("%s%s %s: %s", output.Indent, prefix, label, m.input.View())
+	repoInput := m.repoInput.View()
+	if m.stage == stageTemplateName {
+		repoInput = ""
+	}
+	line := fmt.Sprintf("%s%s %s: %s", output.Indent, prefix, label, repoInput)
 	b.WriteString(line)
 	b.WriteString("\n")
 	renderRepoChoiceList(&b, m.filtered, m.cursor, m.useColor, m.theme)
@@ -560,7 +633,7 @@ func (m templateRepoSelectModel) View() string {
 }
 
 func (m templateRepoSelectModel) filterChoices() []PromptChoice {
-	q := strings.ToLower(strings.TrimSpace(m.input.Value()))
+	q := strings.ToLower(strings.TrimSpace(m.repoInput.Value()))
 	if q == "" {
 		return append([]PromptChoice(nil), m.choices...)
 	}

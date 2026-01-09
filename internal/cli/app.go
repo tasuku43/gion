@@ -217,27 +217,9 @@ func runTemplateNew(ctx context.Context, rootDir string, args []string, noPrompt
 	useColor := isatty.IsTerminal(os.Stdout.Fd())
 	prompted := false
 
-	if strings.TrimSpace(name) == "" {
+	if strings.TrimSpace(name) == "" && len(repoSpecs) == 0 {
 		if noPrompt {
-			return fmt.Errorf("template name is required with --no-prompt")
-		}
-		prompted = true
-		name, err = ui.PromptTemplateName("gws template new", "", theme, useColor)
-		if err != nil {
-			return err
-		}
-	}
-
-	if err := template.ValidateName(name); err != nil {
-		return err
-	}
-	if _, exists := file.Templates[name]; exists {
-		return fmt.Errorf("template already exists: %s", name)
-	}
-
-	if len(repoSpecs) == 0 {
-		if noPrompt {
-			return fmt.Errorf("repos are required with --no-prompt")
+			return fmt.Errorf("template name and repos are required with --no-prompt")
 		}
 		prompted = true
 		choices, err := buildTemplateRepoChoices(rootDir)
@@ -247,11 +229,48 @@ func runTemplateNew(ctx context.Context, rootDir string, args []string, noPrompt
 		if len(choices) == 0 {
 			return fmt.Errorf("no repos found; run gws repo get first")
 		}
-		selected, err := ui.PromptTemplateRepos("gws template new", choices, theme, useColor)
+		name, repoSpecs, err = ui.PromptTemplateRepos("gws template new", name, choices, theme, useColor)
 		if err != nil {
 			return err
 		}
-		repoSpecs = template.NormalizeRepos(selected)
+		repoSpecs = template.NormalizeRepos(repoSpecs)
+	} else {
+		if strings.TrimSpace(name) == "" {
+			if noPrompt {
+				return fmt.Errorf("template name is required with --no-prompt")
+			}
+			prompted = true
+			name, err = ui.PromptTemplateName("gws template new", "", theme, useColor)
+			if err != nil {
+				return err
+			}
+		}
+		if len(repoSpecs) == 0 {
+			if noPrompt {
+				return fmt.Errorf("repos are required with --no-prompt")
+			}
+			prompted = true
+			choices, err := buildTemplateRepoChoices(rootDir)
+			if err != nil {
+				return err
+			}
+			if len(choices) == 0 {
+				return fmt.Errorf("no repos found; run gws repo get first")
+			}
+			var selected []string
+			name, selected, err = ui.PromptTemplateRepos("gws template new", name, choices, theme, useColor)
+			if err != nil {
+				return err
+			}
+			repoSpecs = template.NormalizeRepos(selected)
+		}
+	}
+
+	if err := template.ValidateName(name); err != nil {
+		return err
+	}
+	if _, exists := file.Templates[name]; exists {
+		return fmt.Errorf("template already exists: %s", name)
 	}
 
 	if len(repoSpecs) == 0 {
