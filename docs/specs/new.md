@@ -20,7 +20,7 @@ Create a new workspace directory under `<root>/workspaces` and populate it with 
 - Applies the template by adding a worktree for each repo:
   - Alias defaults to the repo name.
   - Branch defaults to `WORKSPACE_ID`.
-  - Fetches the bare store before adding the worktree.
+  - Refreshes the bare store only when the default branch is stale or missing (checked via `git ls-remote`, unless a recent fetch exists within `GWS_FETCH_GRACE_SECONDS`, default 30s); skips fetch when already up-to-date.
   - Base ref is auto-detected (prefers `HEAD`, then `origin/HEAD`, then `main`/`master`/`develop` locally or on origin).
 - When prompting is allowed, collects per-repo branch names interactively:
   - For each repo in the template, prompt: `branch for <alias> [default: <WORKSPACE_ID>]:`
