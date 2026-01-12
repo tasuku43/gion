@@ -48,3 +48,15 @@ Only implement:
 - Implement the smallest correct change to satisfy acceptance criteria.
 - Add/adjust tests as required.
 - Ensure docs remain consistent.
+
+## GitHub CLI usage notes
+- When creating issues or PRs with `gh`, pass the body via a here-doc to preserve newlines for proper GitHub rendering:
+  ```sh
+  gh issue create \
+    --title "Implement gws create unified command" \
+    --body "$(cat <<'EOF'
+  ## Summary
+  ...
+  EOF
+  )"
+  ```
