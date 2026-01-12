@@ -159,7 +159,7 @@ type createFlowModel struct {
 
 	templateModel inputsModel
 	templateRepos []string
-	description  string
+	description   string
 	descInput     textinput.Model
 	branchInput   textinput.Model
 	branchIndex   int
@@ -175,12 +175,12 @@ type createFlowModel struct {
 	reviewPRs     []string
 	issueIssues   []string
 
-	reviewRepoModel  choiceSelectModel
-	reviewPRModel    multiSelectModel
-	issueRepoModel   choiceSelectModel
-	issueIssueModel  multiSelectModel
-	loadReviewPRs    func(string) ([]PromptChoice, error)
-	loadIssueChoices func(string) ([]PromptChoice, error)
+	reviewRepoModel   choiceSelectModel
+	reviewPRModel     multiSelectModel
+	issueRepoModel    choiceSelectModel
+	issueIssueModel   multiSelectModel
+	loadReviewPRs     func(string) ([]PromptChoice, error)
+	loadIssueChoices  func(string) ([]PromptChoice, error)
 	loadTemplateRepos func(string) ([]string, error)
 	validateBranch    func(string) error
 
@@ -197,18 +197,18 @@ func newCreateFlowModel(title string, templates []string, tmplErr error, reviewR
 		input.PlaceholderStyle = theme.Muted
 	}
 	m := createFlowModel{
-		stage:            createStageMode,
-		templates:        templates,
-		tmplErr:          tmplErr,
-		modeInput:        input,
-		reviewRepos:      reviewRepos,
-		issueRepos:       issueRepos,
-		loadReviewPRs:    loadReview,
-		loadIssueChoices: loadIssue,
+		stage:             createStageMode,
+		templates:         templates,
+		tmplErr:           tmplErr,
+		modeInput:         input,
+		reviewRepos:       reviewRepos,
+		issueRepos:        issueRepos,
+		loadReviewPRs:     loadReview,
+		loadIssueChoices:  loadIssue,
 		loadTemplateRepos: loadTemplateRepos,
 		validateBranch:    validateBranch,
-		theme:            theme,
-		useColor:         useColor,
+		theme:             theme,
+		useColor:          useColor,
 	}
 	m.filtered = m.filterModes()
 	return m
@@ -509,13 +509,15 @@ func (m createFlowModel) View() string {
 		return m.reviewRepoModel.View()
 	}
 	if m.stage == createStageReviewPRs {
-		return m.reviewPRModel.View()
+		labelRepo := promptLabel(m.theme, m.useColor, "repo")
+		return renderMultiSelectFrame(m.reviewPRModel, fmt.Sprintf("%s: %s", labelRepo, m.reviewRepo))
 	}
 	if m.stage == createStageIssueRepo {
 		return m.issueRepoModel.View()
 	}
 	if m.stage == createStageIssueIssues {
-		return m.issueIssueModel.View()
+		labelRepo := promptLabel(m.theme, m.useColor, "repo")
+		return renderMultiSelectFrame(m.issueIssueModel, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
 	}
 
 	frame := NewFrame(m.theme, m.useColor)
@@ -1176,7 +1178,6 @@ func (m templateRepoSelectModel) View() string {
 	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
 	frame.AppendInfoRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
-		fmt.Sprintf("%s%s enter: add highlighted repo", output.Indent, infoPrefix),
 	)
 	return frame.Render()
 }
@@ -1434,37 +1435,42 @@ func (m multiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m multiSelectModel) View() string {
-	frame := NewFrame(m.theme, m.useColor)
-	label := promptLabel(m.theme, m.useColor, m.label)
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+	return renderMultiSelectFrame(m)
+}
+
+func renderMultiSelectFrame(model multiSelectModel, headerLines ...string) string {
+	frame := NewFrame(model.theme, model.useColor)
+	lines := append([]string(nil), headerLines...)
+	label := promptLabel(model.theme, model.useColor, model.label)
+	lines = append(lines, fmt.Sprintf("%s: %s", label, model.input.View()))
+	frame.SetInputsPrompt(lines...)
 
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderRepoChoiceList(b, m.filtered, m.cursor, m.useColor, m.theme)
+		renderRepoChoiceList(b, model.filtered, model.cursor, model.useColor, model.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
 
-	if m.useColor {
-		frame.SetInfo(m.theme.Accent.Render("selected"))
+	if model.useColor {
+		frame.SetInfo(model.theme.Accent.Render("selected"))
 	} else {
 		frame.SetInfo("selected")
 	}
 	selectedLines := collectLines(func(b *strings.Builder) {
-		renderSelectedChoiceTree(b, m.selected, m.useColor, m.theme)
+		renderSelectedChoiceTree(b, model.selected, model.useColor, model.theme)
 	})
 	frame.AppendInfoRaw(selectedLines...)
 
-	if m.errorLine != "" {
-		msg := m.errorLine
-		if m.useColor {
-			msg = m.theme.Error.Render(msg)
+	if model.errorLine != "" {
+		msg := model.errorLine
+		if model.useColor {
+			msg = model.theme.Error.Render(msg)
 		}
-		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
+		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), msg))
 	}
 
-	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
+	infoPrefix := mutedToken(model.theme, model.useColor, output.StepPrefix)
 	frame.AppendInfoRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
-		fmt.Sprintf("%s%s enter: add highlighted %s", output.Indent, infoPrefix, m.label),
 	)
 	return frame.Render()
 }
@@ -1838,7 +1844,6 @@ func (m workspaceMultiSelectModel) View() string {
 	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
 	frame.AppendInfoRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
-		fmt.Sprintf("%s%s enter: add highlighted workspace", output.Indent, infoPrefix),
 	)
 
 	if len(m.blocked) > 0 {
