@@ -19,7 +19,7 @@ Open a workspace by launching an interactive subshell at the workspace root, mak
 - Wires STDIN/STDOUT/STDERR for direct interaction.
 - Optionally sets `GWS_WORKSPACE=<WORKSPACE_ID>` for the child process.
 - For shells `bash`, `zsh`, `sh`, prepends a prompt prefix to the child process `PS1`:
-  - Prefix format: `[gws:<WORKSPACE_ID>] `
+  - Prefix format: `[gws:<WORKSPACE_ID>] ` (blue)
   - If `PS1` is empty or unset, the prefix alone becomes `PS1`.
   - Only the child process receives the modified `PS1`; the parent shell is not changed.
 - When the subshell exits, `gws open` exits and the parent shell cwd remains unchanged.

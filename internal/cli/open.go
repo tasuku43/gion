@@ -184,7 +184,7 @@ func prepareBashPromptOverride(workspaceID string) (*promptOverride, error) {
 	}
 	rcfile := filepath.Join(dir, "bashrc")
 	home := os.Getenv("HOME")
-	prefix := fmt.Sprintf("[gws:%s] ", workspaceID)
+	prefix := fmt.Sprintf("\\[\\033[34m\\][gws:%s]\\[\\033[0m\\] ", workspaceID)
 	content := strings.Join([]string{
 		"# gws open prompt wrapper",
 		fmt.Sprintf("if [ -r %s ]; then . %s; fi", strconv.Quote(filepath.Join(home, ".bashrc")), strconv.Quote(filepath.Join(home, ".bashrc"))),
@@ -224,7 +224,7 @@ func prepareZshPromptOverride(workspaceID string) (*promptOverride, error) {
 	if origZdot == "" {
 		origZdot = home
 	}
-	prefix := fmt.Sprintf("[gws:%s] ", workspaceID)
+	prefix := fmt.Sprintf("%%F{blue}[gws:%s]%%f ", workspaceID)
 	content := strings.Join([]string{
 		"# gws open prompt wrapper",
 		fmt.Sprintf("orig=${GWS_ZDOTDIR_ORIG:-%s}", strconv.Quote(origZdot)),
@@ -271,7 +271,7 @@ func prepareShPromptOverride(workspaceID string) (*promptOverride, error) {
 	}
 	rcfile := filepath.Join(dir, "shrc")
 	origEnv := os.Getenv("ENV")
-	prefix := fmt.Sprintf("[gws:%s] ", workspaceID)
+	prefix := fmt.Sprintf("\\033[34m[gws:%s]\\033[0m ", workspaceID)
 	content := strings.Join([]string{
 		"# gws open prompt wrapper",
 		fmt.Sprintf("orig=${GWS_ENV_ORIG:-%s}", strconv.Quote(origEnv)),
