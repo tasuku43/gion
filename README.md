@@ -56,11 +56,12 @@ Or run `gws new` with no args to select a template and workspace id interactivel
 
 ```bash
 gws ls
+gws open MY-123
 gws status MY-123
 gws rm MY-123
 ```
 
-gws prints the workspace path so you can `cd` into it.
+gws opens an interactive subshell at the workspace root.
 
 ## Review a PR/MR (GitHub, GitLab, Bitbucket)
 
@@ -113,6 +114,7 @@ Core workflow:
 - `gws new [--template <name>] [<id>]` - create a workspace from a template
 - `gws add [<id>] [<repo>]` - add another repo worktree to a workspace
 - `gws ls` - list workspaces and repos
+- `gws open [<id>]` - open a workspace in an interactive subshell
 - `gws status [<id>]` - show branch, dirty/untracked, and ahead/behind
 - `gws rm [<id>]` - remove a workspace (refuses if dirty)
 

@@ -101,6 +101,8 @@ func Run() error {
 		return runWorkspaceStatus(ctx, rootDir, args[1:])
 	case "rm":
 		return runWorkspaceRemove(ctx, rootDir, args[1:])
+	case "open":
+		return runWorkspaceOpen(ctx, rootDir, args[1:], noPrompt)
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}

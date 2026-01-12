@@ -1,6 +1,6 @@
 ---
 title: "gws open"
-status: planned
+status: implemented
 ---
 
 ## Synopsis
@@ -26,6 +26,26 @@ Open a workspace by launching an interactive subshell at the workspace root, mak
 ## Success Criteria
 - `gws open <WORKSPACE_ID>` starts an interactive shell at the workspace root.
 - Exiting the subshell returns the user to the original shell.
+
+## Output
+Example:
+
+```
+Info
+  • workspace: ISSUE-19
+  • path: /path/to/gws/workspaces/ISSUE-19
+  • shell: /bin/zsh (interactive)
+  • note: subshell; parent cwd unchanged
+
+Steps
+  • chdir
+    └─ /path/to/gws/workspaces/ISSUE-19
+  • launch subshell
+    └─ /bin/zsh -i
+
+Result
+  • enter subshell (type `exit` to return)
+```
 
 ## Failure Modes
 - Missing workspace ID.

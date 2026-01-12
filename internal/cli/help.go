@@ -24,6 +24,7 @@ func printGlobalHelp(w io.Writer) {
 	fmt.Fprintln(w, "  ls                                list workspaces (with repos)")
 	fmt.Fprintln(w, "  status [<ID>]                      check dirty/untracked status")
 	fmt.Fprintln(w, "  rm [<ID>]                          remove workspace (clean only)")
+	fmt.Fprintln(w, "  open [<ID>]                        open workspace in subshell")
 	fmt.Fprintln(w, "  review <PR URL>                    create review workspace from PR")
 	fmt.Fprintln(w, "  issue <ISSUE URL>                  create issue workspace from issue")
 	fmt.Fprintln(w, "  repo <subcommand>                  repo commands (get/ls)")
@@ -51,6 +52,8 @@ func printCommandHelp(cmd string, w io.Writer) bool {
 		printStatusHelp(w)
 	case "rm":
 		printRmHelp(w)
+	case "open":
+		printOpenHelp(w)
 	case "review":
 		printReviewHelp(w)
 	case "issue":
@@ -89,6 +92,11 @@ func printStatusHelp(w io.Writer) {
 
 func printRmHelp(w io.Writer) {
 	fmt.Fprintln(w, "Usage: gws rm <WORKSPACE_ID>")
+}
+
+func printOpenHelp(w io.Writer) {
+	fmt.Fprintln(w, "Usage: gws open [<WORKSPACE_ID>] [--shell]")
+	fmt.Fprintln(w, "  Open an interactive subshell at the workspace root")
 }
 
 func printReviewHelp(w io.Writer) {
