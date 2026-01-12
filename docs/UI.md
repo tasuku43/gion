@@ -135,7 +135,7 @@ Result
 ## Notes
 - Prefix token is a theme value and can be changed later.
 - All prompts and labels are English.
-- Info section is optional and contains warnings / skipped / blocked items.
+- Info section is optional and may include warnings/skipped/blocked items, selection state, and inline help/auxiliary meta.
 - Errors should be emphasized with a red prefix and red text.
 - Suggestion section is optional and shown on TTY only (e.g. `cd <path>`).
 

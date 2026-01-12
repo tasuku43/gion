@@ -648,7 +648,7 @@ func runRepoGet(ctx context.Context, rootDir string, args []string) error {
 	}
 	renderer.Blank()
 	renderer.Section("Result")
-	renderer.Bullet(fmt.Sprintf("%s\t%s", store.RepoKey, store.StorePath))
+	renderer.Bullet(fmt.Sprintf("%s %s", store.RepoKey, store.StorePath))
 	renderSuggestion(renderer, useColor, repoSrcAbs(rootDir, repoSpec))
 	return nil
 }
@@ -3304,7 +3304,7 @@ func writeRepoListText(entries []repo.Entry, warnings []error) {
 
 	renderer.Section("Result")
 	for _, entry := range entries {
-		renderer.Bullet(fmt.Sprintf("%s\t%s", entry.RepoKey, entry.StorePath))
+		renderer.Bullet(fmt.Sprintf("%s %s", entry.RepoKey, entry.StorePath))
 	}
 }
 
