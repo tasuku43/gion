@@ -22,6 +22,7 @@ Same behavior as the former `gws new`.
 - Resolves `--template` and `WORKSPACE_ID`; if either is missing and `--no-prompt` is not set, interactively prompts for both. With `--no-prompt`, missing values cause an error.
 - Validates `WORKSPACE_ID` using `git check-ref-format --branch` and fails on invalid IDs.
 - Loads the specified template from `templates.yaml`; errors if the template is missing.
+- When prompting is allowed, asks for an optional description (`description`). Empty input is allowed; non-empty values are saved as workspace metadata.
 - Preflights template repositories to see which stores are absent.
   - If repos are missing and prompting is allowed, offers to run `gws repo get` for them before proceeding.
   - With `--no-prompt`, missing repos cause an error.
@@ -55,6 +56,7 @@ Same behavior as the former `gws review`.
 - If `PR URL` is provided:
   - Accepts GitHub PR URLs only (e.g., `https://github.com/owner/repo/pull/123`); rejects other hosts or malformed paths.
   - Uses `gh api` to fetch PR metadata (requires authenticated GitHub CLI): PR number, head ref, and repositories.
+  - Saves the PR title as the workspace description.
   - Rejects forked PRs (head repo must match base repo).
   - Selects the repo URL based on `defaultRepoProtocol` (SSH preferred, HTTPS fallback).
   - Workspace ID is `REVIEW-PR-<number>`; errors if it already exists.
@@ -71,6 +73,7 @@ Same behavior as the former `gws review`.
   - For each selected PR:
     - Workspace ID = `REVIEW-PR-<number>`.
     - Branch = PR head ref; base ref = `refs/remotes/origin/<head_ref>`.
+    - Workspace description = PR title.
     - Fork PRs remain rejected.
   - Flags other than `--no-prompt` are not allowed in picker mode (error if provided).
   - Creation is sequential; an error on one PR stops further creation and reports successes/failures so far.
@@ -96,6 +99,7 @@ Same behavior as the former `gws issue`.
   - Parse the URL to obtain `owner`, `repo`, and `issue number`.
   - Workspace ID: defaults to `ISSUE-<number>`; can be overridden with `--workspace-id`. Must pass `git check-ref-format --branch`. If the workspace already exists, error.
   - Branch: defaults to `issue/<number>`. Before proceeding, prompt the user with the default and allow editing unless `--no-prompt` or `--branch` is supplied.
+  - For GitHub issues, uses `gh api` to fetch the issue title and saves it as the workspace description.
     - If the branch exists in the bare store, use it.
     - If not, create it from a base ref.
   - Base ref: defaults to the standard detection used by `gws add` (prefer `HEAD`, then `origin/HEAD`, then `main`/`master`/`develop` locally or on origin). `--base` overrides detection; must resolve in the bare store or as `origin/<ref>`.
@@ -112,6 +116,7 @@ Same behavior as the former `gws issue`.
   - For each selected issue:
     - Workspace ID = `ISSUE-<number>` (no per-item override in this flow).
     - Branch = `issue/<number>`.
+    - Workspace description = issue title.
     - Base ref detection and repo missing handling are the same as the URL path.
   - Flags `--workspace-id`, `--branch`, and `--base` are only valid when a single issue is targeted (URL path). In picker mode with multiple selections, using these flags is an error.
   - Creation is sequential; an error on one issue stops further creation and reports successes/failures so far.

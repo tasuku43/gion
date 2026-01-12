@@ -19,8 +19,9 @@ type PromptChoice struct {
 }
 
 type WorkspaceChoice struct {
-	ID    string
-	Repos []PromptChoice
+	ID          string
+	Description string
+	Repos       []PromptChoice
 }
 
 type BlockedChoice struct {
@@ -1659,9 +1660,18 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 		return
 	}
 	for i, item := range items {
-		display := item.ID
+		displayID := item.ID
 		if i == cursor && useColor {
-			display = lipgloss.NewStyle().Bold(true).Render(display)
+			displayID = lipgloss.NewStyle().Bold(true).Render(displayID)
+		}
+		display := displayID
+		desc := strings.TrimSpace(item.Description)
+		if desc != "" {
+			if useColor {
+				display += theme.Muted.Render(" - " + desc)
+			} else {
+				display += " - " + desc
+			}
 		}
 		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), display))
 		if len(item.Repos) == 0 {

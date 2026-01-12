@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Entry struct {
 	WorkspaceID   string
 	WorkspacePath string
+	Description   string
 }
 
 func List(rootDir string) ([]Entry, []error, error) {
@@ -30,6 +32,7 @@ func List(rootDir string) ([]Entry, []error, error) {
 	}
 
 	var results []Entry
+	var warnings []error
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -38,12 +41,21 @@ func List(rootDir string) ([]Entry, []error, error) {
 		wsID := entry.Name()
 		wsPath := filepath.Join(wsRoot, wsID)
 
+		description := ""
+		meta, err := LoadMetadata(wsPath)
+		if err != nil {
+			warnings = append(warnings, fmt.Errorf("workspace %s metadata: %w", wsID, err))
+		} else if strings.TrimSpace(meta.Description) != "" {
+			description = strings.TrimSpace(meta.Description)
+		}
+
 		result := Entry{
 			WorkspaceID:   wsID,
 			WorkspacePath: wsPath,
+			Description:   description,
 		}
 		results = append(results, result)
 	}
 
-	return results, nil, nil
+	return results, warnings, nil
 }

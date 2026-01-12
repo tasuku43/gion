@@ -55,6 +55,30 @@ func (r *Renderer) Bullet(text string) {
 	r.bullet(text)
 }
 
+func (r *Renderer) BulletWithDescription(id, description, suffix string) {
+	prefix := output.StepPrefix + " "
+	if r.useColor {
+		prefix = r.theme.Muted.Render(prefix)
+	}
+	line := id
+	desc := strings.TrimSpace(description)
+	if desc != "" {
+		if r.useColor {
+			line += r.theme.Muted.Render(" - " + desc)
+		} else {
+			line += " - " + desc
+		}
+	}
+	if strings.TrimSpace(suffix) != "" {
+		value := " " + strings.TrimSpace(suffix)
+		if r.useColor {
+			value = r.theme.Muted.Render(value)
+		}
+		line += value
+	}
+	r.writeLine(output.Indent + prefix + line)
+}
+
 func (r *Renderer) BulletError(text string) {
 	prefix := output.StepPrefix + " "
 	if r.useColor {

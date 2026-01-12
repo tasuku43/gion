@@ -645,6 +645,7 @@ func runCreateTemplate(ctx context.Context, rootDir, templateName, workspaceID s
 
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())
+	description := ""
 
 	if templateName == "" || workspaceID == "" {
 		if noPrompt {
@@ -655,6 +656,13 @@ func runCreateTemplate(ctx context.Context, rootDir, templateName, workspaceID s
 		if err != nil {
 			return err
 		}
+	}
+	if !noPrompt {
+		value, err := ui.PromptInputInline("description", "", nil, theme, useColor)
+		if err != nil {
+			return err
+		}
+		description = strings.TrimSpace(value)
 	}
 
 	file, err := template.Load(rootDir)
@@ -691,6 +699,12 @@ func runCreateTemplate(ctx context.Context, rootDir, templateName, workspaceID s
 	if err != nil {
 		return err
 	}
+	if err := workspace.SaveMetadata(wsDir, workspace.Metadata{Description: description}); err != nil {
+		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
+			return fmt.Errorf("save workspace metadata failed: %w (rollback failed: %v)", err, rollbackErr)
+		}
+		return err
+	}
 
 	if err := applyTemplate(ctx, rootDir, workspaceID, tmpl, branches); err != nil {
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
@@ -702,7 +716,7 @@ func runCreateTemplate(ctx context.Context, rootDir, templateName, workspaceID s
 	renderer.Blank()
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
-	renderWorkspaceBlock(renderer, workspaceID, repos)
+	renderWorkspaceBlock(renderer, workspaceID, description, repos)
 	renderSuggestion(renderer, useColor, wsDir)
 	return nil
 }
@@ -774,7 +788,8 @@ func runWorkspaceAdd(ctx context.Context, rootDir string, args []string) error {
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 	renderer.Blank()
 	renderer.Section("Result")
-	renderWorkspaceBlock(renderer, workspaceID, repos)
+	description := loadWorkspaceDescription(wsDir)
+	renderWorkspaceBlock(renderer, workspaceID, description, repos)
 	renderSuggestion(renderer, useColor, filepath.Join(rootDir, "workspaces", workspaceID))
 	return nil
 }
@@ -803,6 +818,14 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 		return err
 	}
 	repoURL := buildRepoURLFromParts(req.Host, req.Owner, req.Repo)
+	description := ""
+	if strings.EqualFold(strings.TrimSpace(req.Provider), "github") {
+		issue, err := fetchGitHubIssue(ctx, req.Host, req.Owner, req.Repo, req.Number)
+		if err != nil {
+			return err
+		}
+		description = issue.Title
+	}
 
 	branchProvided := branch != ""
 	if workspaceID == "" {
@@ -856,6 +879,12 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 	if err != nil {
 		return err
 	}
+	if err := workspace.SaveMetadata(wsDir, workspace.Metadata{Description: description}); err != nil {
+		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
+			return fmt.Errorf("save workspace metadata failed: %w (rollback failed: %v)", err, rollbackErr)
+		}
+		return err
+	}
 
 	output.Step(formatStep("worktree add", displayRepoName(repoURL), worktreeDest(rootDir, workspaceID, repoURL)))
 	if _, err := workspace.AddWithBranch(ctx, rootDir, workspaceID, repoURL, "", branch, baseRef, true); err != nil {
@@ -868,7 +897,7 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 	renderer.Blank()
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
-	renderWorkspaceBlock(renderer, workspaceID, repos)
+	renderWorkspaceBlock(renderer, workspaceID, description, repos)
 	renderSuggestion(renderer, useColor, wsDir)
 	return nil
 }
@@ -930,6 +959,14 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 		return err
 	}
 	repoURL := buildRepoURLFromParts(req.Host, req.Owner, req.Repo)
+	description := ""
+	if strings.EqualFold(strings.TrimSpace(req.Provider), "github") {
+		issue, err := fetchGitHubIssue(ctx, req.Host, req.Owner, req.Repo, req.Number)
+		if err != nil {
+			return err
+		}
+		description = issue.Title
+	}
 
 	branchProvided := branch != ""
 	if workspaceID == "" {
@@ -983,6 +1020,12 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	if err != nil {
 		return err
 	}
+	if err := workspace.SaveMetadata(wsDir, workspace.Metadata{Description: description}); err != nil {
+		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
+			return fmt.Errorf("save workspace metadata failed: %w (rollback failed: %v)", err, rollbackErr)
+		}
+		return err
+	}
 
 	output.Step(formatStep("worktree add", displayRepoName(repoURL), worktreeDest(rootDir, workspaceID, repoURL)))
 	if _, err := workspace.AddWithBranch(ctx, rootDir, workspaceID, repoURL, "", branch, baseRef, true); err != nil {
@@ -995,7 +1038,7 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	renderer.Blank()
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
-	renderWorkspaceBlock(renderer, workspaceID, repos)
+	renderWorkspaceBlock(renderer, workspaceID, description, repos)
 	renderSuggestion(renderer, useColor, wsDir)
 	return nil
 }
@@ -1053,8 +1096,10 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 		return fmt.Errorf("no issues found")
 	}
 
+	issueByNumber := make(map[int]issueSummary, len(issues))
 	var issueChoices []ui.PromptChoice
 	for _, issue := range issues {
+		issueByNumber[issue.Number] = issue
 		label := fmt.Sprintf("#%d", issue.Number)
 		if strings.TrimSpace(issue.Title) != "" {
 			label = fmt.Sprintf("#%d %s", issue.Number, strings.TrimSpace(issue.Title))
@@ -1094,6 +1139,7 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 	repoURL := buildRepoURLFromParts(selectedRepo.Host, selectedRepo.Owner, selectedRepo.Repo)
 	type issueWorkspaceResult struct {
 		workspaceID string
+		description string
 		repos       []workspace.Repo
 	}
 	var results []issueWorkspaceResult
@@ -1107,12 +1153,25 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 			failureID = value
 			break
 		}
+		description := ""
+		if issue, ok := issueByNumber[num]; ok {
+			description = issue.Title
+		}
 		workspaceID := fmt.Sprintf("ISSUE-%d", num)
 		branch := fmt.Sprintf("issue/%d", num)
 		output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, filepath.Join(rootDir, "workspaces", workspaceID))))
 		wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 		if err != nil {
 			failure = err
+			failureID = workspaceID
+			break
+		}
+		if err := workspace.SaveMetadata(wsDir, workspace.Metadata{Description: description}); err != nil {
+			if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
+				failure = fmt.Errorf("save workspace metadata failed: %w (rollback failed: %v)", err, rollbackErr)
+			} else {
+				failure = err
+			}
 			failureID = workspaceID
 			break
 		}
@@ -1131,6 +1190,7 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 		repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 		results = append(results, issueWorkspaceResult{
 			workspaceID: workspaceID,
+			description: description,
 			repos:       repos,
 		})
 	}
@@ -1139,7 +1199,7 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 		renderer.Blank()
 		renderer.Section("Result")
 		for _, result := range results {
-			renderWorkspaceBlock(renderer, result.workspaceID, result.repos)
+			renderWorkspaceBlock(renderer, result.workspaceID, result.description, result.repos)
 		}
 	}
 	if failure != nil {
@@ -1219,6 +1279,40 @@ func fetchGitHubIssues(ctx context.Context, host, owner, repoName string) ([]iss
 	return parseGitHubIssues(stdout.Bytes())
 }
 
+func fetchGitHubIssue(ctx context.Context, host, owner, repoName string, number int) (issueSummary, error) {
+	if strings.TrimSpace(owner) == "" || strings.TrimSpace(repoName) == "" || number <= 0 {
+		return issueSummary{}, fmt.Errorf("owner/repo and issue number are required")
+	}
+	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d", owner, repoName, number)
+	args := []string{"api", "-X", "GET", endpoint}
+	if host != "" && !strings.EqualFold(host, "github.com") {
+		args = append([]string{"api", "--hostname", host}, args[1:]...)
+	}
+	cmd := exec.CommandContext(ctx, "gh", args...)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg != "" {
+			return issueSummary{}, fmt.Errorf("gh api failed: %s", msg)
+		}
+		return issueSummary{}, fmt.Errorf("gh api failed: %w", err)
+	}
+	var item githubIssueItem
+	if err := json.Unmarshal(stdout.Bytes(), &item); err != nil {
+		return issueSummary{}, fmt.Errorf("parse gh api response: %w", err)
+	}
+	if item.Number == 0 {
+		return issueSummary{}, fmt.Errorf("issue not found")
+	}
+	return issueSummary{
+		Number: item.Number,
+		Title:  strings.TrimSpace(item.Title),
+	}, nil
+}
+
 func parseGitHubIssues(data []byte) ([]issueSummary, error) {
 	var raw []githubIssueItem
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -1296,6 +1390,7 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool) 
 	if !strings.EqualFold(strings.TrimSpace(pr.HeadRepo), strings.TrimSpace(pr.BaseRepo)) {
 		return fmt.Errorf("fork PRs are not supported: %s", pr.HeadRepo)
 	}
+	description := pr.Title
 
 	baseOwner, baseRepo, ok := splitRepoFullName(pr.BaseRepo)
 	if !ok {
@@ -1333,6 +1428,12 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool) 
 	if err != nil {
 		return err
 	}
+	if err := workspace.SaveMetadata(wsDir, workspace.Metadata{Description: description}); err != nil {
+		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
+			return fmt.Errorf("save workspace metadata failed: %w (rollback failed: %v)", err, rollbackErr)
+		}
+		return err
+	}
 
 	store, err := repo.Open(ctx, rootDir, repoURL, false)
 	if err != nil {
@@ -1354,7 +1455,7 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool) 
 	renderer.Blank()
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
-	renderWorkspaceBlock(renderer, workspaceID, repos)
+	renderWorkspaceBlock(renderer, workspaceID, description, repos)
 	renderSuggestion(renderer, useColor, wsDir)
 	return nil
 }
@@ -1440,6 +1541,7 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool) e
 
 	type reviewWorkspaceResult struct {
 		workspaceID string
+		description string
 		repos       []workspace.Repo
 	}
 	var results []reviewWorkspaceResult
@@ -1464,11 +1566,21 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool) e
 			failureID = fmt.Sprintf("PR-%d", num)
 			break
 		}
+		description := pr.Title
 		workspaceID := fmt.Sprintf("REVIEW-PR-%d", num)
 		output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, filepath.Join(rootDir, "workspaces", workspaceID))))
 		wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 		if err != nil {
 			failure = err
+			failureID = workspaceID
+			break
+		}
+		if err := workspace.SaveMetadata(wsDir, workspace.Metadata{Description: description}); err != nil {
+			if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
+				failure = fmt.Errorf("save workspace metadata failed: %w (rollback failed: %v)", err, rollbackErr)
+			} else {
+				failure = err
+			}
 			failureID = workspaceID
 			break
 		}
@@ -1500,6 +1612,7 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool) e
 		repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 		results = append(results, reviewWorkspaceResult{
 			workspaceID: workspaceID,
+			description: description,
 			repos:       repos,
 		})
 	}
@@ -1508,7 +1621,7 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool) e
 		renderer.Blank()
 		renderer.Section("Result")
 		for _, result := range results {
-			renderWorkspaceBlock(renderer, result.workspaceID, result.repos)
+			renderWorkspaceBlock(renderer, result.workspaceID, result.description, result.repos)
 		}
 	}
 	if failure != nil {
@@ -1703,6 +1816,11 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 		return err
 	}
 	repoURL := buildRepoURL(req)
+	pr, err := fetchGitHubPR(ctx, req.Host, req.Owner, req.Repo, req.Number)
+	if err != nil {
+		return err
+	}
+	description := pr.Title
 
 	_, exists, err := repo.Exists(rootDir, repoURL)
 	if err != nil {
@@ -1733,6 +1851,12 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 	if err != nil {
 		return err
 	}
+	if err := workspace.SaveMetadata(wsDir, workspace.Metadata{Description: description}); err != nil {
+		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
+			return fmt.Errorf("save workspace metadata failed: %w (rollback failed: %v)", err, rollbackErr)
+		}
+		return err
+	}
 
 	store, err := repo.Open(ctx, rootDir, repoURL, false)
 	if err != nil {
@@ -1755,7 +1879,7 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 	renderer.Blank()
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
-	renderWorkspaceBlock(renderer, workspaceID, repos)
+	renderWorkspaceBlock(renderer, workspaceID, description, repos)
 	renderSuggestion(renderer, useColor, wsDir)
 	return nil
 }
@@ -1999,14 +2123,31 @@ func renderWorkspaceRepos(r *ui.Renderer, repos []workspace.Repo, extraIndent st
 	}
 }
 
-func renderWorkspaceBlock(r *ui.Renderer, workspaceID string, repos []workspace.Repo) {
+func renderWorkspaceBlock(r *ui.Renderer, workspaceID, description string, repos []workspace.Repo) {
+	label := formatWorkspaceLabel(workspaceID, description)
 	if r != nil {
-		r.Bullet(fmt.Sprintf("%s (repos: %d)", workspaceID, len(repos)))
+		r.BulletWithDescription(workspaceID, description, fmt.Sprintf("(repos: %d)", len(repos)))
 		renderWorkspaceRepos(r, repos, output.Indent)
 		return
 	}
-	fmt.Fprintf(os.Stdout, "%s%s %s (repos: %d)\n", output.Indent, output.StepPrefix, workspaceID, len(repos))
+	fmt.Fprintf(os.Stdout, "%s%s %s (repos: %d)\n", output.Indent, output.StepPrefix, label, len(repos))
 	renderWorkspaceRepos(nil, repos, output.Indent)
+}
+
+func formatWorkspaceLabel(workspaceID, description string) string {
+	desc := strings.TrimSpace(description)
+	if desc == "" {
+		return workspaceID
+	}
+	return fmt.Sprintf("%s - %s", workspaceID, desc)
+}
+
+func loadWorkspaceDescription(wsDir string) string {
+	desc, err := workspace.ReadDescription(wsDir)
+	if err != nil {
+		return ""
+	}
+	return desc
 }
 
 func loadWorkspaceRepos(ctx context.Context, wsDir string) ([]workspace.Repo, []error, error) {
@@ -2026,7 +2167,10 @@ func buildWorkspaceChoices(ctx context.Context, entries []workspace.Entry) []ui.
 }
 
 func buildWorkspaceChoice(ctx context.Context, entry workspace.Entry) ui.WorkspaceChoice {
-	choice := ui.WorkspaceChoice{ID: entry.WorkspaceID}
+	choice := ui.WorkspaceChoice{
+		ID:          entry.WorkspaceID,
+		Description: entry.Description,
+	}
 	repos, _, err := workspace.ScanRepos(ctx, entry.WorkspacePath)
 	if err != nil {
 		return choice
@@ -2707,7 +2851,7 @@ func writeWorkspaceListText(ctx context.Context, entries []workspace.Entry, warn
 			repoWarnings = append(repoWarnings, fmt.Sprintf("%s: %s", entry.WorkspaceID, compactError(err)))
 		}
 		repoWarnings = appendWarningLines(repoWarnings, entry.WorkspaceID, warnings)
-		renderWorkspaceBlock(renderer, entry.WorkspaceID, repos)
+		renderWorkspaceBlock(renderer, entry.WorkspaceID, entry.Description, repos)
 	}
 	repoWarnings = appendWarningLines(repoWarnings, "", warnings)
 	renderWarningsSection(renderer, "warnings", repoWarnings, true)

@@ -11,6 +11,7 @@
 - `$GWS_ROOT/workspaces/`     : workspace (AI)
 - `$GWS_ROOT/workspaces/<ID>/`:
     - `<alias>/`        : worktree 作業ディレクトリ
+    - `.gws/metadata.json` : workspace のメタデータ（description など）
 
 ## repo store のパス
 - `$GWS_ROOT/bare/<host>/<owner>/<repo>.git`
