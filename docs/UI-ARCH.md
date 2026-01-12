@@ -37,6 +37,7 @@
 - 直接 `fmt.Fprintf/Printf/Println` でUI出力しない（Renderer/Frame経由）
 - プロンプトの行は `Inputs` に集約し、情報は `Info` に集約する
 - 独自ヘッダ（例: “Selected”）は作らず、Info にまとめる
+- 対話は AltScreen を使わず、画面を奪わない（`tea.WithAltScreen` を使わない）
 
 ## 既存フローへの適用
 - 連続する複数の Prompt 呼び出しは、可能な限り単一の Frame で更新する

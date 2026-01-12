@@ -18,6 +18,20 @@ type PromptChoice struct {
 	Value string
 }
 
+type createFlowStage int
+
+const (
+	createStageMode createFlowStage = iota
+	createStageTemplate
+	createStageTemplateDesc
+	createStageTemplateBranch
+	createStageTemplateBranchConfirm
+	createStageReviewRepo
+	createStageReviewPRs
+	createStageIssueRepo
+	createStageIssueIssues
+)
+
 type WorkspaceChoice struct {
 	ID          string
 	Description string
@@ -30,8 +44,7 @@ type BlockedChoice struct {
 
 func PromptNewWorkspaceInputs(title string, templates []string, templateName string, workspaceID string, theme Theme, useColor bool) (string, string, error) {
 	model := newInputsModel(title, templates, templateName, workspaceID, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return "", "", err
 	}
@@ -44,8 +57,7 @@ func PromptNewWorkspaceInputs(title string, templates []string, templateName str
 
 func PromptWorkspaceAndRepo(title string, workspaces []WorkspaceChoice, repos []PromptChoice, workspaceID, repoSpec string, theme Theme, useColor bool) (string, string, error) {
 	model := newAddInputsModel(title, workspaces, repos, workspaceID, repoSpec, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return "", "", err
 	}
@@ -58,8 +70,7 @@ func PromptWorkspaceAndRepo(title string, workspaces []WorkspaceChoice, repos []
 
 func PromptWorkspace(title string, workspaces []WorkspaceChoice, theme Theme, useColor bool) (string, error) {
 	model := newWorkspaceSelectModel(title, workspaces, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return "", err
 	}
@@ -72,8 +83,7 @@ func PromptWorkspace(title string, workspaces []WorkspaceChoice, theme Theme, us
 
 func PromptWorkspaceWithBlocked(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, theme Theme, useColor bool) (string, error) {
 	model := newWorkspaceSelectModelWithBlocked(title, workspaces, blocked, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return "", err
 	}
@@ -86,8 +96,7 @@ func PromptWorkspaceWithBlocked(title string, workspaces []WorkspaceChoice, bloc
 
 func PromptWorkspaceMultiSelectWithBlocked(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, theme Theme, useColor bool) ([]string, error) {
 	model := newWorkspaceMultiSelectModel(title, workspaces, blocked, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return nil, err
 	}
@@ -100,8 +109,7 @@ func PromptWorkspaceMultiSelectWithBlocked(title string, workspaces []WorkspaceC
 
 func PromptConfirmInline(label string, theme Theme, useColor bool) (bool, error) {
 	model := newConfirmInlineModel(label, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return false, err
 	}
@@ -134,6 +142,417 @@ type inputsModel struct {
 	cursor    int
 	err       error
 	errorLine string
+	done      bool
+}
+
+type createFlowModel struct {
+	stage createFlowStage
+	mode  string
+
+	templates []string
+	tmplErr   error
+
+	modeInput textinput.Model
+	filtered  []PromptChoice
+	cursor    int
+	err       error
+
+	templateModel inputsModel
+	templateRepos []string
+	description  string
+	descInput     textinput.Model
+	branchInput   textinput.Model
+	branchIndex   int
+	branches      []string
+	usedBranches  map[string]int
+	pendingBranch string
+	confirmModel  confirmInlineModel
+	errorLine     string
+	reviewRepos   []PromptChoice
+	issueRepos    []PromptChoice
+	reviewRepo    string
+	issueRepo     string
+	reviewPRs     []string
+	issueIssues   []string
+
+	reviewRepoModel  choiceSelectModel
+	reviewPRModel    multiSelectModel
+	issueRepoModel   choiceSelectModel
+	issueIssueModel  multiSelectModel
+	loadReviewPRs    func(string) ([]PromptChoice, error)
+	loadIssueChoices func(string) ([]PromptChoice, error)
+	loadTemplateRepos func(string) ([]string, error)
+	validateBranch    func(string) error
+
+	theme    Theme
+	useColor bool
+}
+
+func newCreateFlowModel(title string, templates []string, tmplErr error, reviewRepos []PromptChoice, issueRepos []PromptChoice, loadReview func(string) ([]PromptChoice, error), loadIssue func(string) ([]PromptChoice, error), loadTemplateRepos func(string) ([]string, error), validateBranch func(string) error, theme Theme, useColor bool) createFlowModel {
+	input := textinput.New()
+	input.Prompt = ""
+	input.Placeholder = "search"
+	input.Focus()
+	if useColor {
+		input.PlaceholderStyle = theme.Muted
+	}
+	m := createFlowModel{
+		stage:            createStageMode,
+		templates:        templates,
+		tmplErr:          tmplErr,
+		modeInput:        input,
+		reviewRepos:      reviewRepos,
+		issueRepos:       issueRepos,
+		loadReviewPRs:    loadReview,
+		loadIssueChoices: loadIssue,
+		loadTemplateRepos: loadTemplateRepos,
+		validateBranch:    validateBranch,
+		theme:            theme,
+		useColor:         useColor,
+	}
+	m.filtered = m.filterModes()
+	return m
+}
+
+func (m createFlowModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			m.err = ErrPromptCanceled
+			return m, tea.Quit
+		case tea.KeyUp:
+			if m.stage == createStageMode && m.cursor > 0 {
+				m.cursor--
+				return m, nil
+			}
+		case tea.KeyDown:
+			if m.stage == createStageMode && m.cursor < len(m.filtered)-1 {
+				m.cursor++
+				return m, nil
+			}
+		case tea.KeyEnter:
+			if m.stage == createStageMode {
+				if len(m.filtered) == 0 {
+					return m, nil
+				}
+				m.mode = m.filtered[m.cursor].Value
+				switch m.mode {
+				case "template":
+					if m.tmplErr != nil {
+						m.err = m.tmplErr
+						return m, tea.Quit
+					}
+					m.stage = createStageTemplate
+					m.templateModel = newInputsModel("gws create", m.templates, "", "", m.theme, m.useColor)
+				case "review":
+					if len(m.reviewRepos) == 0 {
+						m.err = fmt.Errorf("no GitHub repos found")
+						return m, tea.Quit
+					}
+					m.stage = createStageReviewRepo
+					m.reviewRepoModel = newChoiceSelectModel("gws create", "repo", m.reviewRepos, m.theme, m.useColor)
+				case "issue":
+					if len(m.issueRepos) == 0 {
+						m.err = fmt.Errorf("no repos with supported hosts found")
+						return m, tea.Quit
+					}
+					m.stage = createStageIssueRepo
+					m.issueRepoModel = newChoiceSelectModel("gws create", "repo", m.issueRepos, m.theme, m.useColor)
+				default:
+					m.err = fmt.Errorf("unknown mode: %s", m.mode)
+					return m, tea.Quit
+				}
+				return m, nil
+			}
+		}
+	}
+
+	if m.stage == createStageTemplate {
+		model, _ := m.templateModel.Update(msg)
+		m.templateModel = model.(inputsModel)
+		if m.templateModel.done {
+			repos, err := m.loadTemplateRepos(m.templateName())
+			if err != nil {
+				m.err = err
+				return m, tea.Quit
+			}
+			m.templateRepos = repos
+			m.descInput = textinput.New()
+			m.descInput.Prompt = ""
+			m.descInput.Placeholder = "description"
+			m.descInput.Focus()
+			if m.useColor {
+				m.descInput.PlaceholderStyle = m.theme.Muted
+			}
+			m.stage = createStageTemplateDesc
+			return m, nil
+		}
+		return m, nil
+	}
+
+	if m.stage == createStageTemplateDesc {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.Type {
+			case tea.KeyCtrlC, tea.KeyEsc:
+				m.err = ErrPromptCanceled
+				return m, tea.Quit
+			case tea.KeyEnter:
+				m.description = strings.TrimSpace(m.descInput.Value())
+				if len(m.templateRepos) == 0 {
+					return m, tea.Quit
+				}
+				m.branches = make([]string, len(m.templateRepos))
+				m.usedBranches = map[string]int{}
+				m.branchIndex = 0
+				m.branchInput = textinput.New()
+				m.branchInput.Prompt = ""
+				m.branchInput.Placeholder = m.workspaceID()
+				m.branchInput.SetValue(m.workspaceID())
+				m.branchInput.Focus()
+				if m.useColor {
+					m.branchInput.PlaceholderStyle = m.theme.Muted
+				}
+				m.stage = createStageTemplateBranch
+				return m, nil
+			}
+		}
+		var cmd tea.Cmd
+		m.descInput, cmd = m.descInput.Update(msg)
+		return m, cmd
+	}
+
+	if m.stage == createStageTemplateBranch {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.Type {
+			case tea.KeyCtrlC, tea.KeyEsc:
+				m.err = ErrPromptCanceled
+				return m, tea.Quit
+			case tea.KeyEnter:
+				value := strings.TrimSpace(m.branchInput.Value())
+				if value == "" {
+					value = m.workspaceID()
+				}
+				if m.validateBranch != nil {
+					if err := m.validateBranch(value); err != nil {
+						m.errorLine = err.Error()
+						return m, nil
+					}
+				}
+				if prevIndex, exists := m.usedBranches[value]; exists {
+					label := fmt.Sprintf("branch %q already used for repo #%d; use again?", value, prevIndex+1)
+					m.pendingBranch = value
+					m.confirmModel = newConfirmInlineModel(label, m.theme, m.useColor)
+					m.stage = createStageTemplateBranchConfirm
+					return m, nil
+				}
+				m.branches[m.branchIndex] = value
+				m.usedBranches[value] = m.branchIndex
+				m.branchIndex++
+				m.errorLine = ""
+				if m.branchIndex >= len(m.templateRepos) {
+					return m, tea.Quit
+				}
+				m.branchInput.SetValue(m.workspaceID())
+				m.branchInput.CursorEnd()
+				return m, nil
+			}
+		}
+		var cmd tea.Cmd
+		m.branchInput, cmd = m.branchInput.Update(msg)
+		if strings.TrimSpace(m.branchInput.Value()) != "" {
+			m.errorLine = ""
+		}
+		return m, cmd
+	}
+
+	if m.stage == createStageTemplateBranchConfirm {
+		model, _ := m.confirmModel.Update(msg)
+		m.confirmModel = model.(confirmInlineModel)
+		if m.confirmModel.done {
+			if m.confirmModel.value {
+				m.branches[m.branchIndex] = m.pendingBranch
+				m.usedBranches[m.pendingBranch] = m.branchIndex
+				m.branchIndex++
+				if m.branchIndex >= len(m.templateRepos) {
+					return m, tea.Quit
+				}
+				m.branchInput.SetValue(m.workspaceID())
+				m.branchInput.CursorEnd()
+			}
+			m.pendingBranch = ""
+			m.confirmModel = confirmInlineModel{}
+			m.stage = createStageTemplateBranch
+		}
+		return m, nil
+	}
+
+	if m.stage == createStageReviewRepo {
+		model, _ := m.reviewRepoModel.Update(msg)
+		m.reviewRepoModel = model.(choiceSelectModel)
+		if m.reviewRepoModel.done {
+			m.reviewRepo = m.reviewRepoModel.value
+			choices, err := m.loadReviewPRs(m.reviewRepo)
+			if err != nil {
+				m.err = err
+				return m, tea.Quit
+			}
+			if len(choices) == 0 {
+				m.err = fmt.Errorf("no pull requests found")
+				return m, tea.Quit
+			}
+			m.reviewPRModel = newMultiSelectModel("gws create", "pull request", choices, m.theme, m.useColor)
+			m.stage = createStageReviewPRs
+		}
+		return m, nil
+	}
+
+	if m.stage == createStageReviewPRs {
+		model, _ := m.reviewPRModel.Update(msg)
+		m.reviewPRModel = model.(multiSelectModel)
+		if m.reviewPRModel.done {
+			m.reviewPRs = append([]string(nil), m.reviewPRModel.selectedValues...)
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+
+	if m.stage == createStageIssueRepo {
+		model, _ := m.issueRepoModel.Update(msg)
+		m.issueRepoModel = model.(choiceSelectModel)
+		if m.issueRepoModel.done {
+			m.issueRepo = m.issueRepoModel.value
+			choices, err := m.loadIssueChoices(m.issueRepo)
+			if err != nil {
+				m.err = err
+				return m, tea.Quit
+			}
+			if len(choices) == 0 {
+				m.err = fmt.Errorf("no issues found")
+				return m, tea.Quit
+			}
+			m.issueIssueModel = newMultiSelectModel("gws create", "issue", choices, m.theme, m.useColor)
+			m.stage = createStageIssueIssues
+		}
+		return m, nil
+	}
+
+	if m.stage == createStageIssueIssues {
+		model, _ := m.issueIssueModel.Update(msg)
+		m.issueIssueModel = model.(multiSelectModel)
+		if m.issueIssueModel.done {
+			m.issueIssues = append([]string(nil), m.issueIssueModel.selectedValues...)
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.modeInput, cmd = m.modeInput.Update(msg)
+	m.filtered = m.filterModes()
+	if m.cursor >= len(m.filtered) {
+		m.cursor = max(0, len(m.filtered)-1)
+	}
+	return m, cmd
+}
+
+func (m createFlowModel) View() string {
+	if m.stage == createStageTemplate {
+		return m.templateModel.View()
+	}
+	if m.stage == createStageTemplateDesc {
+		frame := NewFrame(m.theme, m.useColor)
+		labelTemplate := promptLabel(m.theme, m.useColor, "template")
+		labelWorkspace := promptLabel(m.theme, m.useColor, "workspace id")
+		labelDesc := promptLabel(m.theme, m.useColor, "description")
+		frame.SetInputsPrompt(
+			fmt.Sprintf("%s: %s", labelTemplate, m.templateName()),
+			fmt.Sprintf("%s: %s", labelWorkspace, m.workspaceID()),
+			fmt.Sprintf("%s: %s", labelDesc, m.descInput.View()),
+		)
+		return frame.Render()
+	}
+	if m.stage == createStageTemplateBranch {
+		frame := NewFrame(m.theme, m.useColor)
+		labelTemplate := promptLabel(m.theme, m.useColor, "template")
+		labelWorkspace := promptLabel(m.theme, m.useColor, "workspace id")
+		labelDesc := promptLabel(m.theme, m.useColor, "description")
+		repoLabel := fmt.Sprintf("repo #%d", m.branchIndex+1)
+		if m.branchIndex < len(m.templateRepos) {
+			repoLabel = fmt.Sprintf("repo #%d (%s)", m.branchIndex+1, m.templateRepos[m.branchIndex])
+		}
+		labelBranch := promptLabel(m.theme, m.useColor, fmt.Sprintf("branch for %s", repoLabel))
+		lines := []string{
+			fmt.Sprintf("%s: %s", labelTemplate, m.templateName()),
+			fmt.Sprintf("%s: %s", labelWorkspace, m.workspaceID()),
+		}
+		if m.description != "" {
+			lines = append(lines, fmt.Sprintf("%s: %s", labelDesc, m.description))
+		}
+		lines = append(lines, fmt.Sprintf("%s: %s", labelBranch, m.branchInput.View()))
+		frame.SetInputsPrompt(lines...)
+		if m.errorLine != "" {
+			frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), m.errorLine))
+		}
+		return frame.Render()
+	}
+	if m.stage == createStageTemplateBranchConfirm {
+		return m.confirmModel.View()
+	}
+	if m.stage == createStageReviewRepo {
+		return m.reviewRepoModel.View()
+	}
+	if m.stage == createStageReviewPRs {
+		return m.reviewPRModel.View()
+	}
+	if m.stage == createStageIssueRepo {
+		return m.issueRepoModel.View()
+	}
+	if m.stage == createStageIssueIssues {
+		return m.issueIssueModel.View()
+	}
+
+	frame := NewFrame(m.theme, m.useColor)
+	label := promptLabel(m.theme, m.useColor, "mode")
+	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.modeInput.View()))
+	rawLines := collectLines(func(b *strings.Builder) {
+		renderRepoChoiceList(b, m.filtered, m.cursor, m.useColor, m.theme)
+	})
+	frame.AppendInputsRaw(rawLines...)
+	return frame.Render()
+}
+
+func (m createFlowModel) filterModes() []PromptChoice {
+	q := strings.ToLower(strings.TrimSpace(m.modeInput.Value()))
+	choices := []PromptChoice{
+		{Label: "template", Value: "template"},
+		{Label: "review", Value: "review"},
+		{Label: "issue", Value: "issue"},
+	}
+	if q == "" {
+		return choices
+	}
+	var out []PromptChoice
+	for _, item := range choices {
+		if strings.Contains(strings.ToLower(item.Label), q) || strings.Contains(strings.ToLower(item.Value), q) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func (m createFlowModel) templateName() string {
+	return strings.TrimSpace(m.templateModel.template)
+}
+
+func (m createFlowModel) workspaceID() string {
+	return m.templateModel.currentWorkspaceID()
 }
 
 func newInputsModel(title string, templates []string, templateName string, workspaceID string, theme Theme, useColor bool) inputsModel {
@@ -196,6 +615,7 @@ func (m inputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.template = m.filtered[m.cursor]
 				if strings.TrimSpace(m.workspaceID) != "" {
+					m.done = true
 					return m, tea.Quit
 				}
 				m.stage = stageWorkspace
@@ -209,6 +629,7 @@ func (m inputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				m.workspaceID = value
+				m.done = true
 				return m, tea.Quit
 			}
 		case tea.KeyUp:
@@ -321,6 +742,7 @@ type confirmInlineModel struct {
 	input    textinput.Model
 	value    bool
 	err      error
+	done     bool
 }
 
 func newConfirmInlineModel(label string, theme Theme, useColor bool) confirmInlineModel {
@@ -355,9 +777,11 @@ func (m confirmInlineModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch value {
 			case "y", "yes":
 				m.value = true
+				m.done = true
 				return m, tea.Quit
 			case "n", "no":
 				m.value = false
+				m.done = true
 				return m, tea.Quit
 			default:
 				return m, nil
@@ -381,8 +805,7 @@ func (m confirmInlineModel) View() string {
 // Empty input accepts the default. Validation errors are shown inline and reprompted.
 func PromptInputInline(label, defaultValue string, validate func(string) error, theme Theme, useColor bool) (string, error) {
 	model := newInputInlineModel(label, defaultValue, validate, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return "", err
 	}
@@ -486,8 +909,7 @@ func (m inputInlineModel) View() string {
 // It can also collect a template name when not provided.
 func PromptTemplateRepos(title string, templateName string, choices []PromptChoice, theme Theme, useColor bool) (string, []string, error) {
 	model := newTemplateRepoSelectModel(title, templateName, choices, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return "", nil, err
 	}
@@ -501,8 +923,7 @@ func PromptTemplateRepos(title string, templateName string, choices []PromptChoi
 // PromptTemplateName asks for a template name via text input.
 func PromptTemplateName(title string, defaultValue string, theme Theme, useColor bool) (string, error) {
 	model := newTemplateNameModel(title, defaultValue, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return "", err
 	}
@@ -516,8 +937,7 @@ func PromptTemplateName(title string, defaultValue string, theme Theme, useColor
 // PromptChoiceSelect lets users pick a single choice from a list with filtering.
 func PromptChoiceSelect(title, label string, choices []PromptChoice, theme Theme, useColor bool) (string, error) {
 	model := newChoiceSelectModel(title, label, choices, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return "", err
 	}
@@ -531,8 +951,7 @@ func PromptChoiceSelect(title, label string, choices []PromptChoice, theme Theme
 // PromptMultiSelect lets users pick one or more choices from a list with filtering.
 func PromptMultiSelect(title, label string, choices []PromptChoice, theme Theme, useColor bool) ([]string, error) {
 	model := newMultiSelectModel(title, label, choices, theme, useColor)
-	prog := tea.NewProgram(model)
-	out, err := prog.Run()
+	out, err := runProgram(model)
 	if err != nil {
 		return nil, err
 	}
@@ -541,6 +960,19 @@ func PromptMultiSelect(title, label string, choices []PromptChoice, theme Theme,
 		return nil, final.err
 	}
 	return append([]string(nil), final.selectedValues...), nil
+}
+
+func PromptCreateFlow(title string, templates []string, templateErr error, reviewRepos []PromptChoice, issueRepos []PromptChoice, loadReview func(string) ([]PromptChoice, error), loadIssue func(string) ([]PromptChoice, error), loadTemplateRepos func(string) ([]string, error), validateBranch func(string) error, theme Theme, useColor bool) (string, string, string, string, []string, string, []string, string, []string, error) {
+	model := newCreateFlowModel(title, templates, templateErr, reviewRepos, issueRepos, loadReview, loadIssue, loadTemplateRepos, validateBranch, theme, useColor)
+	out, err := runProgram(model)
+	if err != nil {
+		return "", "", "", "", nil, "", nil, "", nil, err
+	}
+	final := out.(createFlowModel)
+	if final.err != nil {
+		return "", "", "", "", nil, "", nil, "", nil, final.err
+	}
+	return final.mode, final.templateName(), final.workspaceID(), final.description, append([]string(nil), final.branches...), final.reviewRepo, append([]string(nil), final.reviewPRs...), final.issueRepo, append([]string(nil), final.issueIssues...), nil
 }
 
 type templateRepoSelectModel struct {
@@ -723,9 +1155,13 @@ func (m templateRepoSelectModel) View() string {
 	})
 	frame.AppendInputsRaw(rawLines...)
 
-	frame.SetInfo("selected")
+	if m.useColor {
+		frame.SetInfo(m.theme.Accent.Render("selected"))
+	} else {
+		frame.SetInfo("selected")
+	}
 	selectedLines := collectLines(func(b *strings.Builder) {
-		renderSelectedRepoList(b, m.selected, m.useColor, m.theme)
+		renderSelectedRepoTree(b, m.selected, m.useColor, m.theme)
 	})
 	frame.AppendInfoRaw(selectedLines...)
 
@@ -790,6 +1226,7 @@ type choiceSelectModel struct {
 	value     string
 	err       error
 	errorLine string
+	done      bool
 
 	theme    Theme
 	useColor bool
@@ -844,6 +1281,7 @@ func (m choiceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			choice := m.filtered[m.cursor]
 			m.value = choice.Value
+			m.done = true
 			return m, tea.Quit
 		}
 	}
@@ -877,9 +1315,6 @@ func (m choiceSelectModel) View() string {
 		}
 		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
 	}
-
-	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
-	frame.AppendInfoRaw(fmt.Sprintf("%s%s enter: select highlighted %s", output.Indent, infoPrefix, m.label))
 	return frame.Render()
 }
 
@@ -907,6 +1342,7 @@ type multiSelectModel struct {
 	cursor         int
 	err            error
 	errorLine      string
+	done           bool
 
 	theme    Theme
 	useColor bool
@@ -949,6 +1385,7 @@ func (m multiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errorLine = fmt.Sprintf("select at least one %s", m.label)
 				return m, nil
 			}
+			m.done = true
 			return m, tea.Quit
 		case tea.KeyUp:
 			if m.cursor > 0 {
@@ -967,6 +1404,7 @@ func (m multiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.errorLine = fmt.Sprintf("select at least one %s", m.label)
 					return m, nil
 				}
+				m.done = true
 				return m, tea.Quit
 			}
 			if len(m.filtered) == 0 {
@@ -1005,9 +1443,13 @@ func (m multiSelectModel) View() string {
 	})
 	frame.AppendInputsRaw(rawLines...)
 
-	frame.SetInfo("selected")
+	if m.useColor {
+		frame.SetInfo(m.theme.Accent.Render("selected"))
+	} else {
+		frame.SetInfo("selected")
+	}
 	selectedLines := collectLines(func(b *strings.Builder) {
-		renderSelectedChoiceList(b, m.selected, m.useColor, m.theme)
+		renderSelectedChoiceTree(b, m.selected, m.useColor, m.theme)
 	})
 	frame.AppendInfoRaw(selectedLines...)
 
@@ -1123,6 +1565,10 @@ func mutedToken(theme Theme, useColor bool, token string) string {
 		return theme.Muted.Render(token)
 	}
 	return token
+}
+
+func runProgram(model tea.Model) (tea.Model, error) {
+	return tea.NewProgram(model).Run()
 }
 
 func collectLines(render func(*strings.Builder)) []string {
@@ -1371,9 +1817,13 @@ func (m workspaceMultiSelectModel) View() string {
 	})
 	frame.AppendInputsRaw(rawLines...)
 
-	frame.SetInfo("selected")
+	if m.useColor {
+		frame.SetInfo(m.theme.Accent.Render("selected"))
+	} else {
+		frame.SetInfo("selected")
+	}
 	selectedLines := collectLines(func(b *strings.Builder) {
-		renderSelectedWorkspaceList(b, m.selected, m.useColor, m.theme)
+		renderSelectedWorkspaceTree(b, m.selected, m.useColor, m.theme)
 	})
 	frame.AppendInfoRaw(selectedLines...)
 
@@ -1730,6 +2180,52 @@ func renderSelectedChoiceList(b *strings.Builder, items []PromptChoice, useColor
 	}
 }
 
+func renderSelectedRepoTree(b *strings.Builder, items []string, useColor bool, theme Theme) {
+	if len(items) == 0 {
+		msg := "none"
+		if useColor {
+			msg = theme.Muted.Render(msg)
+		}
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
+		return
+	}
+	for i, item := range items {
+		prefix := "├─ "
+		if i == len(items)-1 {
+			prefix = "└─ "
+		}
+		line := fmt.Sprintf("%s%s%s", output.Indent, prefix, item)
+		if useColor {
+			line = theme.Muted.Render(line)
+		}
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+}
+
+func renderSelectedChoiceTree(b *strings.Builder, items []PromptChoice, useColor bool, theme Theme) {
+	if len(items) == 0 {
+		msg := "none"
+		if useColor {
+			msg = theme.Muted.Render(msg)
+		}
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
+		return
+	}
+	for i, item := range items {
+		prefix := "├─ "
+		if i == len(items)-1 {
+			prefix = "└─ "
+		}
+		line := fmt.Sprintf("%s%s%s", output.Indent, prefix, item.Label)
+		if useColor {
+			line = theme.Muted.Render(line)
+		}
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+}
+
 func renderRepoDetailList(b *strings.Builder, repos []PromptChoice, indent string, useColor bool, theme Theme) {
 	for i, repo := range repos {
 		connector := "├─"
@@ -1769,6 +2265,33 @@ func renderSelectedWorkspaceList(b *strings.Builder, items []WorkspaceChoice, us
 			prefix = theme.Accent.Render(prefix)
 		}
 		line := fmt.Sprintf("%s%s %s", output.Indent, prefix, display)
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+}
+
+func renderSelectedWorkspaceTree(b *strings.Builder, items []WorkspaceChoice, useColor bool, theme Theme) {
+	if len(items) == 0 {
+		msg := "none"
+		if useColor {
+			msg = theme.Muted.Render(msg)
+		}
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
+		return
+	}
+	for i, item := range items {
+		label := item.ID
+		if strings.TrimSpace(item.Description) != "" {
+			label = fmt.Sprintf("%s - %s", item.ID, item.Description)
+		}
+		prefix := "├─ "
+		if i == len(items)-1 {
+			prefix = "└─ "
+		}
+		line := fmt.Sprintf("%s%s%s", output.Indent, prefix, label)
+		if useColor {
+			line = theme.Muted.Render(line)
+		}
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
