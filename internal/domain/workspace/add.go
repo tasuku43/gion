@@ -105,6 +105,91 @@ func AddWithBranch(ctx context.Context, rootDir, workspaceID, repoSpec, alias, b
 	return repoEntry, nil
 }
 
+func AddWithTrackingBranch(ctx context.Context, rootDir, workspaceID, repoSpec, alias, branch, remoteRef string, fetch bool) (Repo, error) {
+	if err := validateWorkspaceID(ctx, workspaceID); err != nil {
+		return Repo{}, err
+	}
+	if err := validateBranchName(ctx, branch); err != nil {
+		return Repo{}, err
+	}
+	if strings.TrimSpace(remoteRef) == "" {
+		return Repo{}, fmt.Errorf("remote ref is required")
+	}
+	if rootDir == "" {
+		return Repo{}, fmt.Errorf("root directory is required")
+	}
+
+	wsDir := filepath.Join(rootDir, "workspaces", workspaceID)
+	if exists, err := pathExists(wsDir); err != nil {
+		return Repo{}, err
+	} else if !exists {
+		return Repo{}, fmt.Errorf("workspace does not exist: %s", wsDir)
+	}
+
+	spec, err := repospec.Normalize(repoSpec)
+	if err != nil {
+		return Repo{}, err
+	}
+	if alias == "" {
+		alias = spec.Repo
+	}
+	if alias == "" {
+		return Repo{}, fmt.Errorf("alias is required")
+	}
+	repos, _, err := ScanRepos(ctx, wsDir)
+	if err != nil {
+		return Repo{}, err
+	}
+	for _, existing := range repos {
+		if existing.Alias == alias {
+			return Repo{}, fmt.Errorf("alias already exists: %s", alias)
+		}
+		if spec.RepoKey != "" && existing.RepoKey == spec.RepoKey {
+			return Repo{}, fmt.Errorf("repo already exists: %s", spec.RepoKey)
+		}
+	}
+
+	store, err := repo.Open(ctx, rootDir, repoSpec, fetch)
+	if err != nil {
+		return Repo{}, err
+	}
+
+	worktreePath := filepath.Join(wsDir, alias)
+	if exists, err := pathExists(worktreePath); err != nil {
+		return Repo{}, err
+	} else if exists {
+		return Repo{}, fmt.Errorf("worktree already exists: %s", worktreePath)
+	}
+
+	remoteName := strings.TrimPrefix(remoteRef, "refs/remotes/")
+	if remoteName == remoteRef {
+		return Repo{}, fmt.Errorf("remote ref is required: %s", remoteRef)
+	}
+	exists, err := refExists(ctx, store.StorePath, remoteRef)
+	if err != nil {
+		return Repo{}, err
+	}
+	if !exists {
+		return Repo{}, fmt.Errorf("ref not found: %s", remoteRef)
+	}
+
+	gitcmd.Logf("git worktree add -b %s --track %s %s", branch, worktreePath, remoteName)
+	if _, err := gitcmd.Run(ctx, []string{"worktree", "add", "-b", branch, "--track", worktreePath, remoteName}, gitcmd.Options{Dir: store.StorePath, ShowOutput: true}); err != nil {
+		return Repo{}, err
+	}
+
+	repoEntry := Repo{
+		Alias:        alias,
+		RepoSpec:     repoSpec,
+		RepoKey:      spec.RepoKey,
+		StorePath:    store.StorePath,
+		WorktreePath: worktreePath,
+		Branch:       branch,
+	}
+
+	return repoEntry, nil
+}
+
 func resolveBaseRef(ctx context.Context, storePath string) (string, error) {
 	if storePath == "" {
 		return "", fmt.Errorf("store path is required")
