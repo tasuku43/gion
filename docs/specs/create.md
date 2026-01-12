@@ -117,7 +117,7 @@ Same behavior as the former `gws issue`.
   - Step 3: multi-select issues using the same add/remove loop as `gws template new` (filterable list; `<Enter>` adds; `<Ctrl+D>` or `done` to finish; minimum 1 selection).
   - For each selected issue:
     - Workspace ID = `ISSUE-<number>-<owner>-<repo>` (no per-item override in this flow).
-    - Branch = `issue/<number>`.
+    - Branch defaults to `issue/<number>` and can be edited per issue in a list editor; duplicate branches must be re-entered.
     - Workspace description = issue title.
     - Base ref detection and repo missing handling are the same as the URL path.
   - Flags `--workspace-id`, `--branch`, and `--base` are only valid when a single issue is targeted (URL path). In picker mode with multiple selections, using these flags is an error.

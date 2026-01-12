@@ -18,6 +18,11 @@ type PromptChoice struct {
 	Value string
 }
 
+type IssueSelection struct {
+	Value  string
+	Branch string
+}
+
 type createFlowStage int
 
 const (
@@ -173,12 +178,12 @@ type createFlowModel struct {
 	reviewRepo    string
 	issueRepo     string
 	reviewPRs     []string
-	issueIssues   []string
+	issueIssues   []IssueSelection
 
 	reviewRepoModel   choiceSelectModel
 	reviewPRModel     multiSelectModel
 	issueRepoModel    choiceSelectModel
-	issueIssueModel   multiSelectModel
+	issueIssueModel   issueBranchSelectModel
 	loadReviewPRs     func(string) ([]PromptChoice, error)
 	loadIssueChoices  func(string) ([]PromptChoice, error)
 	loadTemplateRepos func(string) ([]string, error)
@@ -437,7 +442,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.err = fmt.Errorf("no issues found")
 				return m, tea.Quit
 			}
-			m.issueIssueModel = newMultiSelectModel("gws create", "issue", choices, m.theme, m.useColor)
+			m.issueIssueModel = newIssueBranchSelectModel("gws create", "issue", choices, m.validateBranch, m.theme, m.useColor)
 			m.stage = createStageIssueIssues
 		}
 		return m, nil
@@ -445,9 +450,9 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if m.stage == createStageIssueIssues {
 		model, _ := m.issueIssueModel.Update(msg)
-		m.issueIssueModel = model.(multiSelectModel)
+		m.issueIssueModel = model.(issueBranchSelectModel)
 		if m.issueIssueModel.done {
-			m.issueIssues = append([]string(nil), m.issueIssueModel.selectedValues...)
+			m.issueIssues = append([]IssueSelection(nil), m.issueIssueModel.selectedIssues...)
 			return m, tea.Quit
 		}
 		return m, nil
@@ -517,7 +522,21 @@ func (m createFlowModel) View() string {
 	}
 	if m.stage == createStageIssueIssues {
 		labelRepo := promptLabel(m.theme, m.useColor, "repo")
-		return renderMultiSelectFrame(m.issueIssueModel, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
+		if m.issueIssueModel.stage == issueBranchStageEdit {
+			return renderIssueBranchEditFrame(m.issueIssueModel, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
+		}
+		return renderMultiSelectFrame(multiSelectModel{
+			title:     m.issueIssueModel.title,
+			label:     m.issueIssueModel.label,
+			choices:   m.issueIssueModel.choices,
+			filtered:  m.issueIssueModel.filtered,
+			selected:  m.issueIssueModel.selected,
+			cursor:    m.issueIssueModel.cursor,
+			errorLine: m.issueIssueModel.errorLine,
+			theme:     m.issueIssueModel.theme,
+			useColor:  m.issueIssueModel.useColor,
+			input:     m.issueIssueModel.input,
+		}, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
 	}
 
 	frame := NewFrame(m.theme, m.useColor)
@@ -964,7 +983,20 @@ func PromptMultiSelect(title, label string, choices []PromptChoice, theme Theme,
 	return append([]string(nil), final.selectedValues...), nil
 }
 
-func PromptCreateFlow(title string, templates []string, templateErr error, reviewRepos []PromptChoice, issueRepos []PromptChoice, loadReview func(string) ([]PromptChoice, error), loadIssue func(string) ([]PromptChoice, error), loadTemplateRepos func(string) ([]string, error), validateBranch func(string) error, theme Theme, useColor bool) (string, string, string, string, []string, string, []string, string, []string, error) {
+func PromptIssueSelectWithBranches(title, label string, choices []PromptChoice, validateBranch func(string) error, theme Theme, useColor bool) ([]IssueSelection, error) {
+	model := newIssueBranchSelectModel(title, label, choices, validateBranch, theme, useColor)
+	out, err := runProgram(model)
+	if err != nil {
+		return nil, err
+	}
+	final := out.(issueBranchSelectModel)
+	if final.err != nil {
+		return nil, final.err
+	}
+	return append([]IssueSelection(nil), final.selectedIssues...), nil
+}
+
+func PromptCreateFlow(title string, templates []string, templateErr error, reviewRepos []PromptChoice, issueRepos []PromptChoice, loadReview func(string) ([]PromptChoice, error), loadIssue func(string) ([]PromptChoice, error), loadTemplateRepos func(string) ([]string, error), validateBranch func(string) error, theme Theme, useColor bool) (string, string, string, string, []string, string, []string, string, []IssueSelection, error) {
 	model := newCreateFlowModel(title, templates, templateErr, reviewRepos, issueRepos, loadReview, loadIssue, loadTemplateRepos, validateBranch, theme, useColor)
 	out, err := runProgram(model)
 	if err != nil {
@@ -974,7 +1006,7 @@ func PromptCreateFlow(title string, templates []string, templateErr error, revie
 	if final.err != nil {
 		return "", "", "", "", nil, "", nil, "", nil, final.err
 	}
-	return final.mode, final.templateName(), final.workspaceID(), final.description, append([]string(nil), final.branches...), final.reviewRepo, append([]string(nil), final.reviewPRs...), final.issueRepo, append([]string(nil), final.issueIssues...), nil
+	return final.mode, final.templateName(), final.workspaceID(), final.description, append([]string(nil), final.branches...), final.reviewRepo, append([]string(nil), final.reviewPRs...), final.issueRepo, append([]IssueSelection(nil), final.issueIssues...), nil
 }
 
 type templateRepoSelectModel struct {
@@ -1475,6 +1507,55 @@ func renderMultiSelectFrame(model multiSelectModel, headerLines ...string) strin
 	return frame.Render()
 }
 
+func renderIssueBranchEditFrame(model issueBranchSelectModel, headerLines ...string) string {
+	frame := NewFrame(model.theme, model.useColor)
+	lines := append([]string(nil), headerLines...)
+	label := promptLabel(model.theme, model.useColor, model.label)
+	lines = append(lines, fmt.Sprintf("%s: edit branches", label))
+	frame.SetInputsPrompt(lines...)
+
+	rawLines := collectLines(func(b *strings.Builder) {
+		if len(model.selected) == 0 {
+			msg := "no selections"
+			if model.useColor {
+				msg = model.theme.Muted.Render(msg)
+			}
+			b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), msg))
+			return
+		}
+		for i, choice := range model.selected {
+			display := choice.Label
+			branchValue := strings.TrimSpace(model.branchInputs[i].Value())
+			if branchValue == "" {
+				branchValue = defaultIssueBranch(choice.Value)
+			}
+			branchDisplay := branchValue
+			if i == model.branchCursor {
+				if model.useColor {
+					display = lipgloss.NewStyle().Bold(true).Render(display)
+				}
+				branchDisplay = model.branchInputs[i].View()
+			}
+			b.WriteString(fmt.Sprintf("%s%s %s | branch: %s\n", output.Indent+output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), display, branchDisplay))
+		}
+	})
+	frame.AppendInputsRaw(rawLines...)
+
+	if model.errorLine != "" {
+		msg := model.errorLine
+		if model.useColor {
+			msg = model.theme.Error.Render(msg)
+		}
+		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), msg))
+	}
+
+	infoPrefix := mutedToken(model.theme, model.useColor, output.StepPrefix)
+	frame.AppendInfoRaw(
+		fmt.Sprintf("%s%s finish: Ctrl+D", output.Indent, infoPrefix),
+	)
+	return frame.Render()
+}
+
 func (m multiSelectModel) filterChoices() []PromptChoice {
 	q := strings.ToLower(strings.TrimSpace(m.input.Value()))
 	if q == "" {
@@ -1487,6 +1568,280 @@ func (m multiSelectModel) filterChoices() []PromptChoice {
 		}
 	}
 	return out
+}
+
+type issueBranchStage int
+
+const (
+	issueBranchStageSelect issueBranchStage = iota
+	issueBranchStageEdit
+)
+
+type issueBranchSelectModel struct {
+	title          string
+	label          string
+	choices        []PromptChoice
+	filtered       []PromptChoice
+	selected       []PromptChoice
+	cursor         int
+	err            error
+	errorLine      string
+	done           bool
+	stage          issueBranchStage
+	branchCursor   int
+	branchInputs   []textinput.Model
+	selectedIssues []IssueSelection
+
+	theme          Theme
+	useColor       bool
+	input          textinput.Model
+	validateBranch func(string) error
+}
+
+func newIssueBranchSelectModel(title, label string, choices []PromptChoice, validateBranch func(string) error, theme Theme, useColor bool) issueBranchSelectModel {
+	input := textinput.New()
+	input.Prompt = ""
+	input.Placeholder = "search"
+	input.Focus()
+	if useColor {
+		input.PlaceholderStyle = theme.Muted
+	}
+	m := issueBranchSelectModel{
+		title:          title,
+		label:          label,
+		choices:        choices,
+		theme:          theme,
+		useColor:       useColor,
+		input:          input,
+		validateBranch: validateBranch,
+	}
+	m.filtered = m.filterChoices()
+	return m
+}
+
+func (m issueBranchSelectModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m issueBranchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			m.err = ErrPromptCanceled
+			return m, tea.Quit
+		case tea.KeyUp:
+			if m.stage == issueBranchStageSelect && m.cursor > 0 {
+				m.cursor--
+				return m, nil
+			}
+			if m.stage == issueBranchStageEdit && m.branchCursor > 0 {
+				m.branchCursor--
+				m = m.focusBranchInput(m.branchCursor)
+				return m, nil
+			}
+		case tea.KeyDown:
+			if m.stage == issueBranchStageSelect && m.cursor < len(m.filtered)-1 {
+				m.cursor++
+				return m, nil
+			}
+			if m.stage == issueBranchStageEdit && m.branchCursor < len(m.branchInputs)-1 {
+				m.branchCursor++
+				m = m.focusBranchInput(m.branchCursor)
+				return m, nil
+			}
+		case tea.KeyCtrlD:
+			if m.stage == issueBranchStageSelect {
+				if len(m.selected) == 0 {
+					m.errorLine = fmt.Sprintf("select at least one %s", m.label)
+					return m, nil
+				}
+				m = m.startBranchEdit()
+				return m, nil
+			}
+			if m.stage == issueBranchStageEdit {
+				var ok bool
+				m, ok = m.finalizeBranches()
+				if ok {
+					return m, tea.Quit
+				}
+				return m, nil
+			}
+		case tea.KeyEnter:
+			if m.stage == issueBranchStageSelect {
+				value := strings.TrimSpace(m.input.Value())
+				if value == "done" {
+					if len(m.selected) == 0 {
+						m.errorLine = fmt.Sprintf("select at least one %s", m.label)
+						return m, nil
+					}
+					m = m.startBranchEdit()
+					return m, nil
+				}
+				if len(m.filtered) == 0 {
+					return m, nil
+				}
+				choice := m.filtered[m.cursor]
+				m.selected = append(m.selected, choice)
+				m.choices = removeChoice(m.choices, choice.Value)
+				m.input.SetValue("")
+				m.filtered = m.filterChoices()
+				if m.cursor >= len(m.filtered) {
+					m.cursor = max(0, len(m.filtered)-1)
+				}
+				m.errorLine = ""
+				return m, nil
+			}
+			if m.stage == issueBranchStageEdit {
+				if len(m.branchInputs) == 0 {
+					return m, nil
+				}
+				branch := strings.TrimSpace(m.branchInputs[m.branchCursor].Value())
+				if branch == "" {
+					branch = defaultIssueBranch(m.selected[m.branchCursor].Value)
+					m.branchInputs[m.branchCursor].SetValue(branch)
+					m.branchInputs[m.branchCursor].CursorEnd()
+				}
+				if m.validateBranch != nil {
+					if err := m.validateBranch(branch); err != nil {
+						m.errorLine = err.Error()
+						return m, nil
+					}
+				}
+				m.errorLine = ""
+				if m.branchCursor < len(m.branchInputs)-1 {
+					m.branchCursor++
+					m = m.focusBranchInput(m.branchCursor)
+				}
+				return m, nil
+			}
+		}
+	}
+
+	if m.stage == issueBranchStageSelect {
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		m.filtered = m.filterChoices()
+		if m.cursor >= len(m.filtered) {
+			m.cursor = max(0, len(m.filtered)-1)
+		}
+		return m, cmd
+	}
+
+	if m.stage == issueBranchStageEdit && len(m.branchInputs) > 0 {
+		var cmd tea.Cmd
+		m.branchInputs[m.branchCursor], cmd = m.branchInputs[m.branchCursor].Update(msg)
+		if strings.TrimSpace(m.branchInputs[m.branchCursor].Value()) != "" {
+			m.errorLine = ""
+		}
+		return m, cmd
+	}
+
+	return m, nil
+}
+
+func (m issueBranchSelectModel) View() string {
+	if m.stage == issueBranchStageEdit {
+		return renderIssueBranchEditFrame(m)
+	}
+	return renderMultiSelectFrame(multiSelectModel{
+		title:     m.title,
+		label:     m.label,
+		choices:   m.choices,
+		filtered:  m.filtered,
+		selected:  m.selected,
+		cursor:    m.cursor,
+		errorLine: m.errorLine,
+		theme:     m.theme,
+		useColor:  m.useColor,
+		input:     m.input,
+	})
+}
+
+func (m issueBranchSelectModel) filterChoices() []PromptChoice {
+	q := strings.ToLower(strings.TrimSpace(m.input.Value()))
+	if q == "" {
+		return append([]PromptChoice(nil), m.choices...)
+	}
+	var out []PromptChoice
+	for _, item := range m.choices {
+		if strings.Contains(strings.ToLower(item.Label), q) || strings.Contains(strings.ToLower(item.Value), q) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func (m issueBranchSelectModel) startBranchEdit() issueBranchSelectModel {
+	m.stage = issueBranchStageEdit
+	m.branchInputs = make([]textinput.Model, len(m.selected))
+	for i, choice := range m.selected {
+		input := textinput.New()
+		input.Prompt = ""
+		input.Placeholder = "branch"
+		input.SetValue(defaultIssueBranch(choice.Value))
+		if m.useColor {
+			input.PlaceholderStyle = m.theme.Muted
+		}
+		m.branchInputs[i] = input
+	}
+	m.branchCursor = 0
+	m = m.focusBranchInput(0)
+	m.errorLine = ""
+	return m
+}
+
+func (m issueBranchSelectModel) focusBranchInput(index int) issueBranchSelectModel {
+	for i := range m.branchInputs {
+		if i == index {
+			m.branchInputs[i].Focus()
+		} else {
+			m.branchInputs[i].Blur()
+		}
+	}
+	return m
+}
+
+func (m issueBranchSelectModel) finalizeBranches() (issueBranchSelectModel, bool) {
+	branchByValue := make(map[string]int, len(m.selected))
+	m.selectedIssues = make([]IssueSelection, len(m.selected))
+	for i, choice := range m.selected {
+		branch := strings.TrimSpace(m.branchInputs[i].Value())
+		if branch == "" {
+			branch = defaultIssueBranch(choice.Value)
+			m.branchInputs[i].SetValue(branch)
+			m.branchInputs[i].CursorEnd()
+		}
+		if m.validateBranch != nil {
+			if err := m.validateBranch(branch); err != nil {
+				m.errorLine = fmt.Sprintf("%s: %s", choice.Label, err.Error())
+				m.branchCursor = i
+				m = m.focusBranchInput(i)
+				return m, false
+			}
+		}
+		if prev, exists := branchByValue[branch]; exists {
+			m.errorLine = fmt.Sprintf("branch %q already used for %s; re-enter", branch, m.selected[prev].Label)
+			m.branchCursor = i
+			m = m.focusBranchInput(i)
+			return m, false
+		}
+		branchByValue[branch] = i
+		m.selectedIssues[i] = IssueSelection{
+			Value:  choice.Value,
+			Branch: branch,
+		}
+	}
+	m.done = true
+	return m, true
+}
+
+func defaultIssueBranch(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "issue/"
+	}
+	return fmt.Sprintf("issue/%s", value)
 }
 
 type templateNameModel struct {

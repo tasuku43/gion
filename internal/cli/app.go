@@ -462,7 +462,7 @@ func runCreate(ctx context.Context, rootDir string, args []string, noPrompt bool
 		validateBranch := func(v string) error {
 			return workspace.ValidateBranchName(ctx, v)
 		}
-		mode, tmplName, tmplWorkspaceID, tmplDesc, tmplBranches, reviewRepo, reviewPRs, issueRepo, issueIssues, err := ui.PromptCreateFlow("gws create", templateNames, tmplErr, reviewPrompt, issuePrompt, loadReview, loadIssue, loadTemplateRepos, validateBranch, theme, useColor)
+		mode, tmplName, tmplWorkspaceID, tmplDesc, tmplBranches, reviewRepo, reviewPRs, issueRepo, issueSelections, err := ui.PromptCreateFlow("gws create", templateNames, tmplErr, reviewPrompt, issuePrompt, loadReview, loadIssue, loadTemplateRepos, validateBranch, theme, useColor)
 		if err != nil {
 			return err
 		}
@@ -482,7 +482,7 @@ func runCreate(ctx context.Context, rootDir string, args []string, noPrompt bool
 			}
 			return nil
 		case "issue":
-			if err := runCreateIssueSelected(ctx, rootDir, noPrompt, issueRepo, issueIssues); err != nil {
+			if err := runCreateIssueSelected(ctx, rootDir, noPrompt, issueRepo, issueSelections); err != nil {
 				return err
 			}
 			return nil
@@ -1196,7 +1196,10 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 		})
 	}
 
-	selectedIssues, err := ui.PromptMultiSelect(title, "issue", issueChoices, theme, useColor)
+	validateBranch := func(value string) error {
+		return workspace.ValidateBranchName(ctx, value)
+	}
+	selectedIssues, err := ui.PromptIssueSelectWithBranches(title, "issue", issueChoices, validateBranch, theme, useColor)
 	if err != nil {
 		return err
 	}
@@ -1231,11 +1234,11 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 	var failure error
 	var failureID string
 
-	for _, value := range selectedIssues {
-		num, err := strconv.Atoi(strings.TrimSpace(value))
+	for _, selection := range selectedIssues {
+		num, err := strconv.Atoi(strings.TrimSpace(selection.Value))
 		if err != nil {
-			failure = fmt.Errorf("invalid issue number: %s", value)
-			failureID = value
+			failure = fmt.Errorf("invalid issue number: %s", selection.Value)
+			failureID = selection.Value
 			break
 		}
 		description := ""
@@ -1243,7 +1246,10 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 			description = issue.Title
 		}
 		workspaceID := fmt.Sprintf("ISSUE-%d-%s-%s", num, selectedRepo.Owner, selectedRepo.Repo)
-		branch := fmt.Sprintf("issue/%d", num)
+		branch := strings.TrimSpace(selection.Branch)
+		if branch == "" {
+			branch = fmt.Sprintf("issue/%d", num)
+		}
 		output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, workspace.WorkspaceDir(rootDir, workspaceID))))
 		wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 		if err != nil {
@@ -1293,7 +1299,7 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 	return nil
 }
 
-func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, repoSpec string, selectedIssues []string) error {
+func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, repoSpec string, selectedIssues []ui.IssueSelection) error {
 	if strings.TrimSpace(repoSpec) == "" {
 		return fmt.Errorf("repo is required")
 	}
@@ -1358,11 +1364,11 @@ func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, 
 	var failure error
 	var failureID string
 
-	for _, value := range selectedIssues {
-		num, err := strconv.Atoi(strings.TrimSpace(value))
+	for _, selection := range selectedIssues {
+		num, err := strconv.Atoi(strings.TrimSpace(selection.Value))
 		if err != nil {
-			failure = fmt.Errorf("invalid issue number: %s", value)
-			failureID = value
+			failure = fmt.Errorf("invalid issue number: %s", selection.Value)
+			failureID = selection.Value
 			break
 		}
 		description := ""
@@ -1370,7 +1376,15 @@ func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, 
 			description = issue.Title
 		}
 		workspaceID := fmt.Sprintf("ISSUE-%d-%s-%s", num, selectedRepo.Owner, selectedRepo.Repo)
-		branch := fmt.Sprintf("issue/%d", num)
+		branch := strings.TrimSpace(selection.Branch)
+		if branch == "" {
+			branch = fmt.Sprintf("issue/%d", num)
+		}
+		if err := workspace.ValidateBranchName(ctx, branch); err != nil {
+			failure = err
+			failureID = workspaceID
+			break
+		}
 		output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, workspace.WorkspaceDir(rootDir, workspaceID))))
 		wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 		if err != nil {
