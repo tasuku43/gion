@@ -829,7 +829,7 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 
 	branchProvided := branch != ""
 	if workspaceID == "" {
-		workspaceID = fmt.Sprintf("ISSUE-%d", req.Number)
+		workspaceID = fmt.Sprintf("ISSUE-%d-%s-%s", req.Number, req.Owner, req.Repo)
 	}
 	if branch == "" {
 		branch = fmt.Sprintf("issue/%d", req.Number)
@@ -970,7 +970,7 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 
 	branchProvided := branch != ""
 	if workspaceID == "" {
-		workspaceID = fmt.Sprintf("ISSUE-%d", req.Number)
+		workspaceID = fmt.Sprintf("ISSUE-%d-%s-%s", req.Number, req.Owner, req.Repo)
 	}
 	if branch == "" {
 		branch = fmt.Sprintf("issue/%d", req.Number)
@@ -1157,7 +1157,7 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 		if issue, ok := issueByNumber[num]; ok {
 			description = issue.Title
 		}
-		workspaceID := fmt.Sprintf("ISSUE-%d", num)
+		workspaceID := fmt.Sprintf("ISSUE-%d-%s-%s", num, selectedRepo.Owner, selectedRepo.Repo)
 		branch := fmt.Sprintf("issue/%d", num)
 		output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, filepath.Join(rootDir, "workspaces", workspaceID))))
 		wsDir, err := workspace.New(ctx, rootDir, workspaceID)
@@ -1422,7 +1422,7 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool) 
 		}
 	}
 
-	workspaceID := fmt.Sprintf("REVIEW-PR-%d", pr.Number)
+	workspaceID := fmt.Sprintf("REVIEW-PR-%d-%s-%s", pr.Number, baseOwner, baseRepo)
 	output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, filepath.Join(rootDir, "workspaces", workspaceID))))
 	wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 	if err != nil {
@@ -1443,9 +1443,9 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool) 
 		return err
 	}
 
-	baseRef := fmt.Sprintf("refs/remotes/origin/%s", pr.HeadRef)
+	headRef := fmt.Sprintf("refs/remotes/origin/%s", pr.HeadRef)
 	output.Step(formatStep("worktree add", displayRepoName(repoURL), worktreeDest(rootDir, workspaceID, repoURL)))
-	if _, err := workspace.AddWithBranch(ctx, rootDir, workspaceID, repoURL, "", pr.HeadRef, baseRef, false); err != nil {
+	if _, err := workspace.AddWithTrackingBranch(ctx, rootDir, workspaceID, repoURL, "", pr.HeadRef, headRef, false); err != nil {
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("review failed: %w (rollback failed: %v)", err, rollbackErr)
 		}
@@ -1567,7 +1567,7 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool) e
 			break
 		}
 		description := pr.Title
-		workspaceID := fmt.Sprintf("REVIEW-PR-%d", num)
+		workspaceID := fmt.Sprintf("REVIEW-PR-%d-%s-%s", num, selectedRepo.Owner, selectedRepo.Repo)
 		output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, filepath.Join(rootDir, "workspaces", workspaceID))))
 		wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 		if err != nil {
@@ -1597,9 +1597,9 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool) e
 			break
 		}
 
-		baseRef := fmt.Sprintf("refs/remotes/origin/%s", pr.HeadRef)
+		headRef := fmt.Sprintf("refs/remotes/origin/%s", pr.HeadRef)
 		output.Step(formatStep("worktree add", displayRepoName(selectedRepo.RepoURL), worktreeDest(rootDir, workspaceID, selectedRepo.RepoURL)))
-		if _, err := workspace.AddWithBranch(ctx, rootDir, workspaceID, selectedRepo.RepoURL, "", pr.HeadRef, baseRef, false); err != nil {
+		if _, err := workspace.AddWithTrackingBranch(ctx, rootDir, workspaceID, selectedRepo.RepoURL, "", pr.HeadRef, headRef, false); err != nil {
 			if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 				failure = fmt.Errorf("review failed: %w (rollback failed: %v)", err, rollbackErr)
 			} else {
@@ -1826,7 +1826,7 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 	if err != nil {
 		return err
 	}
-	workspaceID := fmt.Sprintf("REVIEW-PR-%d", req.Number)
+	workspaceID := fmt.Sprintf("REVIEW-PR-%d-%s-%s", req.Number, req.Owner, req.Repo)
 
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())

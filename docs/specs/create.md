@@ -59,20 +59,21 @@ Same behavior as the former `gws review`.
   - Saves the PR title as the workspace description.
   - Rejects forked PRs (head repo must match base repo).
   - Selects the repo URL based on `defaultRepoProtocol` (SSH preferred, HTTPS fallback).
-  - Workspace ID is `REVIEW-PR-<number>`; errors if it already exists.
+  - Workspace ID is `REVIEW-PR-<number>-<owner>-<repo>`; errors if it already exists.
   - Ensures the repo store exists, prompting to run `gws repo get` if missing (unless `--no-prompt`, which fails instead).
   - Fetches the PR head ref into the bare store: `git fetch origin <head_ref>`.
   - Adds a worktree under `<root>/workspaces/REVIEW-PR-<number>/<alias>` where:
-    - Branch is `<head_ref>`.
-    - Base ref is `refs/remotes/origin/<head_ref>`.
+    - Creates a local branch `<head_ref>` tracking `origin/<head_ref>`.
+    - Workspace metadata stores branch name as `<head_ref>`.
 - If `PR URL` is omitted and prompts are allowed (interactive picker):
   - `--no-prompt` with no URL => error.
   - Step 1: pick a repo from fetched bare stores whose origin remote is GitHub. Display `alias (owner/repo)`; filterable by substring.
   - Step 2: fetch open PRs for the repo via `gh api` (latest 50 open, sorted by updated desc).
   - Step 3: multi-select PRs using the same add/remove loop as `gws template new` (filterable list; `<Enter>` adds; `<Ctrl+D>` or `done` to finish; minimum 1 selection).
   - For each selected PR:
-    - Workspace ID = `REVIEW-PR-<number>`.
-    - Branch = PR head ref; base ref = `refs/remotes/origin/<head_ref>`.
+    - Workspace ID = `REVIEW-PR-<number>-<owner>-<repo>`.
+    - Creates a local branch matching the PR head ref, tracking `origin/<head_ref>`.
+    - Workspace metadata stores branch name as the PR head ref.
     - Workspace description = PR title.
     - Fork PRs remain rejected.
   - Flags other than `--no-prompt` are not allowed in picker mode (error if provided).
@@ -97,7 +98,7 @@ Same behavior as the former `gws issue`.
 ### Behavior
 - If `ISSUE_URL` is provided:
   - Parse the URL to obtain `owner`, `repo`, and `issue number`.
-  - Workspace ID: defaults to `ISSUE-<number>`; can be overridden with `--workspace-id`. Must pass `git check-ref-format --branch`. If the workspace already exists, error.
+  - Workspace ID: defaults to `ISSUE-<number>-<owner>-<repo>`; can be overridden with `--workspace-id`. Must pass `git check-ref-format --branch`. If the workspace already exists, error.
   - Branch: defaults to `issue/<number>`. Before proceeding, prompt the user with the default and allow editing unless `--no-prompt` or `--branch` is supplied.
   - For GitHub issues, uses `gh api` to fetch the issue title and saves it as the workspace description.
     - If the branch exists in the bare store, use it.
@@ -114,7 +115,7 @@ Same behavior as the former `gws issue`.
   - Step 2: fetch open issues for the chosen repo from the host API (GitHub via `gh api`; other hosts may be added later). Default fetch: latest 50 open issues sorted by updated desc.
   - Step 3: multi-select issues using the same add/remove loop as `gws template new` (filterable list; `<Enter>` adds; `<Ctrl+D>` or `done` to finish; minimum 1 selection).
   - For each selected issue:
-    - Workspace ID = `ISSUE-<number>` (no per-item override in this flow).
+    - Workspace ID = `ISSUE-<number>-<owner>-<repo>` (no per-item override in this flow).
     - Branch = `issue/<number>`.
     - Workspace description = issue title.
     - Base ref detection and repo missing handling are the same as the URL path.
