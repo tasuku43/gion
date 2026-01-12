@@ -40,3 +40,15 @@ func TestShellCommandForOpenUnknown(t *testing.T) {
 		t.Fatalf("expected no args, got %v", args)
 	}
 }
+
+func TestNestedOpenWorkspaceID(t *testing.T) {
+	t.Setenv("GWS_WORKSPACE", "")
+	if got := nestedOpenWorkspaceID(); got != "" {
+		t.Fatalf("expected empty, got %q", got)
+	}
+
+	t.Setenv("GWS_WORKSPACE", "ISSUE-38")
+	if got := nestedOpenWorkspaceID(); got != "ISSUE-38" {
+		t.Fatalf("expected ISSUE-38, got %q", got)
+	}
+}

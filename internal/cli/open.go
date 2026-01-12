@@ -42,6 +42,10 @@ func runWorkspaceOpen(ctx context.Context, rootDir string, args []string, noProm
 		return fmt.Errorf("usage: gws open [<WORKSPACE_ID>] [--shell]")
 	}
 
+	if current := nestedOpenWorkspaceID(); current != "" {
+		return fmt.Errorf("already in gws open workspace: %s (exit the subshell to switch)", current)
+	}
+
 	workspaceID := ""
 	if openFlags.NArg() == 1 {
 		workspaceID = openFlags.Arg(0)
@@ -148,6 +152,10 @@ func shellCommandForOpen(shellPath string) (string, []string) {
 	return shellPath, nil
 }
 
+func nestedOpenWorkspaceID() string {
+	return strings.TrimSpace(os.Getenv("GWS_WORKSPACE"))
+}
+
 func isInteractiveShell(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "bash", "zsh", "sh", "fish", "ksh", "dash", "tcsh", "csh":
@@ -184,11 +192,12 @@ func prepareBashPromptOverride(workspaceID string) (*promptOverride, error) {
 	}
 	rcfile := filepath.Join(dir, "bashrc")
 	home := os.Getenv("HOME")
-	prefix := fmt.Sprintf("\\[\\033[34m\\][gws:%s]\\[\\033[0m\\] ", workspaceID)
+	fallback := workspaceID
 	content := strings.Join([]string{
 		"# gws open prompt wrapper",
 		fmt.Sprintf("if [ -r %s ]; then . %s; fi", strconv.Quote(filepath.Join(home, ".bashrc")), strconv.Quote(filepath.Join(home, ".bashrc"))),
-		fmt.Sprintf("prefix=%s", strconv.Quote(prefix)),
+		fmt.Sprintf("ws=${GWS_WORKSPACE:-%s}", strconv.Quote(fallback)),
+		"prefix=\"\\[\\033[34m\\][gws:${ws}]\\[\\033[0m\\] \"",
 		"if [ -n \"$PS1\" ]; then",
 		"  PS1=\"${prefix}${PS1}\"",
 		"else",
@@ -224,7 +233,7 @@ func prepareZshPromptOverride(workspaceID string) (*promptOverride, error) {
 	if origZdot == "" {
 		origZdot = home
 	}
-	prefix := fmt.Sprintf("%%F{blue}[gws:%s]%%f ", workspaceID)
+	fallback := workspaceID
 	content := strings.Join([]string{
 		"# gws open prompt wrapper",
 		fmt.Sprintf("orig=${GWS_ZDOTDIR_ORIG:-%s}", strconv.Quote(origZdot)),
@@ -237,7 +246,8 @@ func prepareZshPromptOverride(workspaceID string) (*promptOverride, error) {
 		"export HISTFILE",
 		"if [ -r \"$orig/.zshenv\" ]; then . \"$orig/.zshenv\"; fi",
 		"if [ -r \"$orig/.zshrc\" ]; then . \"$orig/.zshrc\"; fi",
-		fmt.Sprintf("prefix=%s", strconv.Quote(prefix)),
+		fmt.Sprintf("ws=${GWS_WORKSPACE:-%s}", strconv.Quote(fallback)),
+		"prefix=\"%F{blue}[gws:${ws}]%f \"",
 		"if [ -n \"$PROMPT\" ]; then",
 		"  if [[ \"$PROMPT\" == $'\\n'* ]]; then",
 		"    PROMPT=$'\\n'\"${prefix}${PROMPT#$'\\n'}\"",
@@ -271,12 +281,13 @@ func prepareShPromptOverride(workspaceID string) (*promptOverride, error) {
 	}
 	rcfile := filepath.Join(dir, "shrc")
 	origEnv := os.Getenv("ENV")
-	prefix := fmt.Sprintf("\\033[34m[gws:%s]\\033[0m ", workspaceID)
+	fallback := workspaceID
 	content := strings.Join([]string{
 		"# gws open prompt wrapper",
 		fmt.Sprintf("orig=${GWS_ENV_ORIG:-%s}", strconv.Quote(origEnv)),
 		"if [ -n \"$orig\" ] && [ -r \"$orig\" ]; then . \"$orig\"; fi",
-		fmt.Sprintf("prefix=%s", strconv.Quote(prefix)),
+		fmt.Sprintf("ws=${GWS_WORKSPACE:-%s}", strconv.Quote(fallback)),
+		"prefix=\"\\033[34m[gws:${ws}]\\033[0m \"",
 		"if [ -n \"$PS1\" ]; then",
 		"  PS1=\"${prefix}${PS1}\"",
 		"else",
