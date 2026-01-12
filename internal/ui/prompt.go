@@ -110,7 +110,20 @@ func PromptWorkspaceMultiSelectWithBlocked(title string, workspaces []WorkspaceC
 }
 
 func PromptConfirmInline(label string, theme Theme, useColor bool) (bool, error) {
-	model := newConfirmInlineModel(label, theme, useColor)
+	model := newConfirmInlineModel(label, theme, useColor, false)
+	out, err := runProgram(model)
+	if err != nil {
+		return false, err
+	}
+	final := out.(confirmInlineModel)
+	if final.err != nil {
+		return false, final.err
+	}
+	return final.value, nil
+}
+
+func PromptConfirmInlineInfo(label string, theme Theme, useColor bool) (bool, error) {
+	model := newConfirmInlineModel(label, theme, useColor, true)
 	out, err := runProgram(model)
 	if err != nil {
 		return false, err
@@ -350,7 +363,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if prevIndex, exists := m.usedBranches[value]; exists {
 					label := fmt.Sprintf("branch %q already used for repo #%d; use again?", value, prevIndex+1)
 					m.pendingBranch = value
-					m.confirmModel = newConfirmInlineModel(label, m.theme, m.useColor)
+					m.confirmModel = newConfirmInlineModel(label, m.theme, m.useColor, false)
 					m.stage = createStageTemplateBranchConfirm
 					return m, nil
 				}
@@ -743,13 +756,14 @@ type confirmInlineModel struct {
 	label    string
 	theme    Theme
 	useColor bool
+	useInfo  bool
 	input    textinput.Model
 	value    bool
 	err      error
 	done     bool
 }
 
-func newConfirmInlineModel(label string, theme Theme, useColor bool) confirmInlineModel {
+func newConfirmInlineModel(label string, theme Theme, useColor bool, useInfo bool) confirmInlineModel {
 	ti := textinput.New()
 	ti.Prompt = ""
 	ti.Placeholder = "y/n"
@@ -761,6 +775,7 @@ func newConfirmInlineModel(label string, theme Theme, useColor bool) confirmInli
 		label:    label,
 		theme:    theme,
 		useColor: useColor,
+		useInfo:  useInfo,
 		input:    ti,
 	}
 }
@@ -801,7 +816,11 @@ func (m confirmInlineModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, m.label)
 	line := fmt.Sprintf("%s (y/n): %s", label, m.input.View())
-	frame.SetInputsPrompt(line)
+	if m.useInfo {
+		frame.SetInfoPrompt(line)
+	} else {
+		frame.SetInputsPrompt(line)
+	}
 	return frame.Render()
 }
 

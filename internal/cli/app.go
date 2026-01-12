@@ -3126,7 +3126,7 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 		state := loadWorkspaceStateForRemoval(ctx, rootDir, workspaceID)
 		if state.Kind != workspace.WorkspaceStateClean {
 			label := removeConfirmLabel(state)
-			confirm, err := ui.PromptConfirmInline(label, theme, useColor)
+			confirm, err := ui.PromptConfirmInlineInfo(label, theme, useColor)
 			if err != nil {
 				return err
 			}
@@ -3169,7 +3169,7 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 	} else if requiresConfirm {
 		confirmLabel = fmt.Sprintf("Selected workspaces have warnings. Remove %d workspaces anyway?", len(selected))
 	}
-	confirm, err := ui.PromptConfirmInline(confirmLabel, theme, useColor)
+	confirm, err := ui.PromptConfirmInlineInfo(confirmLabel, theme, useColor)
 	if err != nil {
 		return err
 	}

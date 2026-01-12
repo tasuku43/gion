@@ -45,8 +45,16 @@ func (f *Frame) SetInfo(lines ...string) {
 	f.Info = copyLines(lines, lineBullet)
 }
 
+func (f *Frame) SetInfoPrompt(lines ...string) {
+	f.Info = copyLines(lines, linePrompt)
+}
+
 func (f *Frame) AppendInfo(lines ...string) {
 	f.Info = append(f.Info, copyLines(lines, lineBullet)...)
+}
+
+func (f *Frame) AppendInfoPrompt(lines ...string) {
+	f.Info = append(f.Info, copyLines(lines, linePrompt)...)
 }
 
 func (f *Frame) SetInfoRaw(lines ...string) {
