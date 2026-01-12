@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tasuku43/gws/internal/core/paths"
 	"github.com/tasuku43/gws/internal/domain/repo"
 	"github.com/tasuku43/gws/internal/domain/workspace"
 )
@@ -76,9 +77,17 @@ func Check(ctx context.Context, rootDir string, now time.Time) (Result, error) {
 
 func checkRootLayout(rootDir string) []Issue {
 	var issues []Issue
-	dirs := []string{"bare", "src", "workspaces"}
-	for _, name := range dirs {
-		path := filepath.Join(rootDir, name)
+	dirs := []struct {
+		name string
+		path string
+	}{
+		{name: "bare", path: paths.BareRoot(rootDir)},
+		{name: "src", path: paths.SrcRoot(rootDir)},
+		{name: "workspaces", path: paths.WorkspacesRoot(rootDir)},
+	}
+	for _, entry := range dirs {
+		name := entry.name
+		path := entry.path
 		info, err := os.Stat(path)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -105,19 +114,17 @@ func checkRootLayout(rootDir string) []Issue {
 		}
 	}
 
-	files := []string{"templates.yaml"}
-	for _, name := range files {
-		path := filepath.Join(rootDir, name)
-		info, err := os.Stat(path)
+	files := []struct {
+		name string
+		path string
+	}{
+		{name: "templates.yaml", path: filepath.Join(rootDir, "templates.yaml")},
+	}
+	for _, entry := range files {
+		name := entry.name
+		path := entry.path
+		exists, err := paths.FileExists(path)
 		if err != nil {
-			if os.IsNotExist(err) {
-				issues = append(issues, Issue{
-					Kind:    "missing_root_file",
-					Path:    path,
-					Message: fmt.Sprintf("%s not found", name),
-				})
-				continue
-			}
 			issues = append(issues, Issue{
 				Kind:    "invalid_root_file",
 				Path:    path,
@@ -125,11 +132,11 @@ func checkRootLayout(rootDir string) []Issue {
 			})
 			continue
 		}
-		if info.IsDir() {
+		if !exists {
 			issues = append(issues, Issue{
-				Kind:    "invalid_root_file",
+				Kind:    "missing_root_file",
 				Path:    path,
-				Message: fmt.Sprintf("%s is a directory", name),
+				Message: fmt.Sprintf("%s not found", name),
 			})
 		}
 	}
@@ -145,14 +152,6 @@ func Fix(ctx context.Context, rootDir string, now time.Time) (FixResult, error) 
 	var fixed []string
 
 	return FixResult{Result: result, Fixed: fixed}, nil
-}
-
-func dirExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
 }
 
 func hasOriginRemote(storePath string) (bool, error) {
