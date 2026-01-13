@@ -59,10 +59,10 @@ Same behavior as the former `gws review`.
   - Saves the PR title as the workspace description.
   - Rejects forked PRs (head repo must match base repo).
   - Selects the repo URL based on `defaultRepoProtocol` (SSH preferred, HTTPS fallback).
-  - Workspace ID is `REVIEW-PR-<number>-<owner>-<repo>`; errors if it already exists.
+  - Workspace ID is `<OWNER>-<REPO>-REVIEW-PR-<number>` (owner/repo uppercased); errors if it already exists.
   - Ensures the repo store exists, prompting to run `gws repo get` if missing (unless `--no-prompt`, which fails instead).
   - Fetches the PR head ref into the bare store: `git fetch origin <head_ref>`.
-  - Adds a worktree under `<root>/workspaces/REVIEW-PR-<number>/<alias>` where:
+  - Adds a worktree under `<root>/workspaces/<OWNER>-<REPO>-REVIEW-PR-<number>/<alias>` where:
     - Creates a local branch `<head_ref>` tracking `origin/<head_ref>`.
     - Workspace metadata stores branch name as `<head_ref>`.
 - If `PR URL` is omitted and prompts are allowed (interactive picker):
@@ -71,7 +71,7 @@ Same behavior as the former `gws review`.
   - Step 2: fetch open PRs for the repo via `gh api` (latest 50 open, sorted by updated desc).
 - Step 3: multi-select PRs using the same add/remove loop as `gws template add` (filterable list; `<Enter>` adds; `<Ctrl+D>` or `done` to finish; minimum 1 selection).
   - For each selected PR:
-    - Workspace ID = `REVIEW-PR-<number>-<owner>-<repo>`.
+    - Workspace ID = `<OWNER>-<REPO>-REVIEW-PR-<number>` (owner/repo uppercased).
     - Creates a local branch matching the PR head ref, tracking `origin/<head_ref>`.
     - Workspace metadata stores branch name as the PR head ref.
     - Workspace description = PR title.
@@ -81,7 +81,7 @@ Same behavior as the former `gws review`.
 - Output uses Inputs/Steps/Result only (no header line). When multiple workspaces are created, Result lists each workspace/worktree added.
 
 ### Success Criteria
-- For URL mode: new workspace `REVIEW-PR-<number>` exists with a worktree checked out to the PR head branch.
+- For URL mode: new workspace `<OWNER>-<REPO>-REVIEW-PR-<number>` exists with a worktree checked out to the PR head branch.
 - For picker mode: each selected PR produces a workspace with the same guarantees; partial success is reported if a later item fails.
 
 ### Failure Modes
@@ -98,7 +98,7 @@ Same behavior as the former `gws issue`.
 ### Behavior
 - If `ISSUE_URL` is provided:
   - Parse the URL to obtain `owner`, `repo`, and `issue number`.
-  - Workspace ID: defaults to `ISSUE-<number>-<owner>-<repo>`; can be overridden with `--workspace-id`. Must pass `git check-ref-format --branch`. If the workspace already exists, error.
+  - Workspace ID: defaults to `<OWNER>-<REPO>-ISSUE-<number>` (owner/repo uppercased); can be overridden with `--workspace-id`. Must pass `git check-ref-format --branch`. If the workspace already exists, error.
   - Branch: defaults to `issue/<number>`. Before proceeding, prompt the user with the default and allow editing unless `--no-prompt` or `--branch` is supplied.
   - For GitHub issues, uses `gh api` to fetch the issue title and saves it as the workspace description.
     - If the branch exists in the bare store, use it.
@@ -116,7 +116,7 @@ Same behavior as the former `gws issue`.
   - Step 2: fetch open issues for the chosen repo from the host API (GitHub via `gh api`; other hosts may be added later). Default fetch: latest 50 open issues sorted by updated desc.
 - Step 3: multi-select issues using the same add/remove loop as `gws template add` (filterable list; `<Enter>` adds; `<Ctrl+D>` or `done` to finish; minimum 1 selection).
   - For each selected issue:
-    - Workspace ID = `ISSUE-<number>-<owner>-<repo>` (no per-item override in this flow).
+    - Workspace ID = `<OWNER>-<REPO>-ISSUE-<number>` (owner/repo uppercased, no per-item override in this flow).
     - Branch defaults to `issue/<number>` and can be edited per issue in a list editor; duplicate branches must be re-entered.
     - Workspace description = issue title.
     - Base ref detection and repo missing handling are the same as the URL path.
@@ -125,7 +125,7 @@ Same behavior as the former `gws issue`.
 - Output uses Inputs/Steps/Result (no header line). When multiple workspaces are created, Result lists each workspace/worktree added.
 
 ### Success Criteria
-- For URL mode: workspace `<root>/workspaces/ISSUE-<number>` exists with a worktree for the issue repo checked out to branch `issue/<number>`.
+- For URL mode: workspace `<root>/workspaces/<OWNER>-<REPO>-ISSUE-<number>` exists with a worktree for the issue repo checked out to branch `issue/<number>`.
 - For picker mode: each selected issue produces a workspace with the same guarantees; partial success is reported if a later item fails.
 
 ### Failure Modes

@@ -41,7 +41,7 @@ Info
 
 Steps
   • chdir
-    └─ /path/to/gws/workspaces/ISSUE-19
+    └─ /path/to/gws/workspaces/OWNER-REPO-ISSUE-19
   • launch subshell
     └─ /bin/zsh -i
 

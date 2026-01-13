@@ -18,7 +18,7 @@
 1. PR URL から `host/owner/repo` と番号を取得（GitHub: pull/<n>）
 2. repo store が未取得なら `repo get` と同等の導線で取得（対話）
 3. workspace を作成
-   - workspace ID は `REVIEW-PR-<number>` を使用（例: `REVIEW-PR-123`）
+   - workspace ID は `<OWNER>-<REPO>-REVIEW-PR-<number>` を使用（例: `OWNER-REPO-REVIEW-PR-123`）
 4. PR の head ref を fetch
    - `git fetch origin <head_ref>`
 5. fetch した ref を base に worktree を作成

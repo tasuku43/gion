@@ -920,7 +920,7 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 
 	branchProvided := branch != ""
 	if workspaceID == "" {
-		workspaceID = fmt.Sprintf("ISSUE-%d-%s-%s", req.Number, req.Owner, req.Repo)
+		workspaceID = formatIssueWorkspaceID(req.Owner, req.Repo, req.Number)
 	}
 	if branch == "" {
 		branch = fmt.Sprintf("issue/%d", req.Number)
@@ -1065,7 +1065,7 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 
 	branchProvided := branch != ""
 	if workspaceID == "" {
-		workspaceID = fmt.Sprintf("ISSUE-%d-%s-%s", req.Number, req.Owner, req.Repo)
+		workspaceID = formatIssueWorkspaceID(req.Owner, req.Repo, req.Number)
 	}
 	if branch == "" {
 		branch = fmt.Sprintf("issue/%d", req.Number)
@@ -1258,7 +1258,7 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 		if issue, ok := issueByNumber[num]; ok {
 			description = issue.Title
 		}
-		workspaceID := fmt.Sprintf("ISSUE-%d-%s-%s", num, selectedRepo.Owner, selectedRepo.Repo)
+		workspaceID := formatIssueWorkspaceID(selectedRepo.Owner, selectedRepo.Repo, num)
 		branch := strings.TrimSpace(selection.Branch)
 		if branch == "" {
 			branch = fmt.Sprintf("issue/%d", num)
@@ -1388,7 +1388,7 @@ func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, 
 		if issue, ok := issueByNumber[num]; ok {
 			description = issue.Title
 		}
-		workspaceID := fmt.Sprintf("ISSUE-%d-%s-%s", num, selectedRepo.Owner, selectedRepo.Repo)
+		workspaceID := formatIssueWorkspaceID(selectedRepo.Owner, selectedRepo.Repo, num)
 		branch := strings.TrimSpace(selection.Branch)
 		if branch == "" {
 			branch = fmt.Sprintf("issue/%d", num)
@@ -1701,7 +1701,7 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool) 
 		}
 	}
 
-	workspaceID := fmt.Sprintf("REVIEW-PR-%d-%s-%s", pr.Number, baseOwner, baseRepo)
+	workspaceID := formatReviewWorkspaceID(baseOwner, baseRepo, pr.Number)
 	output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, workspace.WorkspaceDir(rootDir, workspaceID))))
 	wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 	if err != nil {
@@ -1841,7 +1841,7 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool) e
 			break
 		}
 		description := pr.Title
-		workspaceID := fmt.Sprintf("REVIEW-PR-%d-%s-%s", num, selectedRepo.Owner, selectedRepo.Repo)
+		workspaceID := formatReviewWorkspaceID(selectedRepo.Owner, selectedRepo.Repo, num)
 		output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, workspace.WorkspaceDir(rootDir, workspaceID))))
 		wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 		if err != nil {
@@ -1979,7 +1979,7 @@ func runCreateReviewSelected(ctx context.Context, rootDir string, noPrompt bool,
 			break
 		}
 		description := pr.Title
-		workspaceID := fmt.Sprintf("REVIEW-PR-%d-%s-%s", num, selectedRepo.Owner, selectedRepo.Repo)
+		workspaceID := formatReviewWorkspaceID(selectedRepo.Owner, selectedRepo.Repo, num)
 		output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, workspace.WorkspaceDir(rootDir, workspaceID))))
 		wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 		if err != nil {
@@ -2191,6 +2191,14 @@ func splitRepoFullName(fullName string) (string, string, bool) {
 	return parts[0], parts[1], true
 }
 
+func formatReviewWorkspaceID(owner, repo string, number int) string {
+	return fmt.Sprintf("%s-%s-REVIEW-PR-%d", strings.ToUpper(strings.TrimSpace(owner)), strings.ToUpper(strings.TrimSpace(repo)), number)
+}
+
+func formatIssueWorkspaceID(owner, repo string, number int) string {
+	return fmt.Sprintf("%s-%s-ISSUE-%d", strings.ToUpper(strings.TrimSpace(owner)), strings.ToUpper(strings.TrimSpace(repo)), number)
+}
+
 func fetchPRHead(ctx context.Context, storePath, headRef string) error {
 	if strings.TrimSpace(storePath) == "" {
 		return fmt.Errorf("store path is required")
@@ -2321,7 +2329,7 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 	if err != nil {
 		return err
 	}
-	workspaceID := fmt.Sprintf("REVIEW-PR-%d-%s-%s", req.Number, req.Owner, req.Repo)
+	workspaceID := formatReviewWorkspaceID(req.Owner, req.Repo, req.Number)
 
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())

@@ -23,7 +23,7 @@ Rating legend:
 - **Check status** — `gws status <id>` shows dirty/untracked counts and HEAD per repo. Rating: Excellent (lightweight)
 
 ## Reviews
-- **Start a PR review** — `gws create --review <PR URL>` creates `REVIEW-PR-<num>`, fetches the PR head branch (forks not supported) for GitHub; requires `gh`. Rating: Good (GitHub only)
+- **Start a PR review** — `gws create --review <PR URL>` creates `<OWNER>-<REPO>-REVIEW-PR-<num>`, fetches the PR head branch (forks not supported) for GitHub; requires `gh`. Rating: Good (GitHub only)
 - **Add repos during review** — Use `gws add` after the review workspace is created. Rating: Good
 
 ## Cleanup / Maintenance

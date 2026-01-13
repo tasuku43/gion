@@ -69,7 +69,7 @@ gws opens an interactive subshell at the workspace root.
 gws create --review https://github.com/owner/repo/pull/123
 ```
 
-- Creates `REVIEW-PR-123`
+- Creates `OWNER-REPO-REVIEW-PR-123`
 - Fetches the PR head branch (forks not supported)
 - Requires `gh` authentication
 
