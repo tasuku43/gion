@@ -1,6 +1,7 @@
 package initcmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -77,11 +78,17 @@ func writeTemplates(path string) error {
 			},
 		},
 	}
-	data, err := yaml.Marshal(file)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(file); err != nil {
+		_ = enc.Close()
 		return fmt.Errorf("marshal templates: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := enc.Close(); err != nil {
+		return fmt.Errorf("close templates encoder: %w", err)
+	}
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
 		return fmt.Errorf("write templates: %w", err)
 	}
 	return nil
