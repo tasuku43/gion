@@ -65,8 +65,13 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 		if repo.WorktreePath == "" {
 			return fmt.Errorf("missing worktree path for alias %q", repo.Alias)
 		}
-		gitcmd.Logf("git worktree remove %s", repo.WorktreePath)
-		if err := gitcmd.WorktreeRemove(ctx, repo.StorePath, repo.WorktreePath); err != nil {
+		force := opts.AllowDirty
+		if force {
+			gitcmd.Logf("git worktree remove --force %s", repo.WorktreePath)
+		} else {
+			gitcmd.Logf("git worktree remove %s", repo.WorktreePath)
+		}
+		if err := gitcmd.WorktreeRemove(ctx, repo.StorePath, repo.WorktreePath, force); err != nil {
 			return fmt.Errorf("remove worktree %q: %w", repo.Alias, err)
 		}
 	}

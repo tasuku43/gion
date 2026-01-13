@@ -2246,12 +2246,12 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m workspaceMultiSelectModel) View() string {
 	if m.stage == multiSelectStageConfirm {
 		frame := NewFrame(m.theme, m.useColor)
-		if len(m.confirmInputsRaw) > 0 {
-			frame.SetInputsRaw(m.confirmInputsRaw...)
-		}
 		label := promptLabel(m.theme, m.useColor, m.confirmModel.label)
 		line := fmt.Sprintf("%s (y/n): %s", label, m.confirmModel.input.View())
-		frame.AppendInputsPrompt(line)
+		frame.SetInputsPrompt(line)
+		if len(m.confirmInputsRaw) > 0 {
+			frame.AppendInputsRaw(m.confirmInputsRaw...)
+		}
 		return frame.Render()
 	}
 	frame := NewFrame(m.theme, m.useColor)
@@ -2301,7 +2301,7 @@ func (m workspaceMultiSelectModel) startConfirmIfNeeded() (workspaceMultiSelectM
 		return m, tea.Quit
 	}
 	m.confirmModel = newConfirmInlineModel(label, m.theme, m.useColor, false, nil, nil)
-	m.confirmInputsRaw = WorkspaceChoiceLines(m.filtered, -1, m.useColor, m.theme)
+	m.confirmInputsRaw = WorkspaceChoiceLines(m.selected, -1, m.useColor, m.theme)
 	m.stage = multiSelectStageConfirm
 	return m, nil
 }

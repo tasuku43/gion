@@ -55,8 +55,12 @@ func WorktreeAddTrackingBranch(ctx context.Context, dir, branch, path, remoteNam
 }
 
 // WorktreeRemove removes a worktree.
-func WorktreeRemove(ctx context.Context, dir, path string) error {
-	res, err := Run(ctx, []string{"worktree", "remove", path}, Options{Dir: dir})
+func WorktreeRemove(ctx context.Context, dir, path string, force bool) error {
+	args := []string{"worktree", "remove", path}
+	if force {
+		args = []string{"worktree", "remove", "--force", path}
+	}
+	res, err := Run(ctx, args, Options{Dir: dir})
 	if err != nil {
 		if strings.TrimSpace(res.Stderr) != "" {
 			return fmt.Errorf("git worktree remove failed: %w: %s", err, strings.TrimSpace(res.Stderr))

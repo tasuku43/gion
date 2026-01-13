@@ -31,7 +31,7 @@ Safely remove a workspace and all of its worktrees, warning/confirming for risky
 - Calls `workspace.RemoveWithOptions`, which:
   - Validates the workspace exists.
   - With confirmation, allows dirty repos to be removed; otherwise fails if any repo has uncommitted/untracked/unstaged/unmerged changes.
-  - Runs `git worktree remove <worktree>` for each repo’s worktree.
+  - Runs `git worktree remove --force <worktree>` for dirty workspaces; otherwise runs `git worktree remove <worktree>` for each repo’s worktree.
   - Deletes the workspace directory.
 
 ## Success Criteria

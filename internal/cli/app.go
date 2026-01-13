@@ -3188,6 +3188,7 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 	}
 
 	var selected []string
+	selectedFromPrompt := false
 	if workspaceID == "" {
 		workspaces, wsWarn, err := workspace.List(rootDir)
 		if err != nil {
@@ -3215,6 +3216,7 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 		if len(selected) == 0 {
 			return nil
 		}
+		selectedFromPrompt = true
 		if len(selected) == 1 {
 			workspaceID = selected[0]
 		}
@@ -3230,7 +3232,7 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 
 	if len(selected) == 1 {
 		state := loadWorkspaceStateForRemoval(ctx, rootDir, workspaceID)
-		if state.Kind != workspace.WorkspaceStateClean {
+		if !selectedFromPrompt && state.Kind != workspace.WorkspaceStateClean {
 			label := removeConfirmLabel(state)
 			confirm, err := ui.PromptConfirmInline(label, theme, useColor)
 			if err != nil {
@@ -3269,18 +3271,20 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 			requiresStrongConfirm = true
 		}
 	}
-	confirmLabel := fmt.Sprintf("Remove %d workspaces?", len(selected))
-	if requiresStrongConfirm {
-		confirmLabel = fmt.Sprintf("Selected workspaces include uncommitted changes or status errors. Remove %d workspaces anyway?", len(selected))
-	} else if requiresConfirm {
-		confirmLabel = fmt.Sprintf("Selected workspaces have warnings. Remove %d workspaces anyway?", len(selected))
-	}
-	confirm, err := ui.PromptConfirmInline(confirmLabel, theme, useColor)
-	if err != nil {
-		return err
-	}
-	if !confirm {
-		return nil
+	if !selectedFromPrompt {
+		confirmLabel := fmt.Sprintf("Remove %d workspaces?", len(selected))
+		if requiresStrongConfirm {
+			confirmLabel = fmt.Sprintf("Selected workspaces include uncommitted changes or status errors. Remove %d workspaces anyway?", len(selected))
+		} else if requiresConfirm {
+			confirmLabel = fmt.Sprintf("Selected workspaces have warnings. Remove %d workspaces anyway?", len(selected))
+		}
+		confirm, err := ui.PromptConfirmInline(confirmLabel, theme, useColor)
+		if err != nil {
+			return err
+		}
+		if !confirm {
+			return nil
+		}
 	}
 
 	renderer.Section("Steps")
