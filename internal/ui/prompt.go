@@ -2130,7 +2130,7 @@ func (m workspaceSelectModel) filterWorkspaces() []WorkspaceChoice {
 	}
 	var out []WorkspaceChoice
 	for _, item := range m.workspaces {
-		if strings.Contains(strings.ToLower(item.ID), q) {
+		if strings.Contains(strings.ToLower(item.ID), q) || strings.Contains(strings.ToLower(item.Description), q) {
 			out = append(out, item)
 		}
 	}
@@ -2572,7 +2572,7 @@ func (m addInputsModel) filterWorkspaces() []WorkspaceChoice {
 	}
 	var out []WorkspaceChoice
 	for _, item := range m.workspaces {
-		if strings.Contains(strings.ToLower(item.ID), q) {
+		if strings.Contains(strings.ToLower(item.ID), q) || strings.Contains(strings.ToLower(item.Description), q) {
 			out = append(out, item)
 		}
 	}
