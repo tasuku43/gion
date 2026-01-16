@@ -82,7 +82,6 @@ func checkRootLayout(rootDir string) []Issue {
 		path string
 	}{
 		{name: "bare", path: paths.BareRoot(rootDir)},
-		{name: "src", path: paths.SrcRoot(rootDir)},
 		{name: "workspaces", path: paths.WorkspacesRoot(rootDir)},
 	}
 	for _, entry := range dirs {

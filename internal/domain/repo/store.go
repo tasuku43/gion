@@ -46,10 +46,6 @@ func Get(ctx context.Context, rootDir string, repo string) (Store, error) {
 		return Store{}, err
 	}
 
-	if err := ensureSrc(ctx, rootDir, spec, storePath, remoteURL, false); err != nil {
-		return Store{}, err
-	}
-
 	return Store{
 		RepoKey:   spec.RepoKey,
 		StorePath: storePath,
@@ -82,31 +78,6 @@ func Open(ctx context.Context, rootDir string, repo string, fetch bool) (Store, 
 		StorePath: storePath,
 		RemoteURL: remoteURL,
 	}, nil
-}
-
-func ensureSrc(ctx context.Context, rootDir string, spec Spec, storePath, remoteURL string, fetch bool) error {
-	srcPath := SrcPath(rootDir, spec)
-	if exists, err := paths.DirExists(srcPath); err != nil {
-		return err
-	} else if exists {
-		if fetch {
-			gitcmd.Logf("git fetch --prune")
-			if _, err := gitcmd.Run(ctx, []string{"fetch", "--prune"}, gitcmd.Options{Dir: srcPath}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	if err := os.MkdirAll(filepath.Dir(srcPath), 0o755); err != nil {
-		return fmt.Errorf("create src dir: %w", err)
-	}
-	gitcmd.Logf("git clone %s %s", storePath, srcPath)
-	if _, err := gitcmd.Run(ctx, []string{"clone", storePath, srcPath}, gitcmd.Options{}); err != nil {
-		return err
-	}
-	_ = gitcmd.RemoteSetURL(ctx, srcPath, "origin", remoteURL)
-	return nil
 }
 
 func Exists(rootDir, repo string) (string, bool, error) {

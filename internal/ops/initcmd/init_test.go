@@ -21,7 +21,7 @@ func TestRunCreatesAndSkips(t *testing.T) {
 		t.Fatalf("expected created files")
 	}
 
-	for _, dir := range []string{"bare", "src", "workspaces"} {
+	for _, dir := range []string{"bare", "workspaces"} {
 		if _, err := os.Stat(filepath.Join(rootDir, dir)); err != nil {
 			t.Fatalf("missing dir %s: %v", dir, err)
 		}

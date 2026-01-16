@@ -11,7 +11,7 @@ Create the minimum directory and file layout under the resolved GWS root so othe
 
 ## Behavior
 - Validates that a root directory was resolved; otherwise fails.
-- Creates (if absent) the directories `bare/`, `src/`, and `workspaces/` under the root with `0755` permissions.
+- Creates (if absent) the directories `bare/` and `workspaces/` under the root with `0755` permissions.
 - Creates `templates.yaml` if it does not exist, seeding it with an `example` template that lists two GitHub repositories.
 - Skips creation for items that already exist and reports them as skipped.
 

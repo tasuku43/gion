@@ -7,7 +7,6 @@
 
 ## 配下構造（固定）
 - `$GWS_ROOT/bare/`   : repo store（bare repo）
-- `$GWS_ROOT/src/`    : human working tree
 - `$GWS_ROOT/workspaces/`     : workspace (AI)
 - `$GWS_ROOT/workspaces/<ID>/`:
     - `<alias>/`        : worktree 作業ディレクトリ

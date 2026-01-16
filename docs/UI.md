@@ -52,7 +52,7 @@ Prefix coloring:
 Example:
 ```
 Steps
-  • repo get git@github.com:org/repo.git -> bare/github.com/org/repo.git, src/github.com/org/repo
+  • repo get git@github.com:org/repo.git -> bare/github.com/org/repo.git
   • worktree add repo -> workspaces/PROJ-123/repo
 ```
 
@@ -66,7 +66,6 @@ Example:
 Steps
   • repo get git@github.com:org/repo.git
     └─ $ git clone --bare ...
-    └─ $ git clone ... /src/...
 ```
 
 ## Colors (fixed)

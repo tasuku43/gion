@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tasuku43/gws/internal/core/paths"
 	"github.com/tasuku43/gws/internal/domain/repo"
 	"github.com/tasuku43/gws/internal/domain/workspace"
 )
@@ -63,11 +62,6 @@ func TestRepoGetWorkspaceAddRemove(t *testing.T) {
 	if _, err := os.Stat(store.StorePath); err != nil {
 		t.Fatalf("store path missing: %v", err)
 	}
-	srcPath := filepath.Join(paths.SrcRoot(rootDir), "example.com", "org", "repo")
-	if _, err := os.Stat(srcPath); err != nil {
-		t.Fatalf("src path missing: %v", err)
-	}
-
 	if _, err := workspace.New(ctx, rootDir, "WS-1"); err != nil {
 		t.Fatalf("workspace new: %v", err)
 	}

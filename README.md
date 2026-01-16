@@ -7,7 +7,6 @@ so humans and multiple AI agents can work in parallel without stepping on each o
 
 - Keep one canonical Git object store (bare) and spin up task workspaces as worktrees
 - Make "start a task" and "review a PR" repeatable with a single CLI
-- Separate human browsing clones from agent/task worktrees
 
 ## Requirements
 
@@ -37,7 +36,7 @@ templates:
       - git@github.com:octocat/Spoon-Knife.git
 ```
 
-### 3) Fetch repos (bare + src)
+### 3) Fetch repos (bare store)
 
 ```bash
 gws repo get git@github.com:octocat/Hello-World.git
@@ -75,12 +74,11 @@ gws create --review https://github.com/owner/repo/pull/123
 
 ## How gws lays out files
 
-gws keeps three top-level directories under `GWS_ROOT`:
+gws keeps two top-level directories under `GWS_ROOT`:
 
 ```
 GWS_ROOT/
   bare/        # bare repo store (shared Git objects)
-  src/         # normal clones for human browsing
   workspaces/  # task worktrees (one folder per workspace id)
   templates.yaml
 ```
@@ -88,7 +86,6 @@ GWS_ROOT/
 Notes:
 
 - Workspace id must be a valid Git branch name, and it becomes the worktree branch name.
-- `src/` is a regular clone and does not share local branches with `workspaces/`.
 - gws never changes your shell directory automatically.
 
 ## Root resolution
@@ -104,7 +101,7 @@ gws resolves `GWS_ROOT` in this order:
 Core workflow:
 
 - `gws init` - create root structure and `templates.yaml`
-- `gws repo get <repo>` - create/update bare repo and a `src/` clone
+- `gws repo get <repo>` - create/update bare repo store
 - `gws repo ls` - list repos already fetched
 - `gws template ls` - list templates from `templates.yaml`
 - `gws create --template <name> [<id>]` - create a workspace from a template
@@ -113,7 +110,7 @@ Core workflow:
 - `gws open [<id>]` - open a workspace in an interactive subshell
 - `gws status [<id>]` - show branch, dirty/untracked, and ahead/behind
 - `gws rm [<id>]` - remove a workspace (refuses if dirty)
-- `gws path (--workspace | --src)` - print a selected workspace/src path
+- `gws path --workspace` - print a selected workspace path
 
 Review workflow:
 

@@ -17,11 +17,6 @@ func StorePath(rootDir string, spec repospec.Spec) string {
 	return filepath.Join(paths.BareRoot(rootDir), spec.Host, spec.Owner, spec.Repo+".git")
 }
 
-// SrcPath returns the path to the working tree for the spec.
-func SrcPath(rootDir string, spec repospec.Spec) string {
-	return filepath.Join(paths.SrcRoot(rootDir), spec.Host, spec.Owner, spec.Repo)
-}
-
 // Normalize trims and validates a repo spec, returning the spec and trimmed input.
 func Normalize(input string) (repospec.Spec, string, error) {
 	trimmed := strings.TrimSpace(input)

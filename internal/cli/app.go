@@ -825,7 +825,6 @@ func runRepoGet(ctx context.Context, rootDir string, args []string) error {
 	renderer.Blank()
 	renderer.Section("Result")
 	renderer.Bullet(fmt.Sprintf("%s %s", store.RepoKey, store.StorePath))
-	renderSuggestion(renderer, useColor, repoSrcAbs(rootDir, repoSpec))
 	return nil
 }
 
@@ -2985,14 +2984,7 @@ func displayRepoName(repoSpec string) string {
 
 func repoDestForSpec(rootDir, repoSpec string) string {
 	store := repoStoreRel(rootDir, repoSpec)
-	src := repoSrcRel(rootDir, repoSpec)
-	if store != "" && src != "" {
-		return fmt.Sprintf("%s, %s", store, src)
-	}
-	if store != "" {
-		return store
-	}
-	return src
+	return store
 }
 
 func repoStoreRel(rootDir, repoSpec string) string {
@@ -3002,23 +2994,6 @@ func repoStoreRel(rootDir, repoSpec string) string {
 	}
 	storePath := repo.StorePath(rootDir, spec)
 	return relPath(rootDir, storePath)
-}
-
-func repoSrcRel(rootDir, repoSpec string) string {
-	spec, _, err := repo.Normalize(repoSpec)
-	if err != nil {
-		return ""
-	}
-	srcPath := repo.SrcPath(rootDir, spec)
-	return relPath(rootDir, srcPath)
-}
-
-func repoSrcAbs(rootDir, repoSpec string) string {
-	spec, _, err := repo.Normalize(repoSpec)
-	if err != nil {
-		return ""
-	}
-	return repo.SrcPath(rootDir, spec)
 }
 
 func worktreeDest(rootDir, workspaceID, repoSpec string) string {

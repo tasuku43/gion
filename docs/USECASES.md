@@ -11,16 +11,16 @@ Rating legend:
 - Missing: Not supported
 
 ## Setup / Preparation
-- **Initialize root** — `gws init` creates bare/src/workspaces and `templates.yaml` in one shot. Once per environment. Rating: Excellent
+- **Initialize root** — `gws init` creates bare/workspaces and `templates.yaml` in one shot. Once per environment. Rating: Excellent
 - **Define / check templates** — Edit `templates.yaml` directly, confirm names with `gws template ls`. Rating: Good (manual YAML editing, no validation)
-- **Fetch repositories** — `gws repo get <repo>` creates bare + src clone; `gws repo ls` lists fetched repos. Rating: Good (does not fetch when bare already exists, so not ideal for updating)
+- **Fetch repositories** — `gws repo get <repo>` creates bare store; `gws repo ls` lists fetched repos. Rating: Good (does not fetch when bare already exists, so not ideal for updating)
 - **Switch roots** — Use `--root` or `GWS_ROOT` to separate environments. Rating: Excellent
 
 ## Start / During a Task
 - **Create workspace from template** — `gws create --template <name> [<id>]`; prompts if omitted. `workspace_id` becomes the branch name for all repos. Rating: Excellent (interactive repo-get prompt appears when a template repo is missing)
 - **Add a repo mid-task** — `gws add <id> <repo>`; branch name = workspace_id, base = origin/HEAD. Rating: Excellent
 - **List workspaces** — `gws ls` enumerates workspaces. Rating: Good (minimal detail only)
-- **Jump to a path** — `gws path --workspace` or `gws path --src` prints a selected path for `cd`. Rating: Good
+- **Jump to a path** — `gws path --workspace` prints a selected path for `cd`. Rating: Good
 - **Check status** — `gws status <id>` shows dirty/untracked counts and HEAD per repo. Rating: Excellent (lightweight)
 
 ## Reviews
@@ -33,7 +33,6 @@ Rating legend:
 - **Refresh to latest base** — Forcing a fresh fetch is manual via `git fetch`; gws alone doesn’t cover it. Rating: Fair
 
 ## Human + Agent Co-use
-- **Separate browsing clone vs task workspaces** — Default layout (bare + `src/` + `workspaces/`) supports this split. Rating: Excellent
 - **Non-interactive runs (agent/CI)** — `--no-prompt` suppresses interaction, though destructive ops may still halt. Rating: Good
 - **Parallel tasks** — Shared branch name = workspace_id keeps multi-agent parallel work safer. Rating: Excellent
 

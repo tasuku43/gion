@@ -28,7 +28,6 @@ func Run(rootDir string) (Result, error) {
 
 	dirs := []string{
 		paths.BareRoot(rootDir),
-		paths.SrcRoot(rootDir),
 		paths.WorkspacesRoot(rootDir),
 	}
 	for _, dir := range dirs {
