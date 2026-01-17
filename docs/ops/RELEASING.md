@@ -7,6 +7,8 @@ status: implemented
 
 This document describes how we ship gws as a “touchable OSS” with a reliable install path.
 
+For the pipeline architecture and sequence, see `docs/ops/RELEASE_PIPELINE.md`.
+
 ## Source of truth
 
 - **GitHub Releases** is the source of truth for distributed binaries.

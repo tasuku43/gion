@@ -14,7 +14,10 @@ status: implemented
 ## Guides
 - `docs/guides/USECASES.md`
 - `docs/guides/INSTALL.md`
-- `docs/guides/RELEASING.md`
 
 ## Concepts
 - `docs/concepts/CONCEPT.md`
+
+## Ops
+- `docs/ops/RELEASING.md`
+- `docs/ops/RELEASE_PIPELINE.md`

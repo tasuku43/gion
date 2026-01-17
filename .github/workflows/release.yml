@@ -37,7 +37,7 @@ jobs:
 
       - name: Update Homebrew formula (working tree)
         run: |
-          ./scripts/update-homebrew-formula.sh "${GITHUB_REF_NAME}" "dist/checksums.txt"
+          ./.github/scripts/update-homebrew-formula.sh "${GITHUB_REF_NAME}" "dist/checksums.txt"
 
       - name: Create PR for Homebrew formula update
         uses: peter-evans/create-pull-request@v7
