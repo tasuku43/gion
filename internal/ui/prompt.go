@@ -739,8 +739,8 @@ func (m createFlowModel) filterModes() []PromptChoice {
 	q := strings.ToLower(strings.TrimSpace(m.modeInput.Value()))
 	choices := []PromptChoice{
 		{Label: "repo", Value: "repo", Description: "1 repo only"},
-		{Label: "issue", Value: "issue", Description: "From an issue (multi-select)"},
-		{Label: "review", Value: "review", Description: "From a review request (multi-select)"},
+		{Label: "issue", Value: "issue", Description: "From an issue (multi-select, GitHub only)"},
+		{Label: "review", Value: "review", Description: "From a review request (multi-select, GitHub only)"},
 		{Label: "template", Value: "template", Description: "From template"},
 	}
 	if q == "" {

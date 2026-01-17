@@ -103,6 +103,16 @@ Result
     └─ helmfiles (branch: SREP-123)
 ```
 
+### gws create (mode picker)
+```
+Inputs
+  • mode: s
+    └─ repo - 1 repo only
+    └─ issue - From an issue (multi-select, GitHub only)
+    └─ review - From a review request (multi-select, GitHub only)
+    └─ template - From template
+```
+
 ### gws create --template (non-interactive)
 ```
 Steps

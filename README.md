@@ -12,7 +12,7 @@ so humans and multiple AI agents can work in parallel without stepping on each o
 
 - Git
 - Go 1.24+ (build/run from source)
-- gh CLI (required for `gws create --review` and `gws create --issue` picker)
+- gh CLI (required for `gws create --review` and `gws create --issue` — GitHub only)
 
 ## Quickstart (5 minutes)
 
@@ -83,6 +83,20 @@ gws create --review https://github.com/owner/repo/pull/123
 - Creates `OWNER-REPO-REVIEW-PR-123`
 - Fetches the PR head branch (forks not supported)
 - Requires `gh` authentication
+
+## Create from an Issue (GitHub only)
+
+```bash
+gws create --issue https://github.com/owner/repo/issues/123
+```
+
+- Creates `OWNER-REPO-ISSUE-123`
+- Defaults branch to `issue/123`
+- Requires `gh` authentication
+
+## Provider support (summary)
+- `gws create --repo` and `gws create --template` are provider-agnostic (any Git host URL).
+- `gws create --review` and `gws create --issue` are GitHub-only today.
 
 ## How gws lays out files
 

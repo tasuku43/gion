@@ -571,7 +571,11 @@ func runCreate(ctx context.Context, rootDir string, args []string, noPrompt bool
 			if !ok {
 				return nil, fmt.Errorf("selected repo not found")
 			}
-			prs, err := fetchGitHubPRs(ctx, selected.Host, selected.Owner, selected.Repo)
+			provider, err := providerByName(selected.Provider)
+			if err != nil {
+				return nil, err
+			}
+			prs, err := provider.FetchPRs(ctx, selected.Host, selected.Owner, selected.Repo)
 			if err != nil {
 				return nil, err
 			}
@@ -588,7 +592,11 @@ func runCreate(ctx context.Context, rootDir string, args []string, noPrompt bool
 			if strings.ToLower(selected.Provider) != "github" {
 				return nil, fmt.Errorf("issue picker supports GitHub only for now: %s", selected.Host)
 			}
-			issues, err := fetchGitHubIssues(ctx, selected.Host, selected.Owner, selected.Repo)
+			provider, err := providerByName(selected.Provider)
+			if err != nil {
+				return nil, err
+			}
+			issues, err := provider.FetchIssues(ctx, selected.Host, selected.Owner, selected.Repo)
 			if err != nil {
 				return nil, err
 			}
@@ -1281,10 +1289,17 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 	if err != nil {
 		return err
 	}
+	if !strings.EqualFold(strings.TrimSpace(req.Provider), "github") {
+		return fmt.Errorf("unsupported issue provider: %s", req.Provider)
+	}
 	repoURL := buildRepoURLFromParts(req.Host, req.Owner, req.Repo)
 	description := ""
 	if strings.EqualFold(strings.TrimSpace(req.Provider), "github") {
-		issue, err := fetchGitHubIssue(ctx, req.Host, req.Owner, req.Repo, req.Number)
+		provider, err := providerByName(req.Provider)
+		if err != nil {
+			return err
+		}
+		issue, err := provider.FetchIssue(ctx, req.Host, req.Owner, req.Repo, req.Number)
 		if err != nil {
 			return err
 		}
@@ -1426,10 +1441,17 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	if err != nil {
 		return err
 	}
+	if !strings.EqualFold(strings.TrimSpace(req.Provider), "github") {
+		return fmt.Errorf("unsupported issue provider: %s", req.Provider)
+	}
 	repoURL := buildRepoURLFromParts(req.Host, req.Owner, req.Repo)
 	description := ""
 	if strings.EqualFold(strings.TrimSpace(req.Provider), "github") {
-		issue, err := fetchGitHubIssue(ctx, req.Host, req.Owner, req.Repo, req.Number)
+		provider, err := providerByName(req.Provider)
+		if err != nil {
+			return err
+		}
+		issue, err := provider.FetchIssue(ctx, req.Host, req.Owner, req.Repo, req.Number)
 		if err != nil {
 			return err
 		}
@@ -1550,7 +1572,11 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 		if strings.ToLower(selected.Provider) != "github" {
 			return nil, fmt.Errorf("issue picker supports GitHub only for now: %s", selected.Host)
 		}
-		issues, err := fetchGitHubIssues(ctx, selected.Host, selected.Owner, selected.Repo)
+		provider, err := providerByName(selected.Provider)
+		if err != nil {
+			return nil, err
+		}
+		issues, err := provider.FetchIssues(ctx, selected.Host, selected.Owner, selected.Repo)
 		if err != nil {
 			return nil, err
 		}
@@ -1588,8 +1614,11 @@ func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, 
 	if strings.ToLower(selectedRepo.Provider) != "github" {
 		return fmt.Errorf("issue picker supports GitHub only for now: %s", selectedRepo.Host)
 	}
-
-	issues, err := fetchGitHubIssues(ctx, selectedRepo.Host, selectedRepo.Owner, selectedRepo.Repo)
+	provider, err := providerByName(selectedRepo.Provider)
+	if err != nil {
+		return err
+	}
+	issues, err := provider.FetchIssues(ctx, selectedRepo.Host, selectedRepo.Owner, selectedRepo.Repo)
 	if err != nil {
 		return err
 	}
@@ -1717,9 +1746,12 @@ func buildIssueRepoChoices(rootDir string) ([]issueRepoChoice, error) {
 			continue
 		}
 		host := parts[0]
+		if !isGitHubHost(host) {
+			continue
+		}
 		owner := parts[1]
 		repoName := parts[2]
-		provider := issueProviderForHost(host)
+		provider := "github"
 		label := fmt.Sprintf("%s (%s)", repoName, repoKey)
 		value := repoSpecFromKey(entry.RepoKey)
 		choices = append(choices, issueRepoChoice{
@@ -1742,17 +1774,6 @@ func toIssuePromptChoices(choices []issueRepoChoice) ([]ui.PromptChoice, map[str
 		byValue[choice.Value] = choice
 	}
 	return prompt, byValue
-}
-
-func issueProviderForHost(host string) string {
-	lower := strings.ToLower(strings.TrimSpace(host))
-	if strings.Contains(lower, "gitlab") {
-		return "gitlab"
-	}
-	if strings.Contains(lower, "bitbucket") {
-		return "bitbucket"
-	}
-	return "github"
 }
 
 type githubIssueItem struct {
@@ -1898,12 +1919,13 @@ func buildPRChoices(prs []prSummary) []ui.PromptChoice {
 }
 
 type reviewRepoChoice struct {
-	Label   string
-	Value   string
-	Host    string
-	Owner   string
-	Repo    string
-	RepoURL string
+	Label    string
+	Value    string
+	Provider string
+	Host     string
+	Owner    string
+	Repo     string
+	RepoURL  string
 }
 
 type prSummary struct {
@@ -1931,7 +1953,11 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool) 
 		return err
 	}
 
-	pr, err := fetchGitHubPR(ctx, req.Host, req.Owner, req.Repo, req.Number)
+	provider, err := providerByName(req.Provider)
+	if err != nil {
+		return err
+	}
+	pr, err := provider.FetchPR(ctx, req.Host, req.Owner, req.Repo, req.Number)
 	if err != nil {
 		return err
 	}
@@ -1953,7 +1979,7 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool) 
 	defer output.SetStepLogger(nil)
 
 	renderer.Section("Inputs")
-	renderer.Bullet(fmt.Sprintf("provider: github (%s)", req.Host))
+	renderer.Bullet(fmt.Sprintf("provider: %s (%s)", strings.ToLower(req.Provider), req.Host))
 	renderer.Bullet(fmt.Sprintf("repo: %s/%s", baseOwner, baseRepo))
 	renderer.Bullet(fmt.Sprintf("pull request: #%d", pr.Number))
 	renderer.Bullet(fmt.Sprintf("branch: %s", pr.HeadRef))
@@ -2017,7 +2043,7 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool) e
 		return err
 	}
 	if len(repoChoices) == 0 {
-		return fmt.Errorf("no GitHub repos found")
+		return fmt.Errorf("no repos with supported review providers found")
 	}
 
 	promptChoices, repoByValue := toPromptChoices(repoChoices)
@@ -2026,7 +2052,11 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool) e
 		if !ok {
 			return nil, fmt.Errorf("selected repo not found")
 		}
-		prs, err := fetchGitHubPRs(ctx, selected.Host, selected.Owner, selected.Repo)
+		provider, err := providerByName(selected.Provider)
+		if err != nil {
+			return nil, err
+		}
+		prs, err := provider.FetchPRs(ctx, selected.Host, selected.Owner, selected.Repo)
 		if err != nil {
 			return nil, err
 		}
@@ -2058,7 +2088,11 @@ func runCreateReviewSelected(ctx context.Context, rootDir string, noPrompt bool,
 	if !ok {
 		return fmt.Errorf("selected repo not found")
 	}
-	prs, err := fetchGitHubPRs(ctx, selectedRepo.Host, selectedRepo.Owner, selectedRepo.Repo)
+	provider, err := providerByName(selectedRepo.Provider)
+	if err != nil {
+		return err
+	}
+	prs, err := provider.FetchPRs(ctx, selectedRepo.Host, selectedRepo.Owner, selectedRepo.Repo)
 	if err != nil {
 		return err
 	}
@@ -2202,12 +2236,13 @@ func buildReviewRepoChoices(rootDir string) ([]reviewRepoChoice, error) {
 		repoURL := buildRepoURLFromParts(host, owner, repoName)
 		value := repoSpecFromKey(entry.RepoKey)
 		choices = append(choices, reviewRepoChoice{
-			Label:   label,
-			Value:   value,
-			Host:    host,
-			Owner:   owner,
-			Repo:    repoName,
-			RepoURL: repoURL,
+			Label:    label,
+			Value:    value,
+			Provider: "github",
+			Host:     host,
+			Owner:    owner,
+			Repo:     repoName,
+			RepoURL:  repoURL,
 		})
 	}
 	return choices, nil
@@ -2449,7 +2484,11 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 		return err
 	}
 	repoURL := buildRepoURL(req)
-	pr, err := fetchGitHubPR(ctx, req.Host, req.Owner, req.Repo, req.Number)
+	provider, err := providerByName(req.Provider)
+	if err != nil {
+		return err
+	}
+	pr, err := provider.FetchPR(ctx, req.Host, req.Owner, req.Repo, req.Number)
 	if err != nil {
 		return err
 	}
@@ -2687,8 +2726,8 @@ func promptTemplateAndID(rootDir, title, templateName, workspaceID string, theme
 func promptCreateMode(theme ui.Theme, useColor bool) (string, error) {
 	choices := []ui.PromptChoice{
 		{Label: "repo", Value: "repo", Description: "1 repo only"},
-		{Label: "issue", Value: "issue", Description: "From an issue (multi-select)"},
-		{Label: "review", Value: "review", Description: "From a review request (multi-select)"},
+		{Label: "issue", Value: "issue", Description: "From an issue (multi-select, GitHub only)"},
+		{Label: "review", Value: "review", Description: "From a review request (multi-select, GitHub only)"},
 		{Label: "template", Value: "template", Description: "From template"},
 	}
 	return ui.PromptChoiceSelect("gws create", "mode", choices, theme, useColor)

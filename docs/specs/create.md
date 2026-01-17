@@ -13,6 +13,7 @@ Unify all workspace creation flows under a single command and keep "create" sema
 - Exactly one of `--template`, `--review`, `--issue`, or `--repo` can be specified. If multiple are provided, error.
 - If none are provided and prompts are allowed, enter an interactive mode picker.
   - The picker presents `template`, `repo`, `review`, `issue` and supports arrow selection with filterable search.
+  - `review` and `issue` are GitHub-only modes; `repo` and `template` are provider-agnostic.
 - If none are provided and `--no-prompt` is set, error.
 - When prompts are used, mode flags (`--template`, `--review`, `--issue`, `--repo`) still run the unified create prompt flow so the Inputs section is rendered as a single in-place interaction.
 
@@ -120,10 +121,11 @@ Same behavior as the former `gws issue`.
 
 ### Behavior
 - If `ISSUE_URL` is provided:
+  - Accepts GitHub issue URLs only (e.g., `https://github.com/owner/repo/issues/123`).
   - Parse the URL to obtain `owner`, `repo`, and `issue number`.
   - Workspace ID: defaults to `<OWNER>-<REPO>-ISSUE-<number>` (owner/repo uppercased); can be overridden with `--workspace-id`. Must pass `git check-ref-format --branch`. If the workspace already exists, error.
   - Branch: defaults to `issue/<number>`. Before proceeding, prompt the user with the default and allow editing unless `--no-prompt` or `--branch` is supplied.
-  - For GitHub issues, uses `gh api` to fetch the issue title and saves it as the workspace description.
+  - Uses `gh api` to fetch the issue title and saves it as the workspace description (requires authenticated GitHub CLI).
     - If the branch exists in the bare store, use it.
     - If the branch exists on `origin` but not locally, fetch it and create a tracking branch.
     - If not, create it from a base ref.
@@ -136,7 +138,7 @@ Same behavior as the former `gws issue`.
 - If `ISSUE_URL` is omitted and prompts are allowed (interactive picker):
   - `--no-prompt` with no URL => error.
   - Step 1: pick a repo from fetched bare stores whose origin remote resolves to a supported host. Display `alias (host/owner/repo)`; filterable by substring.
-  - Step 2: fetch open issues for the chosen repo from the host API (GitHub via `gh api`; other hosts may be added later). Default fetch: latest 50 open issues sorted by updated desc.
+  - Step 2: fetch open issues for the chosen repo via `gh api` (GitHub only). Default fetch: latest 50 open issues sorted by updated desc.
 - Step 3: multi-select issues using the same add/remove loop as `gws template add` (filterable list; `<Enter>` adds; `<Ctrl+D>` or `done` to finish; minimum 1 selection).
   - For each selected issue:
     - Workspace ID = `<OWNER>-<REPO>-ISSUE-<number>` (owner/repo uppercased, no per-item override in this flow).
@@ -152,7 +154,7 @@ Same behavior as the former `gws issue`.
 - For picker mode: each selected issue produces a workspace with the same guarantees; partial success is reported if a later item fails.
 
 ### Failure Modes
-- Unsupported or invalid issue URL.
+- Unsupported or invalid issue URL; non-GitHub host.
 - Workspace already exists.
 - Repo store missing and user declines/forbids `repo get`.
 - Git errors when creating/fetching branch or adding the worktree.
