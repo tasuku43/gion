@@ -66,11 +66,3 @@ jobs:
           base: main
           branch: "chore/homebrew-formula-${{ github.ref_name }}"
           delete-branch: true
-
-      - name: Enable auto-merge for Homebrew formula PR
-        if: steps.channel.outputs.stable == 'true' && steps.cpr.outputs.pull-request-number != ''
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: squash
