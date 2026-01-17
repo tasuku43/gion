@@ -61,6 +61,7 @@ jobs:
           title: "Update Homebrew formula for ${{ github.ref_name }}"
           body: |
             Updates `Formula/gws.rb` to point to GitHub Releases artifacts for `${{ github.ref_name }}`.
+          base: main
           branch: "chore/homebrew-formula-${{ github.ref_name }}"
           delete-branch: true
 
