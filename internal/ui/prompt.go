@@ -3193,6 +3193,8 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 		warnTag := ""
 		if hasWarn {
 			warnTag = "[" + shortWarningTag(item.Warning) + "]"
+		} else {
+			warnTag = "[clean]"
 		}
 		if useColor {
 			if hasWarn {
@@ -3209,7 +3211,11 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 		if warnTag != "" {
 			tag := warnTag
 			if useColor {
-				tag = warnStyle.Render(warnTag)
+				if hasWarn {
+					tag = warnStyle.Render(warnTag)
+				} else {
+					tag = theme.Accent.Render(warnTag)
+				}
 			}
 			display += tag
 		}
@@ -3271,6 +3277,8 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 		warnTag := ""
 		if hasWarn {
 			warnTag = "[" + shortWarningTag(item.Warning) + "]"
+		} else {
+			warnTag = "[clean]"
 		}
 		if useColor && hasWarn {
 			displayID = warnStyle.Render(displayID)
@@ -3279,7 +3287,11 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 		if warnTag != "" {
 			tag := warnTag
 			if useColor {
-				tag = warnStyle.Render(warnTag)
+				if hasWarn {
+					tag = warnStyle.Render(warnTag)
+				} else {
+					tag = theme.Accent.Render(warnTag)
+				}
 			}
 			display += tag
 		}
