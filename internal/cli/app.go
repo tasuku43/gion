@@ -3535,10 +3535,13 @@ func repoNeedsStatusDetails(repo workspace.RepoStatus) bool {
 	if repo.Dirty {
 		return true
 	}
-	if repo.AheadCount > 0 || repo.BehindCount > 0 {
+	if repo.Detached || repo.HeadMissing {
 		return true
 	}
 	if strings.TrimSpace(repo.Upstream) == "" {
+		return true
+	}
+	if repo.AheadCount > 0 {
 		return true
 	}
 	return false
