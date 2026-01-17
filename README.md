@@ -12,7 +12,24 @@ so humans and multiple AI agents can work in parallel without stepping on each o
 
 - Git
 - Go 1.24+ (build/run from source)
-- gh CLI (required for `gws create --review` and `gws create --issue` — GitHub only)
+- gh CLI (optional; required for `gws create --review` and `gws create --issue` — GitHub only)
+
+## Install
+
+Recommended:
+
+```bash
+brew tap tasuku43/gws
+brew install gws
+```
+
+Version pinning (recommended):
+
+```bash
+mise use -g github:tasuku43/gws@v0.1.0
+```
+
+For details and other options, see `docs/guides/INSTALL.md`.
 
 ## Quickstart (5 minutes)
 

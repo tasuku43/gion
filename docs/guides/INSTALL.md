@@ -28,6 +28,7 @@ Install:
 
 Notes:
 - Homebrew is intended for installing the latest stable release.
+- Pre-release tags (e.g. `v0.1.0-rc.1`) are not published to Homebrew.
 - For version pinning, prefer `mise` (see below).
 
 ## Install via mise
