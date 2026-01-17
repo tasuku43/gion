@@ -33,7 +33,7 @@ flowchart LR
 
   RLS -->|checksums.txt + tag| Updater[update-homebrew-formula.sh]
   Updater --> PR[PR updating Formula/gws.rb]
-  Dev -->|merge PR| Main[main branch]
+  GH -->|auto-merge PR after CI| Main[main branch]
   Main --> Brew[brew tap + brew install]
   RLS --> Mise[mise github backend]
 ```
@@ -57,7 +57,8 @@ sequenceDiagram
   GR->>RLS: create/update release + upload artifacts
   GA->>GA: run formula update script (from dist/checksums.txt)
   GA->>PR: open PR to update Formula/gws.rb
-  Dev->>PR: review + merge
+  PR-->>GH: CI passes
+  GH->>GH: auto-merge PR (stable tags only)
   Brew->>GH: brew tap tasuku43/gws (pulls Formula/gws.rb)
   Brew->>RLS: download tar.gz + verify sha256
   Brew->>Brew: install gws
@@ -67,5 +68,5 @@ sequenceDiagram
 ## Notes
 
 - `gws version` correctness is guaranteed for **GitHub Releases binaries** by `-ldflags` injected by GoReleaser.
-- Homebrew formula is updated via a PR after each release tag; installation via `brew` depends on merging that PR.
+- Homebrew formula is updated via a PR after each stable release tag; GitHub auto-merge is enabled by the release workflow.
 - Homebrew formula updates are performed for **stable tags only** (tags without a `-...` prerelease suffix).

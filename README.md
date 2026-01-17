@@ -5,8 +5,46 @@ so humans and multiple AI agents can work in parallel without stepping on each o
 
 ## Why gws
 
-- Keep one canonical Git object store (bare) and spin up task workspaces as worktrees
-- Make "start a task" and "review a PR" repeatable with a single CLI
+- In the era of AI agents, multiple actors edit in parallel and context collisions become common.
+- gws promotes directories into explicit workspaces and manages them safely with Git worktrees.
+- It focuses on creating, listing, and safely cleaning up work environments.
+
+## What makes gws different
+
+### 1) `create` is the center
+
+One command, four creation modes:
+
+```bash
+gws create --repo git@github.com:org/repo.git
+gws create --template app PROJ-123
+gws create --review https://github.com/owner/repo/pull/123   # GitHub only
+gws create --issue https://github.com/owner/repo/issues/123  # GitHub only
+```
+
+### 2) Template = pseudo-monorepo workspace
+
+Define multiple repos as one task unit, then create them together:
+
+```yaml
+templates:
+  app:
+    repos:
+      - git@github.com:org/api.git
+      - git@github.com:org/web.git
+```
+
+```bash
+gws create --template app PROJ-123
+```
+
+### 3) Guardrails on cleanup
+
+`gws rm` refuses or asks for confirmation when workspaces are dirty, unpushed, or unknown:
+
+```bash
+gws rm PROJ-123
+```
 
 ## Requirements
 
@@ -91,26 +129,6 @@ gws rm MY-123
 
 gws opens an interactive subshell at the workspace root.
 
-## Review a PR (GitHub only)
-
-```bash
-gws create --review https://github.com/owner/repo/pull/123
-```
-
-- Creates `OWNER-REPO-REVIEW-PR-123`
-- Fetches the PR head branch (forks not supported)
-- Requires `gh` authentication
-
-## Create from an Issue (GitHub only)
-
-```bash
-gws create --issue https://github.com/owner/repo/issues/123
-```
-
-- Creates `OWNER-REPO-ISSUE-123`
-- Defaults branch to `issue/123`
-- Requires `gh` authentication
-
 ## Provider support (summary)
 - `gws create --repo` and `gws create --template` are provider-agnostic (any Git host URL).
 - `gws create --review` and `gws create --issue` are GitHub-only today.
@@ -139,61 +157,14 @@ gws resolves `GWS_ROOT` in this order:
 2. `GWS_ROOT` environment variable
 3. `~/gws`
 
-## Command overview
+## Command overview (short)
 
-Core workflow:
-
-- `gws init` - create root structure and `templates.yaml`
-- `gws repo get <repo>` - create/update bare repo store
-- `gws repo ls` - list repos already fetched
-- `gws template ls` - list templates from `templates.yaml`
-- `gws template validate` - validate `templates.yaml` entries
-- `gws create --template <name> [<id>]` - create a workspace from a template
-- `gws create --repo [<repo>]` - create a workspace from a repo (prompts for id)
-- `gws add [<id>] [<repo>]` - add another repo worktree to a workspace
-- `gws ls [--details]` - list workspaces and repos (optionally with git status details)
-- `gws open [<id>]` - open a workspace in an interactive subshell
-- `gws status [<id>]` - show branch, dirty/untracked, and ahead/behind
-- `gws rm [<id>]` - remove a workspace (refuses if dirty)
-- `gws path --workspace` - print a selected workspace path
-
-Review workflow:
-
-- `gws create --review <PR URL>` - create a workspace for a GitHub PR
-
-Global flags:
-
-- `--root <path>` - override `GWS_ROOT`
-- `--no-prompt` - disable interactive prompts
-
-## Repo spec format
-
-Only SSH or HTTPS URLs are supported:
-
-```
-# SSH
-git@github.com:owner/repo.git
-
-# HTTPS
-https://github.com/owner/repo.git
-```
-
-## Common tasks
-
-### Add a repo to an existing workspace
-
-```bash
-gws add MY-123 git@github.com:org/another-repo.git
-```
-
-### Remove a workspace safely
-
-```bash
-gws status MY-123
-gws rm MY-123
-```
-
-`gws rm` refuses if the workspace is dirty.
+- `gws init` - initialize root and `templates.yaml`
+- `gws repo get <repo>` - fetch bare repo store
+- `gws create ...` - create workspaces (repo/template/review/issue)
+- `gws open [<id>]` - open a workspace in a subshell
+- `gws status [<id>]` - check status
+- `gws rm [<id>]` - remove workspace with guardrails
 
 ## Help and docs
 
@@ -202,6 +173,7 @@ gws rm MY-123
 - `docs/spec/core/TEMPLATES.md` for template format
 - `docs/spec/core/DIRECTORY_LAYOUT.md` for the file layout
 - `docs/spec/ui/UI.md` for output conventions
+- `docs/concepts/CONCEPT.md` for the background and motivation
 
 ## Maintainer
 

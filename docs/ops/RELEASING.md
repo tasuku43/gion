@@ -47,8 +47,8 @@ For the pipeline architecture and sequence, see `docs/ops/RELEASE_PIPELINE.md`.
    - macOS + Linux archives for amd64/arm64
    - `checksums.txt`
    - release note links to INSTALL and COMPATIBILITY
-6. For stable tags (no `-rc` / no prerelease suffix), confirm the Homebrew update PR was created (or auto-merged once enabled).
-6. Smoke test by downloading a release artifact and running:
+6. For stable tags (no `-rc` / no prerelease suffix), confirm the Homebrew update PR was created and auto-merged.
+7. Smoke test by downloading a release artifact and running:
    - `./gws version`
    - `./gws --version`
 
