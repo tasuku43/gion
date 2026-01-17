@@ -25,6 +25,9 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 	if rootDir == "" {
 		return fmt.Errorf("root directory is required")
 	}
+	if err := validateWorkspaceID(ctx, workspaceID); err != nil {
+		return err
+	}
 
 	wsDir := WorkspaceDir(rootDir, workspaceID)
 	if exists, err := paths.DirExists(wsDir); err != nil {

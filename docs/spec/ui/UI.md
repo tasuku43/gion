@@ -1,3 +1,8 @@
+---
+title: "UI Specification"
+status: implemented
+---
+
 # UI Specification (Bubble Tea + Bubbles + Lip Gloss)
 
 ## Goals
@@ -91,7 +96,7 @@ Steps
 Inputs
   • template: hel
     └─ helmfiles
-  • workspace id: SREP-123
+  • workspace id: PROJ-123
 
 Info
   • (optional warnings / skipped / blocked)
@@ -100,8 +105,8 @@ Steps
   • worktree add helmfiles
 
 Result
-  • /Users/me/gws/workspaces/SREP-123
-    └─ helmfiles (branch: SREP-123)
+  • /Users/me/gws/workspaces/PROJ-123
+    └─ helmfiles (branch: PROJ-123)
 ```
 
 ### gws create (mode picker)
@@ -121,7 +126,7 @@ Steps
   • worktree add repo
 
 Result
-  • /Users/me/gws/workspaces/SREP-123
+  • /Users/me/gws/workspaces/PROJ-123
     ├─ repo
     └─ api
 ```

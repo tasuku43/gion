@@ -35,12 +35,14 @@ func printGlobalHelp(w io.Writer) {
 	fmt.Fprintln(w, helpCommand(theme, useColor, "repo <subcommand>", "repo commands (get/ls)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "template <subcommand>", "template commands (ls/add/rm/validate)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "doctor [--fix | --self]", "check workspace/repo health"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "version", "print gws version"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "help [command]", "show help for a command"))
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Global flags:"))
 	fmt.Fprintln(w, helpFlag(theme, useColor, "--root <path>", "override gws root"))
 	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-prompt", "disable interactive prompt"))
 	fmt.Fprintln(w, helpFlag(theme, useColor, "--debug", "write debug logs to file"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--version", "print version"))
 	fmt.Fprintln(w, helpFlag(theme, useColor, "--help, -h", "show help"))
 }
 
@@ -68,6 +70,8 @@ func printCommandHelp(cmd string, w io.Writer) bool {
 		printDoctorHelp(w)
 	case "init":
 		printInitHelp(w)
+	case "version":
+		printVersion(w)
 	default:
 		return false
 	}

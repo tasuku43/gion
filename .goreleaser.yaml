@@ -1,0 +1,49 @@
+version: 2
+
+project_name: gws
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: gws
+    main: ./cmd/gws
+    binary: gws
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/tasuku43/gws/internal/cli.version={{ .Tag }}
+      - -X github.com/tasuku43/gws/internal/cli.commit={{ .ShortCommit }}
+      - -X github.com/tasuku43/gws/internal/cli.date={{ .Date }}
+
+archives:
+  - id: gws
+    builds:
+      - gws
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Tag }}_
+      {{- if eq .Os "darwin" -}}macos{{- else -}}{{ .Os }}{{- end -}}_
+      {{- if eq .Arch "amd64" -}}x64{{- else -}}{{ .Arch }}{{- end -}}
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+release:
+  prerelease: auto
+  footer: |
+    ## Install
+    - docs/guides/INSTALL.md: https://github.com/tasuku43/gws/blob/{{ .Tag }}/docs/guides/INSTALL.md
+
+    ## Compatibility policy
+    - docs/spec/core/COMPATIBILITY.md: https://github.com/tasuku43/gws/blob/{{ .Tag }}/docs/spec/core/COMPATIBILITY.md
+

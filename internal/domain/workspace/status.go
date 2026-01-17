@@ -42,6 +42,9 @@ func Status(ctx context.Context, rootDir, workspaceID string) (StatusResult, err
 	if rootDir == "" {
 		return StatusResult{}, fmt.Errorf("root directory is required")
 	}
+	if err := validateWorkspaceID(ctx, workspaceID); err != nil {
+		return StatusResult{}, err
+	}
 
 	wsDir := WorkspaceDir(rootDir, workspaceID)
 	if exists, err := paths.DirExists(wsDir); err != nil {

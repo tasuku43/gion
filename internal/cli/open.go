@@ -74,6 +74,9 @@ func runWorkspaceOpen(ctx context.Context, rootDir string, args []string, noProm
 			return err
 		}
 	}
+	if err := workspace.ValidateWorkspaceID(ctx, workspaceID); err != nil {
+		return err
+	}
 
 	wsDir := workspace.WorkspaceDir(rootDir, workspaceID)
 	if info, err := os.Stat(wsDir); err != nil {

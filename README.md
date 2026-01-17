@@ -5,14 +5,123 @@ so humans and multiple AI agents can work in parallel without stepping on each o
 
 ## Why gws
 
-- Keep one canonical Git object store (bare) and spin up task workspaces as worktrees
-- Make "start a task" and "review a PR" repeatable with a single CLI
+- In the era of AI agents, multiple actors edit in parallel and context collisions become common.
+- gws promotes directories into explicit workspaces and manages them safely with Git worktrees.
+- It focuses on creating, listing, and safely cleaning up work environments.
+
+## What makes gws different
+
+### 1) `create` is the center
+
+One command, four creation modes:
+
+```bash
+gws create --repo git@github.com:org/repo.git
+gws create --template app PROJ-123
+gws create --review https://github.com/owner/repo/pull/123   # GitHub only
+gws create --issue https://github.com/owner/repo/issues/123  # GitHub only
+```
+
+If you omit options, gws switches to an interactive flow:
+
+```
+$ gws create
+Inputs
+  • mode: s (type to filter)
+    └─ repo - 1 repo only
+    └─ issue - From an issue (multi-select, GitHub only)
+    └─ review - From a review request (multi-select, GitHub only)
+    └─ template - From template
+```
+
+Review/issue modes are also interactive (repo + multi-select):
+
+```
+$ gws create --review
+Inputs
+  • repo: org/gws
+  • pull request: s (type to filter)
+Info
+  • selected
+    └─ #123 Fix status output
+    └─ #120 Add repo prompt
+```
+
+```
+$ gws create --issue
+Inputs
+  • repo: org/gws
+  • issue: s (type to filter)
+Info
+  • selected
+    └─ #45 Improve template flow
+    └─ #39 Add doctor checks
+```
+
+### 2) Template = pseudo-monorepo workspace
+
+Define multiple repos as one task unit, then create them together:
+
+```yaml
+templates:
+  app:
+    repos:
+      - git@github.com:org/backend.git
+      - git@github.com:org/frontend.git
+      - git@github.com:org/manifests.git
+      - git@github.com:org/docs.git
+```
+
+```bash
+gws create --template app PROJ-123
+```
+
+### 3) Guardrails on cleanup
+
+`gws rm` refuses or asks for confirmation when workspaces are dirty, unpushed, or unknown:
+
+```bash
+gws rm PROJ-123
+```
+
+Omitting the workspace id prompts selection:
+
+```
+$ gws rm
+Inputs
+  • workspace: s (type to filter)
+    └─ PROJ-123 [clean] - sample project
+      └─ gws (branch: PROJ-123-backend)
+    └─ PROJ-124 [dirty changes] - wip
+      └─ gws (branch: PROJ-124-backend)
+```
 
 ## Requirements
 
 - Git
 - Go 1.24+ (build/run from source)
-- gh CLI (required for `gws create --review` and `gws create --issue` — GitHub only)
+- gh CLI (optional; required for `gws create --review` and `gws create --issue` — GitHub only)
+
+## Install
+
+Recommended:
+
+```bash
+brew tap tasuku43/gws
+brew install gws
+```
+
+Version pinning (recommended):
+
+```bash
+mise use -g github:tasuku43/gws@v0.1.0
+```
+
+Manual (GitHub Releases):
+- Download the archive for your OS/arch
+- Extract and place `gws` on your PATH
+
+For details and other options, see `docs/guides/INSTALL.md`.
 
 ## Quickstart (5 minutes)
 
@@ -24,166 +133,68 @@ gws init
 
 This creates `GWS_ROOT` with the standard layout and a starter `templates.yaml`.
 
-### 2) Define templates
+Root resolution order:
+1) `--root <path>`
+2) `GWS_ROOT` environment variable
+3) `~/gws` (default)
 
-Edit `templates.yaml` and list the repos you want in a workspace:
-
-```yaml
-templates:
-  example:
-    repos:
-      - git@github.com:octocat/Hello-World.git
-      - git@github.com:octocat/Spoon-Knife.git
-```
-
-Validate the file:
-
-```bash
-gws template validate
-```
-
-### 3) Fetch repos (bare store)
-
-```bash
-gws repo get git@github.com:octocat/Hello-World.git
-gws repo get git@github.com:octocat/Spoon-Knife.git
-```
-
-### 4) Create a workspace
-
-```bash
-gws create --template example MY-123
-```
-
-Or create from a single repo:
-
-```bash
-gws create --repo git@github.com:octocat/Hello-World.git
-```
-
-Or run `gws create` with no args to pick a mode and fill inputs interactively.
-
-### 5) Work and clean up
-
-```bash
-gws ls
-gws open MY-123
-gws status MY-123
-gws rm MY-123
-```
-
-gws opens an interactive subshell at the workspace root.
-
-## Review a PR (GitHub only)
-
-```bash
-gws create --review https://github.com/owner/repo/pull/123
-```
-
-- Creates `OWNER-REPO-REVIEW-PR-123`
-- Fetches the PR head branch (forks not supported)
-- Requires `gh` authentication
-
-## Create from an Issue (GitHub only)
-
-```bash
-gws create --issue https://github.com/owner/repo/issues/123
-```
-
-- Creates `OWNER-REPO-ISSUE-123`
-- Defaults branch to `issue/123`
-- Requires `gh` authentication
-
-## Provider support (summary)
-- `gws create --repo` and `gws create --template` are provider-agnostic (any Git host URL).
-- `gws create --review` and `gws create --issue` are GitHub-only today.
-
-## How gws lays out files
-
-gws keeps two top-level directories under `GWS_ROOT`:
+Default layout example:
 
 ```
-GWS_ROOT/
+~/gws/
   bare/        # bare repo store (shared Git objects)
   workspaces/  # task worktrees (one folder per workspace id)
   templates.yaml
 ```
 
-Notes:
-
-- Workspace id must be a valid Git branch name, and it becomes the worktree branch name.
-- gws never changes your shell directory automatically.
-
-## Root resolution
-
-gws resolves `GWS_ROOT` in this order:
-
-1. `--root <path>`
-2. `GWS_ROOT` environment variable
-3. `~/gws`
-
-## Command overview
-
-Core workflow:
-
-- `gws init` - create root structure and `templates.yaml`
-- `gws repo get <repo>` - create/update bare repo store
-- `gws repo ls` - list repos already fetched
-- `gws template ls` - list templates from `templates.yaml`
-- `gws template validate` - validate `templates.yaml` entries
-- `gws create --template <name> [<id>]` - create a workspace from a template
-- `gws create --repo [<repo>]` - create a workspace from a repo (prompts for id)
-- `gws add [<id>] [<repo>]` - add another repo worktree to a workspace
-- `gws ls [--details]` - list workspaces and repos (optionally with git status details)
-- `gws open [<id>]` - open a workspace in an interactive subshell
-- `gws status [<id>]` - show branch, dirty/untracked, and ahead/behind
-- `gws rm [<id>]` - remove a workspace (refuses if dirty)
-- `gws path --workspace` - print a selected workspace path
-
-Review workflow:
-
-- `gws create --review <PR URL>` - create a workspace for a GitHub PR
-
-Global flags:
-
-- `--root <path>` - override `GWS_ROOT`
-- `--no-prompt` - disable interactive prompts
-
-## Repo spec format
-
-Only SSH or HTTPS URLs are supported:
-
-```
-# SSH
-git@github.com:owner/repo.git
-
-# HTTPS
-https://github.com/owner/repo.git
-```
-
-## Common tasks
-
-### Add a repo to an existing workspace
+### 2) Fetch repos (bare store)
 
 ```bash
-gws add MY-123 git@github.com:org/another-repo.git
+gws repo get git@github.com:org/backend.git
 ```
 
-### Remove a workspace safely
+### 3) Create a workspace
 
 ```bash
-gws status MY-123
-gws rm MY-123
+gws create --repo git@github.com:org/backend.git
 ```
 
-`gws rm` refuses if the workspace is dirty.
+You'll be prompted for a workspace id (e.g. `PROJ-123`).
+
+Or run `gws create` with no args to pick a mode and fill inputs interactively.
+
+### 4) Work and clean up
+
+List workspaces:
+
+```bash
+gws ls
+```
+
+Open a workspace (prompts if omitted):
+
+```bash
+gws open PROJ-123
+```
+
+This launches an interactive subshell at the workspace root (parent cwd unchanged) and
+prefixes the prompt with `[gws:<WORKSPACE_ID>]`.
+
+Remove a workspace with guardrails (prompts if omitted):
+
+```bash
+gws rm PROJ-123
+```
 
 ## Help and docs
 
-- `docs/specs/README.md` for command specs and status
-- `docs/TEMPLATES.md` for template format
-- `docs/DIRECTORY_LAYOUT.md` for the file layout
-- `docs/UI.md` for output conventions
+- `docs/README.md` for documentation index
+- `docs/spec/README.md` for specs index and status
+- `docs/spec/commands/` for per-command specs (create/add/rm/etc.)
+- `docs/spec/core/TEMPLATES.md` for template format
+- `docs/spec/core/DIRECTORY_LAYOUT.md` for the file layout
+- `docs/spec/ui/UI.md` for output conventions
+- `docs/concepts/CONCEPT.md` for the background and motivation
 
 ## Maintainer
 

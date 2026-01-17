@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  push:
+    branches: ["main"]
   pull_request:
 
 jobs:
@@ -29,3 +31,9 @@ jobs:
 
       - name: go test
         run: go test ./...
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...

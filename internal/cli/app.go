@@ -39,11 +39,13 @@ func Run() error {
 	var noPrompt bool
 	var debugFlag bool
 	var helpFlag bool
+	var versionFlag bool
 	fs.StringVar(&rootFlag, "root", "", "override gws root")
 	fs.BoolVar(&noPrompt, "no-prompt", false, "disable interactive prompt")
 	fs.BoolVar(&debugFlag, "debug", false, "write debug logs to file")
 	fs.BoolVar(&helpFlag, "help", false, "show help")
 	fs.BoolVar(&helpFlag, "h", false, "show help")
+	fs.BoolVar(&versionFlag, "version", false, "print version")
 	fs.SetOutput(os.Stdout)
 	fs.Usage = func() {
 		printGlobalHelp(os.Stdout)
@@ -55,6 +57,10 @@ func Run() error {
 		return err
 	}
 	args := fs.Args()
+	if versionFlag {
+		printVersion(os.Stdout)
+		return nil
+	}
 	if helpFlag {
 		if len(args) > 0 && printCommandHelp(args[0], os.Stdout) {
 			return nil
@@ -71,6 +77,10 @@ func Run() error {
 			return nil
 		}
 		printGlobalHelp(os.Stdout)
+		return nil
+	}
+	if args[0] == "version" {
+		printVersion(os.Stdout)
 		return nil
 	}
 

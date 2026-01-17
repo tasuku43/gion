@@ -31,7 +31,7 @@ the specifications and behavior from there may help it arrive at an answer or id
 ## Bug Reports
 
 - GitHub Issues:  
-  (link to the issue creation page)
+  https://github.com/tasuku43/gws/issues/new
 
 Please report bugs via GitHub Issues.
 

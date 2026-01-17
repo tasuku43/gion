@@ -40,3 +40,10 @@ func validateWorkspaceID(ctx context.Context, workspaceID string) error {
 	}
 	return nil
 }
+
+// ValidateWorkspaceID checks whether the given workspace id satisfies git's
+// branch ref format rules. Workspace ids are used as branch names across
+// worktrees.
+func ValidateWorkspaceID(ctx context.Context, workspaceID string) error {
+	return validateWorkspaceID(ctx, workspaceID)
+}
