@@ -91,7 +91,9 @@ func printAddHelp(w io.Writer) {
 }
 
 func printLsHelp(w io.Writer) {
-	fmt.Fprintln(w, "Usage: gws ls")
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gws ls [--details]")
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--details", "show git status details"))
 }
 
 func printStatusHelp(w io.Writer) {
