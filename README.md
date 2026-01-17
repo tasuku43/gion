@@ -117,6 +117,10 @@ Version pinning (recommended):
 mise use -g github:tasuku43/gws@v0.1.0
 ```
 
+Manual (GitHub Releases):
+- Download the archive for your OS/arch
+- Extract and place `gws` on your PATH
+
 For details and other options, see `docs/guides/INSTALL.md`.
 
 ## Quickstart (5 minutes)
