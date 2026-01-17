@@ -54,7 +54,7 @@ Same behavior as the former `gws new`.
   - The input box is pre-filled with `<WORKSPACE_ID>` so users can press Enter to accept or append (e.g., `-hotfix`) without retyping.
   - Empty input still accepts the default (`WORKSPACE_ID`). Input is validated via `git check-ref-format --branch`.
   - Duplicate branch names across repos are allowed; a duplicate entry is warned and the user can confirm or re-enter.
-- Renders a summary of created worktrees and suggests `cd` into the workspace.
+- Renders a summary of created worktrees and suggests `gws open`.
 
 ### Success Criteria
 - Workspace directory exists with one worktree per template repo, each on branch `WORKSPACE_ID`.

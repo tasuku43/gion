@@ -363,6 +363,10 @@ func runTemplateAdd(ctx context.Context, rootDir string, args []string, noPrompt
 		reposDisplay = append(reposDisplay, displayTemplateRepo(repoSpec))
 	}
 	renderTreeLines(renderer, reposDisplay, treeLineNormal)
+	renderSuggestions(renderer, useColor, []string{
+		"gws create --template",
+		"gws create --template <name>",
+	})
 	return nil
 }
 
@@ -924,6 +928,10 @@ func runRepoGet(ctx context.Context, rootDir string, args []string) error {
 	renderer.Blank()
 	renderer.Section("Result")
 	renderer.Bullet(fmt.Sprintf("%s %s", store.RepoKey, store.StorePath))
+	renderSuggestions(renderer, useColor, []string{
+		"gws create",
+		"gws create --repo <repo>",
+	})
 	return nil
 }
 
@@ -1124,7 +1132,9 @@ func runCreateTemplateWithInputs(ctx context.Context, rootDir string, inputs cre
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 	renderWorkspaceBlock(renderer, workspaceID, description, repos)
-	renderSuggestion(renderer, useColor, wsDir)
+	renderSuggestions(renderer, useColor, []string{
+		"gws open",
+	})
 	return nil
 }
 
@@ -1239,7 +1249,9 @@ func runCreateRepoWithInputs(ctx context.Context, rootDir string, inputs createR
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 	renderWorkspaceBlock(renderer, workspaceID, description, repos)
-	renderSuggestion(renderer, useColor, wsDir)
+	renderSuggestions(renderer, useColor, []string{
+		"gws open",
+	})
 	return nil
 }
 
@@ -1312,7 +1324,9 @@ func runWorkspaceAdd(ctx context.Context, rootDir string, args []string) error {
 	renderer.Section("Result")
 	description := loadWorkspaceDescription(wsDir)
 	renderWorkspaceBlock(renderer, workspaceID, description, repos)
-	renderSuggestion(renderer, useColor, workspace.WorkspaceDir(rootDir, workspaceID))
+	renderSuggestions(renderer, useColor, []string{
+		fmt.Sprintf("gws open %s", workspaceID),
+	})
 	return nil
 }
 
@@ -1454,7 +1468,9 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 	renderWorkspaceBlock(renderer, workspaceID, description, repos)
-	renderSuggestion(renderer, useColor, wsDir)
+	renderSuggestions(renderer, useColor, []string{
+		"gws open",
+	})
 	return nil
 }
 
@@ -1629,7 +1645,9 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 	renderWorkspaceBlock(renderer, workspaceID, description, repos)
-	renderSuggestion(renderer, useColor, wsDir)
+	renderSuggestions(renderer, useColor, []string{
+		"gws open",
+	})
 	return nil
 }
 
@@ -2162,7 +2180,9 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool, 
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 	renderWorkspaceBlock(renderer, workspaceID, description, repos)
-	renderSuggestion(renderer, useColor, wsDir)
+	renderSuggestions(renderer, useColor, []string{
+		"gws open",
+	})
 	return nil
 }
 
@@ -2696,7 +2716,9 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 	renderer.Section("Result")
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 	renderWorkspaceBlock(renderer, workspaceID, description, repos)
-	renderSuggestion(renderer, useColor, wsDir)
+	renderSuggestions(renderer, useColor, []string{
+		"gws open",
+	})
 	return nil
 }
 
@@ -3265,13 +3287,6 @@ func ensureRepoGet(ctx context.Context, rootDir string, repoSpecs []string, noPr
 		}
 	}
 	return nil
-}
-
-func renderSuggestion(r *ui.Renderer, useColor bool, path string) {
-	if strings.TrimSpace(path) == "" {
-		return
-	}
-	renderSuggestions(r, useColor, []string{fmt.Sprintf("cd %s", path)})
 }
 
 func renderSuggestions(r *ui.Renderer, useColor bool, lines []string) {
@@ -3879,6 +3894,10 @@ func writeTemplateListText(file template.File, names []string) {
 	renderer.Section("Result")
 	if len(names) == 0 {
 		renderer.Bullet("no templates found")
+		renderSuggestions(renderer, useColor, []string{
+			"gws create --template",
+			"gws create --template <name>",
+		})
 		return
 	}
 	for _, name := range names {
@@ -3897,6 +3916,10 @@ func writeTemplateListText(file template.File, names []string) {
 		}
 		renderTreeLines(renderer, repos, treeLineNormal)
 	}
+	renderSuggestions(renderer, useColor, []string{
+		"gws create --template",
+		"gws create --template <name>",
+	})
 }
 
 func writeTemplateShowText(name string, tmpl template.Template) {
@@ -3947,6 +3970,8 @@ func writeInitText(result initcmd.Result) {
 	renderer.Bullet(fmt.Sprintf("root: %s", result.RootDir))
 
 	renderSuggestions(renderer, useColor, []string{
+		"gws template ls",
+		"gws repo get <repo>",
 		fmt.Sprintf("Edit templates.yaml: %s", filepath.Join(result.RootDir, "templates.yaml")),
 	})
 }
