@@ -13,6 +13,8 @@ status: implemented
 
 ## Guides
 - `docs/guides/USECASES.md`
+- `docs/guides/INSTALL.md`
+- `docs/guides/RELEASING.md`
 
 ## Concepts
 - `docs/concepts/CONCEPT.md`
