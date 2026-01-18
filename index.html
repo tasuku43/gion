@@ -118,30 +118,12 @@
         overflow: hidden;
       }
 
-      .demo::after {
-        content: "Demo GIF coming soon";
-        position: absolute;
-        top: 16px;
-        right: -40px;
-        transform: rotate(12deg);
-        background: #f9e2d7;
-        color: var(--ink);
-        padding: 8px 16px;
-        font-family: "Space Grotesk", "Verdana", sans-serif;
-        font-size: 12px;
-        border-radius: 999px;
-      }
-
-      .demo pre {
-        margin: 0;
-        font-family: "SF Mono", "Menlo", "Consolas", monospace;
-        font-size: 14px;
-        line-height: 1.6;
-        color: #241f1a;
-        background: #f7f4f0;
-        padding: 16px;
-        border-radius: 12px;
-        overflow-x: auto;
+      .demo video {
+        width: 100%;
+        height: auto;
+        display: block;
+        border-radius: 16px;
+        background: #000;
       }
 
       section {
@@ -264,13 +246,10 @@
           </div>
         </div>
         <div class="demo">
-          <pre>
-$ gwst init
-$ gwst repo get git@github.com:org/repo.git
-$ gwst create --issue
-$ gwst open
-$ gwst rm
-          </pre>
+          <video controls playsinline preload="metadata">
+            <source src="demo.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
         </div>
       </header>
 
