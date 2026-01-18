@@ -274,3 +274,9 @@ func validateBranchName(ctx context.Context, branch string) error {
 func ValidateBranchName(ctx context.Context, branch string) error {
 	return validateBranchName(ctx, branch)
 }
+
+// ResolveBaseRef returns a base ref for new branches in the given store.
+// It mirrors the internal resolution used by workspace operations.
+func ResolveBaseRef(ctx context.Context, storePath string) (string, error) {
+	return resolveBaseRef(ctx, storePath)
+}

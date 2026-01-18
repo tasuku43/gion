@@ -24,6 +24,7 @@ type PromptChoice struct {
 type IssueSelection struct {
 	Value  string
 	Branch string
+	Label  string
 }
 
 type createFlowStage int
@@ -1919,6 +1920,7 @@ func (m issueBranchSelectModel) finalizeBranches() (issueBranchSelectModel, bool
 		m.selectedIssues[i] = IssueSelection{
 			Value:  choice.Value,
 			Branch: branch,
+			Label:  choice.Label,
 		}
 	}
 	m.done = true
