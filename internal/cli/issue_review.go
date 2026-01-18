@@ -792,7 +792,7 @@ func buildPRChoices(prs []prSummary) []ui.PromptChoice {
 		}
 		choices = append(choices, ui.PromptChoice{
 			Label: label,
-			Value: strconv.Itoa(pr.Number),
+			Value: encodeReviewSelection(pr),
 		})
 	}
 	return choices
@@ -1000,17 +1000,6 @@ func runCreateReviewSelected(ctx context.Context, rootDir string, noPrompt bool,
 	if !ok {
 		return fmt.Errorf("selected repo not found")
 	}
-	provider, err := providerByName(selectedRepo.Provider)
-	if err != nil {
-		return err
-	}
-	prs, err := provider.FetchPRs(ctx, selectedRepo.Host, selectedRepo.Owner, selectedRepo.Repo)
-	if err != nil {
-		return err
-	}
-	if len(prs) == 0 {
-		return fmt.Errorf("no pull requests found")
-	}
 
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())
@@ -1036,11 +1025,6 @@ func runCreateReviewSelected(ctx context.Context, rootDir string, noPrompt bool,
 		return err
 	}
 
-	prByNumber := make(map[int]prSummary, len(prs))
-	for _, pr := range prs {
-		prByNumber[pr.Number] = pr
-	}
-
 	type reviewWorkspaceResult struct {
 		workspaceID string
 		description string
@@ -1051,25 +1035,19 @@ func runCreateReviewSelected(ctx context.Context, rootDir string, noPrompt bool,
 	var failureID string
 
 	for _, value := range selectedPRs {
-		num, err := strconv.Atoi(strings.TrimSpace(value))
+		pr, err := decodeReviewSelection(value)
 		if err != nil {
-			failure = fmt.Errorf("invalid PR number: %s", value)
+			failure = err
 			failureID = value
-			break
-		}
-		pr, ok := prByNumber[num]
-		if !ok {
-			failure = fmt.Errorf("PR not found: %d", num)
-			failureID = fmt.Sprintf("PR-%d", num)
 			break
 		}
 		if !strings.EqualFold(strings.TrimSpace(pr.HeadRepo), strings.TrimSpace(pr.BaseRepo)) {
 			failure = fmt.Errorf("fork PRs are not supported: %s", pr.HeadRepo)
-			failureID = fmt.Sprintf("PR-%d", num)
+			failureID = fmt.Sprintf("PR-%d", pr.Number)
 			break
 		}
 		description := pr.Title
-		workspaceID := formatReviewWorkspaceID(selectedRepo.Owner, selectedRepo.Repo, num)
+		workspaceID := formatReviewWorkspaceID(selectedRepo.Owner, selectedRepo.Repo, pr.Number)
 		output.Step(formatStep("create workspace", workspaceID, relPath(rootDir, workspace.WorkspaceDir(rootDir, workspaceID))))
 		wsDir, err := workspace.New(ctx, rootDir, workspaceID)
 		if err != nil {
@@ -1400,6 +1378,49 @@ func formatPRList(values []string) string {
 		out = append(out, fmt.Sprintf("#%s", val))
 	}
 	return strings.Join(out, ", ")
+}
+
+func encodeReviewSelection(pr prSummary) string {
+	escape := url.QueryEscape
+	return strings.Join([]string{
+		strconv.Itoa(pr.Number),
+		escape(pr.HeadRef),
+		escape(pr.HeadRepo),
+		escape(pr.BaseRepo),
+		escape(pr.Title),
+	}, "|")
+}
+
+func decodeReviewSelection(value string) (prSummary, error) {
+	parts := strings.Split(value, "|")
+	if len(parts) == 1 {
+		num, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+		if err != nil {
+			return prSummary{}, fmt.Errorf("invalid PR selection: %s", value)
+		}
+		return prSummary{}, fmt.Errorf("missing PR metadata for #%d; re-run selection", num)
+	}
+	if len(parts) != 5 {
+		return prSummary{}, fmt.Errorf("invalid PR selection: %s", value)
+	}
+	num, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return prSummary{}, fmt.Errorf("invalid PR number: %s", parts[0])
+	}
+	unescape := func(v string) string {
+		out, err := url.QueryUnescape(v)
+		if err != nil {
+			return v
+		}
+		return out
+	}
+	return prSummary{
+		Number:   num,
+		HeadRef:  strings.TrimSpace(unescape(parts[1])),
+		HeadRepo: strings.TrimSpace(unescape(parts[2])),
+		BaseRepo: strings.TrimSpace(unescape(parts[3])),
+		Title:    strings.TrimSpace(unescape(parts[4])),
+	}, nil
 }
 
 func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool) error {
