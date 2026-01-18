@@ -488,7 +488,7 @@ func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, 
 	for branch := range branchSet {
 		branches = append(branches, branch)
 	}
-	remoteBranches, err := fetchRemoteBranches(ctx, store.StorePath, branches)
+	remoteBranches, err := localRemoteBranches(ctx, store.StorePath, branches)
 	if err != nil {
 		return err
 	}
@@ -566,34 +566,20 @@ func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, 
 	return nil
 }
 
-func fetchRemoteBranches(ctx context.Context, storePath string, branches []string) (map[string]bool, error) {
+func localRemoteBranches(ctx context.Context, storePath string, branches []string) (map[string]bool, error) {
 	remote := make(map[string]bool, len(branches))
 	if strings.TrimSpace(storePath) == "" || len(branches) == 0 {
 		return remote, nil
 	}
-	args := append([]string{"ls-remote", "--heads", "origin"}, branches...)
-	res, err := gitcmd.Run(ctx, args, gitcmd.Options{Dir: storePath})
-	if err != nil {
-		msg := strings.TrimSpace(res.Stderr)
-		if msg != "" {
-			return nil, fmt.Errorf("git ls-remote failed: %s", msg)
-		}
-		return nil, fmt.Errorf("git ls-remote failed: %w", err)
-	}
-	for _, line := range strings.Split(strings.TrimSpace(res.Stdout), "\n") {
-		if strings.TrimSpace(line) == "" {
+	for _, branch := range branches {
+		if strings.TrimSpace(branch) == "" {
 			continue
 		}
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
+		exists, err := remoteTrackingExists(ctx, storePath, branch)
+		if err != nil {
+			return nil, err
 		}
-		ref := fields[1]
-		if !strings.HasPrefix(ref, "refs/heads/") {
-			continue
-		}
-		branch := strings.TrimPrefix(ref, "refs/heads/")
-		if branch != "" {
+		if exists {
 			remote[branch] = true
 		}
 	}
