@@ -1,6 +1,6 @@
 # gwst - Git Workspaces for Human + Agentic Development
 
-A workspace-first Git worktree manager for human+agentic development.
+A git workspace tool and worktree manager for human + agentic development.
 
 gwst moves local development from "clone-directory centric" to "workspace centric"
 so humans and multiple AI agents can work in parallel without stepping on each other.
