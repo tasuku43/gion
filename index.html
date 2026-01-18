@@ -3,31 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>gwst — Git worktree workspace tool for AI agents</title>
+    <title>gwst — Aurora Deep</title>
     <meta
       name="description"
       content="gwst is a git workspace tool and worktree manager for AI agents and parallel development. Create task workspaces from issues, reviews, or templates."
     />
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-GGSMHHLEKE"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-
-      gtag("config", "G-GGSMHHLEKE");
-    </script>
     <style>
       :root {
-        --bg: #f4f1ea;
-        --ink: #1c1c1a;
-        --muted: #5d5a55;
-        --accent: #d14a2a;
-        --accent-2: #1b8a6b;
-        --card: #ffffff;
-        --shadow: 0 12px 40px rgba(20, 17, 12, 0.12);
+        --bg: #070b14;
+        --ink: #eef2ff;
+        --muted: #a2b1d0;
+        --accent: #4fd1ff;
+        --accent-2: #ffae4f;
+        --card: #0d1220;
+        --line: rgba(255, 255, 255, 0.08);
+        --shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
       }
 
       * {
@@ -36,17 +26,18 @@
 
       body {
         margin: 0;
-        font-family: "DM Serif Text", "Georgia", "Times New Roman", serif;
         color: var(--ink);
-        background: radial-gradient(1200px 600px at 20% -10%, #ffe9d6, transparent 60%),
-          radial-gradient(900px 600px at 100% 0%, #d7f3ef, transparent 50%),
-          var(--bg);
+        font-family: "Outfit", "Helvetica", sans-serif;
+        background:
+          radial-gradient(900px 520px at 20% -10%, rgba(79, 209, 255, 0.22), transparent 60%),
+          radial-gradient(900px 520px at 90% 0%, rgba(255, 174, 79, 0.2), transparent 60%),
+          linear-gradient(180deg, #070b14 0%, #070915 100%);
       }
 
       .page {
         max-width: 1100px;
         margin: 0 auto;
-        padding: 48px 20px 96px;
+        padding: 56px 20px 96px;
       }
 
       header {
@@ -57,72 +48,74 @@
       }
 
       .kicker {
-        font-family: "Space Grotesk", "Verdana", sans-serif;
-        font-size: 14px;
-        letter-spacing: 0.1em;
+        font-family: "Outfit", "Helvetica", sans-serif;
+        letter-spacing: 0.3em;
         text-transform: uppercase;
+        font-size: 12px;
         color: var(--muted);
       }
 
       h1 {
-        font-size: clamp(36px, 6vw, 60px);
-        margin: 8px 0 12px;
-        line-height: 1.05;
+        font-family: "Bebas Neue", "Outfit", sans-serif;
+        font-size: clamp(40px, 7vw, 72px);
+        margin: 10px 0 12px;
+        letter-spacing: 0.02em;
+        line-height: 1;
       }
 
       .tagline {
-        font-family: "Space Grotesk", "Verdana", sans-serif;
         font-size: 18px;
-        line-height: 1.5;
+        line-height: 1.6;
         color: var(--muted);
         max-width: 520px;
       }
 
       .cta-row {
-        margin-top: 20px;
+        margin-top: 22px;
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
       }
 
       .btn {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
         padding: 12px 18px;
-        border-radius: 999px;
-        font-family: "Space Grotesk", "Verdana", sans-serif;
+        border-radius: 14px;
         font-size: 14px;
         text-decoration: none;
-        border: 1px solid var(--ink);
+        border: 1px solid var(--line);
         color: var(--ink);
-        background: var(--card);
-        transition: transform 200ms ease, box-shadow 200ms ease;
+        background: rgba(13, 18, 32, 0.9);
+        transition: transform 200ms ease, box-shadow 200ms ease, border 200ms ease;
       }
 
       .btn.primary {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: #fff;
+        background: linear-gradient(135deg, var(--accent), #7b6bff);
+        border-color: transparent;
+        color: #04101a;
+        font-weight: 600;
       }
 
       .btn:hover {
         transform: translateY(-2px);
         box-shadow: var(--shadow);
+        border-color: rgba(255, 255, 255, 0.2);
       }
 
       .demo {
         background: var(--card);
-        border-radius: 20px;
-        padding: 24px;
+        border-radius: 22px;
+        padding: 22px;
+        border: 1px solid var(--line);
         box-shadow: var(--shadow);
-        position: relative;
-        overflow: hidden;
       }
 
       .demo video {
         width: 100%;
         height: auto;
         display: block;
-        border-radius: 16px;
+        border-radius: 14px;
         background: #000;
       }
 
@@ -145,6 +138,7 @@
         background: var(--card);
         padding: 20px;
         border-radius: 16px;
+        border: 1px solid var(--line);
         box-shadow: var(--shadow);
       }
 
@@ -155,7 +149,6 @@
 
       .card p {
         margin: 0;
-        font-family: "Space Grotesk", "Verdana", sans-serif;
         color: var(--muted);
         line-height: 1.5;
       }
@@ -163,21 +156,19 @@
       .steps {
         display: grid;
         gap: 12px;
-        font-family: "Space Grotesk", "Verdana", sans-serif;
         color: var(--muted);
       }
 
       code {
-        font-family: "SF Mono", "Menlo", "Consolas", monospace;
-        background: #f2e8df;
+        font-family: "Chivo Mono", "Menlo", monospace;
+        background: rgba(79, 209, 255, 0.14);
         padding: 2px 6px;
         border-radius: 6px;
-        color: #7b2a12;
+        color: var(--accent);
       }
 
       footer {
         margin-top: 64px;
-        font-family: "Space Grotesk", "Verdana", sans-serif;
         color: var(--muted);
         text-align: center;
       }
@@ -186,37 +177,37 @@
         header,
         .card,
         .demo {
-          animation: float-in 600ms ease forwards;
+          animation: glow-in 700ms ease forwards;
           opacity: 0;
           transform: translateY(12px);
         }
 
         header {
-          animation-delay: 100ms;
+          animation-delay: 120ms;
         }
 
         .demo {
-          animation-delay: 200ms;
+          animation-delay: 220ms;
         }
 
         .card:nth-child(1) {
-          animation-delay: 200ms;
+          animation-delay: 220ms;
         }
 
         .card:nth-child(2) {
-          animation-delay: 260ms;
+          animation-delay: 280ms;
         }
 
         .card:nth-child(3) {
-          animation-delay: 320ms;
+          animation-delay: 340ms;
         }
 
         .card:nth-child(4) {
-          animation-delay: 380ms;
+          animation-delay: 400ms;
         }
       }
 
-      @keyframes float-in {
+      @keyframes glow-in {
         to {
           opacity: 1;
           transform: translateY(0);
@@ -225,7 +216,7 @@
     </style>
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=DM+Serif+Text&family=Space+Grotesk:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600&family=Chivo+Mono:wght@400;500&display=swap"
     />
   </head>
   <body>
