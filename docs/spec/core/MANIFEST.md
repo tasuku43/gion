@@ -21,6 +21,7 @@ gwst init
 
 - **Normal commands** (`create`, `add`, `rm`, `resume`, etc.): filesystem operations are the truth. After a successful change, `gwst` rewrites `manifest.yaml` as a whole to reflect the new state.
 - **`gwst apply`**: `manifest.yaml` is the truth. `gwst` computes a diff, shows the plan, and applies the changes to the filesystem after confirmation.
+- **`gwst import`**: filesystem and `.gwst/metadata.json` are the truth. `gwst` rebuilds `manifest.yaml` from the current state.
 
 Notes:
 - `manifest.yaml` is a gwst-managed file. Commands rewrite the full file; comments and ordering may not be preserved.
@@ -75,3 +76,11 @@ When reconciling, gwst computes a plan with three categories:
 - **update**: present in both but differing repo/branch/alias definitions.
 
 Removals are treated as destructive and require explicit confirmation.
+
+## Application layer reuse
+
+Import logic should live in a shared application layer so it can be invoked by:
+- explicit `gwst import`
+- implicit rebuilds after `create`/`rm`/`add`/`resume`
+
+CLI commands should only handle argument parsing and presentation, delegating the actual rebuild to the shared layer.
