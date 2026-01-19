@@ -4,7 +4,7 @@ status: planned
 ---
 
 ## Synopsis
-`gwst apply [--root <path>] [--no-prompt] [--plan]`
+`gwst apply [--root <path>] [--no-prompt]`
 
 ## Intent
 Reconcile the filesystem to match `manifest.yaml` by computing a diff, showing a plan, and applying the changes after confirmation.
@@ -16,7 +16,7 @@ Reconcile the filesystem to match `manifest.yaml` by computing a diff, showing a
   - `add`: workspace or repo entry exists in manifest but not on filesystem.
   - `remove`: exists on filesystem but not in manifest.
   - `update`: exists in both but differs by repo alias, repo key, or branch.
-- Renders a human-readable plan summary before any changes.
+- Renders a human-readable plan summary before any changes (same format as `gwst plan`).
 - By default, prompts for confirmation if any changes exist.
   - `remove` actions are marked as destructive.
   - If only non-destructive adds are present, prompt can be skipped with `--no-prompt`.
@@ -24,7 +24,6 @@ Reconcile the filesystem to match `manifest.yaml` by computing a diff, showing a
 - Updates `manifest.yaml` by rewriting the full file after successful apply.
 
 ## Flags
-- `--plan`: print the plan only; do not apply changes.
 - `--no-prompt`: skip confirmation (errors if any removals are present).
 
 ## Success Criteria
