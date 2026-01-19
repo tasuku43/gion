@@ -2,11 +2,13 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/mattn/go-isatty"
 	"github.com/tasuku43/gwst/internal/app/manifestimport"
+	"github.com/tasuku43/gwst/internal/domain/manifest"
 	"github.com/tasuku43/gwst/internal/ui"
 )
 
@@ -18,7 +20,25 @@ func runImport(ctx context.Context, rootDir string, args []string, noPrompt bool
 	if len(args) != 0 {
 		return fmt.Errorf("usage: gwst import")
 	}
-	result, err := manifestimport.Import(ctx, rootDir)
+	currentFile, err := loadManifestOrEmpty(rootDir)
+	if err != nil {
+		return err
+	}
+	currentBytes, err := manifest.Marshal(currentFile)
+	if err != nil {
+		return err
+	}
+
+	nextFile, warnings, err := manifestimport.Build(ctx, rootDir)
+	if err != nil {
+		return err
+	}
+	nextBytes, err := manifest.Marshal(nextFile)
+	if err != nil {
+		return err
+	}
+
+	diffLines, err := buildUnifiedDiffLines(currentBytes, nextBytes)
 	if err != nil {
 		return err
 	}
@@ -26,6 +46,11 @@ func runImport(ctx context.Context, rootDir string, args []string, noPrompt bool
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())
 	renderer := ui.NewRenderer(os.Stdout, theme, useColor)
+
+	result, err := manifestimport.Write(rootDir, nextFile, warnings)
+	if err != nil {
+		return err
+	}
 
 	var warningLines []string
 	for _, warn := range result.Warnings {
@@ -36,15 +61,22 @@ func runImport(ctx context.Context, rootDir string, args []string, noPrompt bool
 		renderer.Blank()
 	}
 
-	workspaceCount := len(result.Manifest.Workspaces)
-	repoCount := 0
-	for _, ws := range result.Manifest.Workspaces {
-		repoCount += len(ws.Repos)
+	renderer.Section("Diff")
+	if len(diffLines) > 0 {
+		renderDiffLines(renderer, diffLines)
+	} else {
+		renderer.Bullet("no changes")
 	}
-
-	renderer.Section("Result")
-	renderer.Bullet(fmt.Sprintf("write: %s", result.Path))
-	renderer.Bullet(fmt.Sprintf("workspaces: %d", workspaceCount))
-	renderer.Bullet(fmt.Sprintf("repos: %d", repoCount))
 	return nil
+}
+
+func loadManifestOrEmpty(rootDir string) (manifest.File, error) {
+	file, err := manifest.Load(rootDir)
+	if err == nil {
+		return file, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return manifest.File{Version: 1, Workspaces: map[string]manifest.Workspace{}}, nil
+	}
+	return manifest.File{}, err
 }

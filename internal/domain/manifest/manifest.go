@@ -54,6 +54,17 @@ func Load(rootDir string) (File, error) {
 }
 
 func Save(rootDir string, file File) error {
+	data, err := Marshal(file)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(Path(rootDir), data, 0o644); err != nil {
+		return fmt.Errorf("write manifest: %w", err)
+	}
+	return nil
+}
+
+func Marshal(file File) ([]byte, error) {
 	if file.Version == 0 {
 		file.Version = 1
 	}
@@ -65,13 +76,10 @@ func Save(rootDir string, file File) error {
 	enc.SetIndent(2)
 	if err := enc.Encode(file); err != nil {
 		_ = enc.Close()
-		return fmt.Errorf("marshal manifest: %w", err)
+		return nil, fmt.Errorf("marshal manifest: %w", err)
 	}
 	if err := enc.Close(); err != nil {
-		return fmt.Errorf("close manifest encoder: %w", err)
+		return nil, fmt.Errorf("close manifest encoder: %w", err)
 	}
-	if err := os.WriteFile(Path(rootDir), buf.Bytes(), 0o644); err != nil {
-		return fmt.Errorf("write manifest: %w", err)
-	}
-	return nil
+	return buf.Bytes(), nil
 }

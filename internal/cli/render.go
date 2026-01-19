@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mattn/go-isatty"
+	"github.com/pmezard/go-difflib/difflib"
 	"github.com/tasuku43/gwst/internal/app/doctor"
 	"github.com/tasuku43/gwst/internal/app/initcmd"
 	"github.com/tasuku43/gwst/internal/domain/repo"
@@ -28,6 +29,8 @@ const (
 	treeLineNormal treeLineStyle = iota
 	treeLineWarn
 	treeLineError
+	treeLineSuccess
+	treeLineAccent
 )
 
 func renderWorkspaceRepos(r *ui.Renderer, repos []workspace.Repo, extraIndent string) {
@@ -122,8 +125,49 @@ func renderTreeLines(r *ui.Renderer, lines []string, style treeLineStyle) {
 			r.TreeLineWarn(output.Indent+prefix, line)
 		case treeLineError:
 			r.TreeLineError(output.Indent+prefix, line)
+		case treeLineSuccess:
+			r.TreeLineSuccess(output.Indent+prefix, line)
+		case treeLineAccent:
+			r.TreeLineAccent(output.Indent+prefix, line)
 		default:
 			r.TreeLine(output.Indent+prefix, line)
+		}
+	}
+}
+
+func buildUnifiedDiffLines(current, next []byte) ([]string, error) {
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(string(current)),
+		B:        difflib.SplitLines(string(next)),
+		FromFile: "manifest.yaml (current)",
+		ToFile:   "manifest.yaml (target)",
+		Context:  3,
+	}
+	text, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		return nil, err
+	}
+	lines := difflib.SplitLines(text)
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], "\n")
+	}
+	return lines, nil
+}
+
+func renderDiffLines(renderer *ui.Renderer, lines []string) {
+	if renderer == nil || len(lines) == 0 {
+		return
+	}
+	for _, line := range lines {
+		switch {
+		case strings.HasPrefix(line, "+++"), strings.HasPrefix(line, "---"), strings.HasPrefix(line, "@@"):
+			renderer.TreeLineAccent("", line)
+		case strings.HasPrefix(line, "+"):
+			renderer.TreeLineSuccess("", line)
+		case strings.HasPrefix(line, "-"):
+			renderer.TreeLineError("", line)
+		default:
+			renderer.TreeLine("", line)
 		}
 	}
 }
