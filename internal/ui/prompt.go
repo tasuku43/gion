@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/tasuku43/gwst/internal/core/output"
+	"github.com/tasuku43/gwst/internal/infra/output"
 )
 
 var ErrPromptCanceled = errors.New("prompt canceled")

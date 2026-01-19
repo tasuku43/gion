@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/tasuku43/gwst/internal/core/paths"
 	"github.com/tasuku43/gwst/internal/domain/manifest"
 	"github.com/tasuku43/gwst/internal/domain/workspace"
+	"github.com/tasuku43/gwst/internal/infra/paths"
 )
 
 type Result struct {

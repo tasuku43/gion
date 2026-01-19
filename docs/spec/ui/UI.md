@@ -157,5 +157,5 @@ Result
 - Suggestion section is optional and shown only on TTY with colors enabled (e.g. `cd <path>`).
 
 ## Implementation contract
-- CLI output must use `ui.Renderer` (or `internal/core/output` helpers) and must not write directly to stdout via `fmt.Fprintf/Printf/Println` in UI paths.
+- CLI output must use `ui.Renderer` (or `internal/infra/output` helpers) and must not write directly to stdout via `fmt.Fprintf/Printf/Println` in UI paths.
 - Result lines must be rendered using `Bullet()` to enforce consistent prefixing.

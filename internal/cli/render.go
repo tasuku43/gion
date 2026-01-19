@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/mattn/go-isatty"
-	"github.com/tasuku43/gwst/internal/core/output"
+	"github.com/tasuku43/gwst/internal/app/doctor"
+	"github.com/tasuku43/gwst/internal/app/initcmd"
 	"github.com/tasuku43/gwst/internal/domain/repo"
 	"github.com/tasuku43/gwst/internal/domain/template"
 	"github.com/tasuku43/gwst/internal/domain/workspace"
-	"github.com/tasuku43/gwst/internal/ops/doctor"
-	"github.com/tasuku43/gwst/internal/ops/initcmd"
+	"github.com/tasuku43/gwst/internal/infra/output"
 	"github.com/tasuku43/gwst/internal/ui"
 )
 

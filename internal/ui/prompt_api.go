@@ -4,7 +4,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/tasuku43/gwst/internal/core/debuglog"
+	"github.com/tasuku43/gwst/internal/infra/debuglog"
 )
 
 func PromptNewWorkspaceInputs(title string, templates []string, templateName string, workspaceID string, theme Theme, useColor bool) (string, string, error) {

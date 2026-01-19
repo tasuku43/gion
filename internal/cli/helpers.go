@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tasuku43/gwst/internal/core/output"
 	"github.com/tasuku43/gwst/internal/domain/repo"
 	"github.com/tasuku43/gwst/internal/domain/workspace"
+	"github.com/tasuku43/gwst/internal/infra/output"
 	"github.com/tasuku43/gwst/internal/ui"
 )
 

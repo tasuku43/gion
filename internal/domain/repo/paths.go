@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tasuku43/gwst/internal/core/paths"
 	"github.com/tasuku43/gwst/internal/domain/repospec"
+	"github.com/tasuku43/gwst/internal/infra/paths"
 )
 
 // Spec is the normalized repo specification.

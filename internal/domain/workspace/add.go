@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tasuku43/gwst/internal/core/gitcmd"
-	"github.com/tasuku43/gwst/internal/core/paths"
 	"github.com/tasuku43/gwst/internal/domain/repo"
+	"github.com/tasuku43/gwst/internal/infra/gitcmd"
+	"github.com/tasuku43/gwst/internal/infra/paths"
 )
 
 func Add(ctx context.Context, rootDir, workspaceID, repoSpec, alias string, fetch bool) (Repo, error) {
