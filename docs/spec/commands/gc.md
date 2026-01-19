@@ -4,6 +4,9 @@ status: planned
 pending:
   - rules-implementation
   - confirmation-ux
+  - review-upstream-exclusion
+  - created-only-exclusion
+  - reason-format
 ---
 
 ## Synopsis
@@ -29,11 +32,13 @@ Bulk-delete workspaces that are highly likely safe to remove, using conservative
   - each repo matches at least one rule.
 - Rules are evaluated from a list (array) to allow easy future extension.
 - Initial rules (OR):
-  1) **Pushed to origin (strict)**: repo `HEAD` commit exists in any origin remote-tracking ref.
-     - Reason: `already pushed to origin`
-  2) **Merged into origin default branch**: repo `HEAD` is reachable from `origin/<default>` (default resolved from `origin/HEAD`).
-     - Reason: `merged into origin default branch`
+  1) **Merged into origin default branch**: repo `HEAD` is reachable from `origin/<default>` (default resolved from `origin/HEAD`).
+     - Reason: `merged`
 - **Remote selection**: fixed to `origin` only.
+- **Review exclusion**: if repo `HEAD` equals its upstream `origin/<head_ref>` and is **not** merged into origin default, exclude.
+- **Created-only exclusion**: avoid deleting workspaces created but not started (e.g., template/repo/issue)
+  - Even if `HEAD` equals origin default, these should not be GC candidates.
+  - Requires a clear heuristic or explicit mode metadata to avoid false positives.
 
 ## Data Collection / Performance
 - Gather repo info once per repo, then reuse for all rules and exclusions.
@@ -54,6 +59,7 @@ Bulk-delete workspaces that are highly likely safe to remove, using conservative
 ## Output
 - Summary: scanned / candidates / deleted / skipped.
 - Candidate list: workspace id + reasons (rule names/strings, repo context).
+  - Reason strings should be short (e.g., `[merged]`).
 
 ## Success Criteria
 - Dirty/Unpushed/Unknown are always excluded.
