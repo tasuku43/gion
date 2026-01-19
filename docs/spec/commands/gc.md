@@ -1,0 +1,65 @@
+---
+title: "gwst gc"
+status: planned
+pending:
+  - rules-implementation
+  - confirmation-ux
+---
+
+## Synopsis
+`gwst gc`
+
+## Intent
+Bulk-delete workspaces that are highly likely safe to remove, using conservative rules. This is intentionally separated from `gwst rm`, which remains the explicit/manual path.
+
+## Scope
+- **GC**: automatic, bulk, conservative. Exclude when in doubt.
+- **RM**: explicit, interactive, for human judgment.
+
+## Definitions
+- **Clean**: no uncommitted changes in any repo.
+- **Unpushed**: local branch is ahead of upstream (from `git status --porcelain=v2 -b`).
+- **Unknown**: status cannot be determined (e.g., git error, no HEAD).
+- **Base exclusions**: any workspace containing Dirty / Unpushed / Unknown repos is excluded.
+
+## Safe-to-remove Rules (extensible)
+- Rules are predicates that return `(matched bool, reason string)`.
+- A workspace is a candidate only if:
+  - all repos pass base exclusions, and
+  - each repo matches at least one rule.
+- Rules are evaluated from a list (array) to allow easy future extension.
+- Initial rules (OR):
+  1) **Pushed to origin (strict)**: repo `HEAD` commit exists in any origin remote-tracking ref.
+     - Reason: `already pushed to origin`
+  2) **Merged into origin default branch**: repo `HEAD` is reachable from `origin/<default>` (default resolved from `origin/HEAD`).
+     - Reason: `merged into origin default branch`
+- **Remote selection**: fixed to `origin` only.
+
+## Data Collection / Performance
+- Gather repo info once per repo, then reuse for all rules and exclusions.
+- Source of truth for status: `git status --porcelain=v2 -b` (no implicit fetch/prune).
+- Rule evaluation must not re-run expensive git commands per rule; use shared snapshot data.
+
+## Behavior
+- Scans all workspaces under root.
+- For each workspace:
+  - Collect status and structural info per repo.
+  - Apply base exclusions.
+  - Evaluate rules and collect reasons.
+- Prints candidates with reasons (always shown before deletion).
+- Deletes all candidates in one run (single confirmation; no per-item selection).
+- Confirmation requires typing `y` to proceed; any other input cancels.
+- Removes worktrees and workspace directory (same removal semantics as `gwst rm`).
+
+## Output
+- Summary: scanned / candidates / deleted / skipped.
+- Candidate list: workspace id + reasons (rule names/strings, repo context).
+
+## Success Criteria
+- Dirty/Unpushed/Unknown are always excluded.
+- Candidates are explainable with rule reasons.
+- Rule evaluation is extensible without refactoring the core scan loop.
+
+## Failure Modes
+- Git status or rule errors => treat as unknown, skip, and report warning.
+- Removal errors for a candidate => report and continue.
