@@ -24,7 +24,8 @@ gwst init
 
 Notes:
 - `manifest.yaml` is a gwst-managed file. Commands rewrite the full file; comments and ordering may not be preserved.
-- When rewriting, gwst preserves existing metadata for untouched workspaces where possible.
+- When rewriting, gwst preserves existing metadata for untouched workspaces where possible, and may read `.gwst/metadata.json` to refill fields like `mode`, `description`, `template_name`, and `source_url` during imports.
+- Repo branch names are derived from each worktree's Git state when importing from the filesystem.
 
 ## Format
 
@@ -35,6 +36,8 @@ Top-level keys:
 Workspace entry fields:
 - `description` (optional): string.
 - `mode` (required): one of `template`, `repo`, `review`, `issue`, `resume`, `add`.
+- `template_name` (optional): template name when `mode=template`.
+- `source_url` (optional): source URL for `issue`/`review` (or other modes if available).
 - `repos` (required): array of repo entries.
 
 Repo entry fields:
