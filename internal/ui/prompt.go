@@ -883,6 +883,7 @@ type confirmInlineModel struct {
 	useInfo      bool
 	inputsPrompt []string
 	inputsRaw    []string
+	rawAfter     bool
 	input        textinput.Model
 	value        bool
 	err          error
@@ -904,8 +905,15 @@ func newConfirmInlineModel(label string, theme Theme, useColor bool, useInfo boo
 		useInfo:      useInfo,
 		inputsPrompt: append([]string(nil), inputsPrompt...),
 		inputsRaw:    append([]string(nil), inputsRaw...),
+		rawAfter:     false,
 		input:        ti,
 	}
+}
+
+func newConfirmInlineModelWithRawAfterPrompt(label string, theme Theme, useColor bool, inputsRaw []string) confirmInlineModel {
+	model := newConfirmInlineModel(label, theme, useColor, false, nil, inputsRaw)
+	model.rawAfter = true
+	return model
 }
 
 func (m confirmInlineModel) Init() tea.Cmd {
@@ -946,6 +954,11 @@ func (m confirmInlineModel) View() string {
 	line := fmt.Sprintf("%s (y/n): %s", label, m.input.View())
 	if m.useInfo {
 		frame.SetInfoPrompt(line)
+	} else if m.rawAfter {
+		frame.SetInputsPrompt(line)
+		if len(m.inputsRaw) > 0 {
+			frame.AppendInputsRaw(m.inputsRaw...)
+		}
 	} else {
 		if len(m.inputsPrompt) > 0 {
 			frame.SetInputsPrompt(m.inputsPrompt...)
