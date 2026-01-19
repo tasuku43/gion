@@ -20,6 +20,7 @@ type Options struct {
 	AllowDirty       bool
 	AllowStatusError bool
 	PrefetchTimeout  time.Duration
+	Step             func(text string)
 }
 
 func Apply(ctx context.Context, rootDir string, plan manifestplan.Result, opts Options) error {
@@ -31,6 +32,7 @@ func Apply(ctx context.Context, rootDir string, plan manifestplan.Result, opts O
 		if change.Kind != manifestplan.WorkspaceRemove {
 			continue
 		}
+		logStep(opts.Step, fmt.Sprintf("remove workspace %s", change.WorkspaceID))
 		if err := rm.Remove(ctx, rootDir, change.WorkspaceID, opts.AllowDirty); err != nil {
 			return err
 		}
@@ -52,11 +54,11 @@ func Apply(ctx context.Context, rootDir string, plan manifestplan.Result, opts O
 	for _, change := range plan.Changes {
 		switch change.Kind {
 		case manifestplan.WorkspaceAdd:
-			if err := applyWorkspaceAdd(ctx, rootDir, plan.Desired, change); err != nil {
+			if err := applyWorkspaceAdd(ctx, rootDir, plan.Desired, change, opts.Step); err != nil {
 				return err
 			}
 		case manifestplan.WorkspaceUpdate:
-			if err := applyRepoAdds(ctx, rootDir, change); err != nil {
+			if err := applyRepoAdds(ctx, rootDir, change, opts.Step); err != nil {
 				return err
 			}
 		}
@@ -65,11 +67,12 @@ func Apply(ctx context.Context, rootDir string, plan manifestplan.Result, opts O
 	return nil
 }
 
-func applyWorkspaceAdd(ctx context.Context, rootDir string, desired manifest.File, change manifestplan.WorkspaceChange) error {
+func applyWorkspaceAdd(ctx context.Context, rootDir string, desired manifest.File, change manifestplan.WorkspaceChange, step func(text string)) error {
 	ws, ok := desired.Workspaces[change.WorkspaceID]
 	if !ok {
 		return fmt.Errorf("workspace not found in manifest: %s", change.WorkspaceID)
 	}
+	logStep(step, fmt.Sprintf("create workspace %s", change.WorkspaceID))
 	_, err := create.CreateWorkspace(ctx, rootDir, change.WorkspaceID, workspace.Metadata{
 		Description:  ws.Description,
 		Mode:         ws.Mode,
@@ -80,6 +83,7 @@ func applyWorkspaceAdd(ctx context.Context, rootDir string, desired manifest.Fil
 		return err
 	}
 	for _, repoEntry := range ws.Repos {
+		logStep(step, fmt.Sprintf("worktree add %s", repoEntry.Alias))
 		if _, err := add.AddRepo(ctx, rootDir, change.WorkspaceID, repoEntry.RepoKey, repoEntry.Alias, repoEntry.Branch); err != nil {
 			return err
 		}
@@ -91,6 +95,7 @@ func applyRepoRemovals(ctx context.Context, rootDir string, change manifestplan.
 	for _, repoChange := range change.Repos {
 		switch repoChange.Kind {
 		case manifestplan.RepoRemove, manifestplan.RepoUpdate:
+			logStep(opts.Step, fmt.Sprintf("worktree remove %s", repoChange.Alias))
 			if err := remove_repo.RemoveRepo(ctx, rootDir, change.WorkspaceID, repoChange.Alias, remove_repo.Options{
 				AllowDirty:       opts.AllowDirty,
 				AllowStatusError: opts.AllowStatusError,
@@ -102,14 +107,16 @@ func applyRepoRemovals(ctx context.Context, rootDir string, change manifestplan.
 	return nil
 }
 
-func applyRepoAdds(ctx context.Context, rootDir string, change manifestplan.WorkspaceChange) error {
+func applyRepoAdds(ctx context.Context, rootDir string, change manifestplan.WorkspaceChange, step func(text string)) error {
 	for _, repoChange := range change.Repos {
 		switch repoChange.Kind {
 		case manifestplan.RepoAdd:
+			logStep(step, fmt.Sprintf("worktree add %s", repoChange.Alias))
 			if _, err := add.AddRepo(ctx, rootDir, change.WorkspaceID, repoChange.ToRepo, repoChange.Alias, repoChange.ToBranch); err != nil {
 				return err
 			}
 		case manifestplan.RepoUpdate:
+			logStep(step, fmt.Sprintf("worktree add %s", repoChange.Alias))
 			if _, err := add.AddRepo(ctx, rootDir, change.WorkspaceID, repoChange.ToRepo, repoChange.Alias, repoChange.ToBranch); err != nil {
 				return err
 			}
@@ -146,4 +153,11 @@ func collectRepoSpecs(plan manifestplan.Result) []string {
 		specs = append(specs, spec)
 	}
 	return specs
+}
+
+func logStep(step func(text string), text string) {
+	if step == nil {
+		return
+	}
+	step(text)
 }

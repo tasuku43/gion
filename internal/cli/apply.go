@@ -8,6 +8,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/tasuku43/gwst/internal/app/apply"
 	"github.com/tasuku43/gwst/internal/app/manifestplan"
+	"github.com/tasuku43/gwst/internal/infra/output"
 	"github.com/tasuku43/gwst/internal/ui"
 )
 
@@ -28,6 +29,8 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())
 	renderer := ui.NewRenderer(os.Stdout, theme, useColor)
+	output.SetStepLogger(renderer)
+	defer output.SetStepLogger(nil)
 
 	var warningLines []string
 	for _, warn := range plan.Warnings {
@@ -64,10 +67,13 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 		}
 	}
 
+	renderer.Blank()
+	renderer.Section("Steps")
 	if err := apply.Apply(ctx, rootDir, plan, apply.Options{
 		AllowDirty:       destructive,
 		AllowStatusError: destructive,
 		PrefetchTimeout:  defaultPrefetchTimeout,
+		Step:             output.Step,
 	}); err != nil {
 		return err
 	}
