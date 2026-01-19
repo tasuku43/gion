@@ -517,6 +517,9 @@ func runCreateTemplateWithInputs(ctx context.Context, rootDir string, inputs cre
 		}
 		return err
 	}
+	if err := rebuildManifest(ctx, rootDir); err != nil {
+		return err
+	}
 
 	renderer.Blank()
 	renderer.Section("Result")
@@ -635,6 +638,9 @@ func runCreateRepoWithInputs(ctx context.Context, rootDir string, inputs createR
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("apply repo selection failed: %w (rollback failed: %v)", err, rollbackErr)
 		}
+		return err
+	}
+	if err := rebuildManifest(ctx, rootDir); err != nil {
 		return err
 	}
 

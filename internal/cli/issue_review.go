@@ -159,6 +159,9 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 		}
 		return err
 	}
+	if err := rebuildManifest(ctx, rootDir); err != nil {
+		return err
+	}
 
 	renderer.Blank()
 	renderer.Section("Result")
@@ -338,6 +341,9 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("issue setup failed: %w (rollback failed: %v)", err, rollbackErr)
 		}
+		return err
+	}
+	if err := rebuildManifest(ctx, rootDir); err != nil {
 		return err
 	}
 
@@ -566,6 +572,11 @@ func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, 
 		})
 	}
 
+	if len(results) > 0 {
+		if err := rebuildManifest(ctx, rootDir); err != nil {
+			return err
+		}
+	}
 	if len(results) > 0 {
 		renderer.Blank()
 		renderer.Section("Result")
@@ -931,6 +942,9 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool, 
 		}
 		return err
 	}
+	if err := rebuildManifest(ctx, rootDir); err != nil {
+		return err
+	}
 
 	renderer.Blank()
 	renderer.Section("Result")
@@ -1113,6 +1127,11 @@ func runCreateReviewSelected(ctx context.Context, rootDir string, noPrompt bool,
 		})
 	}
 
+	if len(results) > 0 {
+		if err := rebuildManifest(ctx, rootDir); err != nil {
+			return err
+		}
+	}
 	if len(results) > 0 {
 		renderer.Blank()
 		renderer.Section("Result")
@@ -1542,6 +1561,9 @@ func runReview(ctx context.Context, rootDir string, args []string, noPrompt bool
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("review failed: %w (rollback failed: %v)", err, rollbackErr)
 		}
+		return err
+	}
+	if err := rebuildManifest(ctx, rootDir); err != nil {
 		return err
 	}
 

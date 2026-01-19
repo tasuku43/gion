@@ -30,6 +30,10 @@ func TestRunCreatesAndSkips(t *testing.T) {
 	if _, err := os.Stat(templatesPath); err != nil {
 		t.Fatalf("missing file templates.yaml: %v", err)
 	}
+	manifestPath := filepath.Join(rootDir, "manifest.yaml")
+	if _, err := os.Stat(manifestPath); err != nil {
+		t.Fatalf("missing file manifest.yaml: %v", err)
+	}
 	data, err := os.ReadFile(templatesPath)
 	if err != nil {
 		t.Fatalf("read templates.yaml: %v", err)

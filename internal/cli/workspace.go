@@ -80,6 +80,9 @@ func runWorkspaceAdd(ctx context.Context, rootDir string, args []string) error {
 	if _, err := workspace.Add(ctx, rootDir, workspaceID, repoSpec, "", false); err != nil {
 		return err
 	}
+	if err := rebuildManifest(ctx, rootDir); err != nil {
+		return err
+	}
 	wsDir := workspace.WorkspaceDir(rootDir, workspaceID)
 	repos, _, _ := loadWorkspaceRepos(ctx, wsDir)
 	renderer.Blank()
@@ -238,6 +241,9 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 		}); err != nil {
 			return err
 		}
+		if err := rebuildManifest(ctx, rootDir); err != nil {
+			return err
+		}
 
 		renderer.Blank()
 		renderer.Section("Result")
@@ -284,6 +290,9 @@ func runWorkspaceRemove(ctx context.Context, rootDir string, args []string) erro
 		}); err != nil {
 			return err
 		}
+	}
+	if err := rebuildManifest(ctx, rootDir); err != nil {
+		return err
 	}
 
 	renderer.Blank()
