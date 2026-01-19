@@ -98,6 +98,12 @@ func Run() error {
 		return runWorkspaceOpen(ctx, rootDir, args[1:], noPrompt)
 	case "path":
 		return runPath(rootDir, args[1:], noPrompt)
+	case "plan":
+		return runPlan(ctx, rootDir, args[1:])
+	case "import":
+		return runImport(ctx, rootDir, args[1:], noPrompt)
+	case "apply":
+		return runApply(ctx, rootDir, args[1:], noPrompt)
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/tasuku43/gwst/internal/domain/template"
 	"github.com/tasuku43/gwst/internal/domain/workspace"
 	"github.com/tasuku43/gwst/internal/infra/output"
+	"github.com/tasuku43/gwst/internal/infra/prefetcher"
 	"github.com/tasuku43/gwst/internal/ui"
 )
 
@@ -56,7 +57,7 @@ func runCreate(ctx context.Context, rootDir string, args []string, noPrompt bool
 	branch = strings.TrimSpace(branch)
 	baseRef = strings.TrimSpace(baseRef)
 	templateName.value = strings.TrimSpace(templateName.value)
-	prefetch := newPrefetcher(defaultPrefetchTimeout)
+	prefetch := prefetcher.New(defaultPrefetchTimeout)
 
 	templateMode := templateName.set
 	reviewMode := reviewFlag.value
@@ -148,7 +149,7 @@ func runCreate(ctx context.Context, rootDir string, args []string, noPrompt bool
 		}
 		onReposResolved := func(repos []string) {
 			for _, repoSpec := range repos {
-				_, _ = prefetch.start(ctx, rootDir, repoSpec)
+				_, _ = prefetch.Start(ctx, rootDir, repoSpec)
 			}
 		}
 		mode, tmplName, tmplWorkspaceID, tmplDesc, tmplBranches, reviewRepo, reviewPRs, issueRepo, issueSelections, repoSelected, err := ui.PromptCreateFlow("gwst create", "", "", "", templateNames, tmplErr, repoChoices, repoErr, reviewPrompt, issuePrompt, loadReview, loadIssue, loadTemplateRepos, onReposResolved, validateBranch, theme, useColor, "")
@@ -251,7 +252,7 @@ func runCreate(ctx context.Context, rootDir string, args []string, noPrompt bool
 			repoChoices, repoErr := buildTemplateRepoChoices(rootDir)
 			onReposResolved := func(repos []string) {
 				for _, repoSpec := range repos {
-					_, _ = prefetch.start(ctx, rootDir, repoSpec)
+					_, _ = prefetch.Start(ctx, rootDir, repoSpec)
 				}
 			}
 			mode, _, tmplWorkspaceID, tmplDesc, tmplBranches, _, _, _, _, repoSelected, err := ui.PromptCreateFlow("gwst create", "repo", workspaceID, "", nil, nil, repoChoices, repoErr, nil, nil, nil, nil, nil, onReposResolved, func(v string) error {
@@ -280,7 +281,7 @@ func runCreate(ctx context.Context, rootDir string, args []string, noPrompt bool
 			useColor := isatty.IsTerminal(os.Stdout.Fd())
 			onReposResolved := func(repos []string) {
 				for _, repoSpec := range repos {
-					_, _ = prefetch.start(ctx, rootDir, repoSpec)
+					_, _ = prefetch.Start(ctx, rootDir, repoSpec)
 				}
 			}
 			mode, _, tmplWorkspaceID, tmplDesc, tmplBranches, _, _, _, _, repoSelected, err := ui.PromptCreateFlow("gwst create", "repo", workspaceID, "", nil, nil, nil, nil, nil, nil, nil, nil, nil, onReposResolved, func(v string) error {
@@ -368,7 +369,7 @@ func runWorkspaceNew(ctx context.Context, rootDir string, args []string, noPromp
 		workspaceID = newFlags.Arg(0)
 	}
 
-	prefetch := newPrefetcher(defaultPrefetchTimeout)
+	prefetch := prefetcher.New(defaultPrefetchTimeout)
 	return runCreateTemplate(ctx, rootDir, templateName, workspaceID, noPrompt, prefetch)
 }
 
@@ -388,7 +389,7 @@ type createRepoInputs struct {
 	fromFlow    bool
 }
 
-func runCreateTemplate(ctx context.Context, rootDir, templateName, workspaceID string, noPrompt bool, prefetch *prefetcher) error {
+func runCreateTemplate(ctx context.Context, rootDir, templateName, workspaceID string, noPrompt bool, prefetch *prefetcher.Prefetcher) error {
 	inputs := createTemplateInputs{
 		templateName: templateName,
 		workspaceID:  workspaceID,
@@ -396,8 +397,8 @@ func runCreateTemplate(ctx context.Context, rootDir, templateName, workspaceID s
 	return runCreateTemplateWithInputs(ctx, rootDir, inputs, noPrompt, prefetch)
 }
 
-func runCreateTemplateWithInputs(ctx context.Context, rootDir string, inputs createTemplateInputs, noPrompt bool, prefetch *prefetcher) error {
-	prefetch = ensurePrefetcher(prefetch)
+func runCreateTemplateWithInputs(ctx context.Context, rootDir string, inputs createTemplateInputs, noPrompt bool, prefetch *prefetcher.Prefetcher) error {
+	prefetch = prefetcher.Ensure(prefetch, defaultPrefetchTimeout)
 	templateName := strings.TrimSpace(inputs.templateName)
 	workspaceID := strings.TrimSpace(inputs.workspaceID)
 
@@ -425,7 +426,7 @@ func runCreateTemplateWithInputs(ctx context.Context, rootDir string, inputs cre
 		}
 		onReposResolved := func(repos []string) {
 			for _, repoSpec := range repos {
-				_, _ = prefetch.start(ctx, rootDir, repoSpec)
+				_, _ = prefetch.Start(ctx, rootDir, repoSpec)
 			}
 		}
 		mode, tmplName, tmplWorkspaceID, tmplDesc, tmplBranches, _, _, _, _, _, err := ui.PromptCreateFlow("gwst create", "template", workspaceID, templateName, templateNames, tmplErr, nil, nil, nil, nil, nil, nil, loadTemplateRepos, onReposResolved, validateBranch, theme, useColor, "")
@@ -468,7 +469,7 @@ func runCreateTemplateWithInputs(ctx context.Context, rootDir string, inputs cre
 	if err != nil {
 		return err
 	}
-	if _, err := prefetch.startAll(ctx, rootDir, tmpl.Repos); err != nil {
+	if _, err := prefetch.StartAll(ctx, rootDir, tmpl.Repos); err != nil {
 		return err
 	}
 	renderer := ui.NewRenderer(os.Stdout, theme, useColor)
@@ -486,7 +487,7 @@ func runCreateTemplateWithInputs(ctx context.Context, rootDir string, inputs cre
 	if err := ensureRepoGet(ctx, rootDir, missing, noPrompt, theme, useColor); err != nil {
 		return err
 	}
-	if _, err := prefetch.startAll(ctx, rootDir, missing); err != nil {
+	if _, err := prefetch.StartAll(ctx, rootDir, missing); err != nil {
 		return err
 	}
 
@@ -503,7 +504,7 @@ func runCreateTemplateWithInputs(ctx context.Context, rootDir string, inputs cre
 		return err
 	}
 
-	if err := prefetch.waitAll(ctx, tmpl.Repos); err != nil {
+	if err := prefetch.WaitAll(ctx, tmpl.Repos); err != nil {
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("prefetch failed: %w (rollback failed: %v)", err, rollbackErr)
 		}
@@ -531,8 +532,8 @@ func runCreateTemplateWithInputs(ctx context.Context, rootDir string, inputs cre
 	return nil
 }
 
-func runCreateRepoWithInputs(ctx context.Context, rootDir string, inputs createRepoInputs, noPrompt bool, prefetch *prefetcher) error {
-	prefetch = ensurePrefetcher(prefetch)
+func runCreateRepoWithInputs(ctx context.Context, rootDir string, inputs createRepoInputs, noPrompt bool, prefetch *prefetcher.Prefetcher) error {
+	prefetch = prefetcher.Ensure(prefetch, defaultPrefetchTimeout)
 	repoSpecs := template.NormalizeRepos(inputs.repos)
 	workspaceID := strings.TrimSpace(inputs.workspaceID)
 
@@ -560,7 +561,7 @@ func runCreateRepoWithInputs(ctx context.Context, rootDir string, inputs createR
 	if len(repoSpecs) != 1 {
 		return fmt.Errorf("exactly one repo is required")
 	}
-	if _, err := prefetch.startAll(ctx, rootDir, repoSpecs); err != nil {
+	if _, err := prefetch.StartAll(ctx, rootDir, repoSpecs); err != nil {
 		return err
 	}
 
@@ -609,7 +610,7 @@ func runCreateRepoWithInputs(ctx context.Context, rootDir string, inputs createR
 	if err := ensureRepoGet(ctx, rootDir, missing, noPrompt, theme, useColor); err != nil {
 		return err
 	}
-	if _, err := prefetch.startAll(ctx, rootDir, missing); err != nil {
+	if _, err := prefetch.StartAll(ctx, rootDir, missing); err != nil {
 		return err
 	}
 
@@ -625,7 +626,7 @@ func runCreateRepoWithInputs(ctx context.Context, rootDir string, inputs createR
 		return err
 	}
 
-	if err := prefetch.waitAll(ctx, tmpl.Repos); err != nil {
+	if err := prefetch.WaitAll(ctx, tmpl.Repos); err != nil {
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("prefetch failed: %w (rollback failed: %v)", err, rollbackErr)
 		}

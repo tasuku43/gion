@@ -20,11 +20,12 @@ import (
 	"github.com/tasuku43/gwst/internal/infra/debuglog"
 	"github.com/tasuku43/gwst/internal/infra/gitcmd"
 	"github.com/tasuku43/gwst/internal/infra/output"
+	"github.com/tasuku43/gwst/internal/infra/prefetcher"
 	"github.com/tasuku43/gwst/internal/ui"
 )
 
-func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch, baseRef string, noPrompt bool, prefetch *prefetcher) error {
-	prefetch = ensurePrefetcher(prefetch)
+func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch, baseRef string, noPrompt bool, prefetch *prefetcher.Prefetcher) error {
+	prefetch = prefetcher.Ensure(prefetch, defaultPrefetchTimeout)
 	issueURL = strings.TrimSpace(issueURL)
 	workspaceID = strings.TrimSpace(workspaceID)
 	branch = strings.TrimSpace(branch)
@@ -67,7 +68,7 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 	if _, exists, err := repo.Exists(rootDir, repoURL); err != nil {
 		return err
 	} else if exists {
-		started, err := prefetch.start(ctx, rootDir, repoURL)
+		started, err := prefetch.Start(ctx, rootDir, repoURL)
 		if err != nil {
 			return err
 		}
@@ -122,7 +123,7 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 		if err := ensureRepoGet(ctx, rootDir, []string{repoURL}, noPrompt, theme, useColor); err != nil {
 			return err
 		}
-		if _, err := prefetch.start(ctx, rootDir, repoURL); err != nil {
+		if _, err := prefetch.Start(ctx, rootDir, repoURL); err != nil {
 			return err
 		}
 	}
@@ -144,7 +145,7 @@ func runCreateIssue(ctx context.Context, rootDir, issueURL, workspaceID, branch,
 		return err
 	}
 
-	if err := prefetch.wait(ctx, repoURL); err != nil {
+	if err := prefetch.Wait(ctx, repoURL); err != nil {
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("prefetch failed: %w (rollback failed: %v)", err, rollbackErr)
 		}
@@ -200,7 +201,7 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	workspaceID = strings.TrimSpace(workspaceID)
 	branch = strings.TrimSpace(branch)
 	baseRef = strings.TrimSpace(baseRef)
-	prefetch := newPrefetcher(defaultPrefetchTimeout)
+	prefetch := prefetcher.New(defaultPrefetchTimeout)
 
 	if issueFlags.NArg() == 0 {
 		if noPrompt {
@@ -248,7 +249,7 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	if _, exists, err := repo.Exists(rootDir, repoURL); err != nil {
 		return err
 	} else if exists {
-		started, err := prefetch.start(ctx, rootDir, repoURL)
+		started, err := prefetch.Start(ctx, rootDir, repoURL)
 		if err != nil {
 			return err
 		}
@@ -303,7 +304,7 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 		if err := ensureRepoGet(ctx, rootDir, []string{repoURL}, noPrompt, theme, useColor); err != nil {
 			return err
 		}
-		if _, err := prefetch.start(ctx, rootDir, repoURL); err != nil {
+		if _, err := prefetch.Start(ctx, rootDir, repoURL); err != nil {
 			return err
 		}
 	}
@@ -325,7 +326,7 @@ func runIssue(ctx context.Context, rootDir string, args []string, noPrompt bool)
 		return err
 	}
 
-	if err := prefetch.wait(ctx, repoURL); err != nil {
+	if err := prefetch.Wait(ctx, repoURL); err != nil {
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("prefetch failed: %w (rollback failed: %v)", err, rollbackErr)
 		}
@@ -366,8 +367,8 @@ type issueSummary struct {
 	Title  string
 }
 
-func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title string, prefetch *prefetcher) error {
-	prefetch = ensurePrefetcher(prefetch)
+func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title string, prefetch *prefetcher.Prefetcher) error {
+	prefetch = prefetcher.Ensure(prefetch, defaultPrefetchTimeout)
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())
 
@@ -403,7 +404,7 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 	}
 	onReposResolved := func(repos []string) {
 		for _, repoSpec := range repos {
-			_, _ = prefetch.start(ctx, rootDir, repoSpec)
+			_, _ = prefetch.Start(ctx, rootDir, repoSpec)
 		}
 	}
 	mode, _, _, _, _, _, _, issueRepo, issueSelections, _, err := ui.PromptCreateFlow(title, "issue", "", "", nil, nil, nil, nil, nil, promptChoices, nil, loadIssue, nil, onReposResolved, validateBranch, theme, useColor, "")
@@ -416,8 +417,8 @@ func runIssuePicker(ctx context.Context, rootDir string, noPrompt bool, title st
 	return runCreateIssueSelected(ctx, rootDir, noPrompt, issueRepo, issueSelections, prefetch)
 }
 
-func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, repoSpec string, selectedIssues []ui.IssueSelection, prefetch *prefetcher) error {
-	prefetch = ensurePrefetcher(prefetch)
+func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, repoSpec string, selectedIssues []ui.IssueSelection, prefetch *prefetcher.Prefetcher) error {
+	prefetch = prefetcher.Ensure(prefetch, defaultPrefetchTimeout)
 	if strings.TrimSpace(repoSpec) == "" {
 		return fmt.Errorf("repo is required")
 	}
@@ -482,14 +483,14 @@ func runCreateIssueSelected(ctx context.Context, rootDir string, noPrompt bool, 
 			return err
 		}
 	}
-	if _, err := prefetch.start(ctx, rootDir, repoSpec); err != nil {
+	if _, err := prefetch.Start(ctx, rootDir, repoSpec); err != nil {
 		return err
 	}
 	store, err := repo.Open(ctx, rootDir, repoSpec, false)
 	if err != nil {
 		return err
 	}
-	if err := prefetch.wait(ctx, repoSpec); err != nil {
+	if err := prefetch.Wait(ctx, repoSpec); err != nil {
 		return err
 	}
 
@@ -816,8 +817,8 @@ type prSummary struct {
 	BaseRepo string
 }
 
-func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool, prefetch *prefetcher) error {
-	prefetch = ensurePrefetcher(prefetch)
+func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool, prefetch *prefetcher.Prefetcher) error {
+	prefetch = prefetcher.Ensure(prefetch, defaultPrefetchTimeout)
 	prURL = strings.TrimSpace(prURL)
 	if prURL == "" {
 		if noPrompt {
@@ -856,7 +857,7 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool, 
 	if _, exists, err := repo.Exists(rootDir, repoURL); err != nil {
 		return err
 	} else if exists {
-		started, err := prefetch.start(ctx, rootDir, repoURL)
+		started, err := prefetch.Start(ctx, rootDir, repoURL)
 		if err != nil {
 			return err
 		}
@@ -888,7 +889,7 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool, 
 		if err := ensureRepoGet(ctx, rootDir, []string{repoURL}, noPrompt, theme, useColor); err != nil {
 			return err
 		}
-		if _, err := prefetch.start(ctx, rootDir, repoURL); err != nil {
+		if _, err := prefetch.Start(ctx, rootDir, repoURL); err != nil {
 			return err
 		}
 	}
@@ -911,7 +912,7 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool, 
 	if err != nil {
 		return err
 	}
-	if err := prefetch.wait(ctx, repoURL); err != nil {
+	if err := prefetch.Wait(ctx, repoURL); err != nil {
 		if rollbackErr := workspace.Remove(ctx, rootDir, workspaceID); rollbackErr != nil {
 			return fmt.Errorf("prefetch failed: %w (rollback failed: %v)", err, rollbackErr)
 		}
@@ -943,8 +944,8 @@ func runCreateReview(ctx context.Context, rootDir, prURL string, noPrompt bool, 
 	return nil
 }
 
-func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool, prefetch *prefetcher) error {
-	prefetch = ensurePrefetcher(prefetch)
+func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool, prefetch *prefetcher.Prefetcher) error {
+	prefetch = prefetcher.Ensure(prefetch, defaultPrefetchTimeout)
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())
 
@@ -974,7 +975,7 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool, p
 	}
 	onReposResolved := func(repos []string) {
 		for _, repoSpec := range repos {
-			_, _ = prefetch.start(ctx, rootDir, repoSpec)
+			_, _ = prefetch.Start(ctx, rootDir, repoSpec)
 		}
 	}
 	mode, _, _, _, _, reviewRepo, reviewPRs, _, _, _, err := ui.PromptCreateFlow("gwst create", "review", "", "", nil, nil, nil, nil, promptChoices, nil, loadReview, nil, nil, onReposResolved, nil, theme, useColor, "")
@@ -987,8 +988,8 @@ func runCreateReviewPicker(ctx context.Context, rootDir string, noPrompt bool, p
 	return runCreateReviewSelected(ctx, rootDir, noPrompt, reviewRepo, reviewPRs, prefetch)
 }
 
-func runCreateReviewSelected(ctx context.Context, rootDir string, noPrompt bool, repoSpec string, selectedPRs []string, prefetch *prefetcher) error {
-	prefetch = ensurePrefetcher(prefetch)
+func runCreateReviewSelected(ctx context.Context, rootDir string, noPrompt bool, repoSpec string, selectedPRs []string, prefetch *prefetcher.Prefetcher) error {
+	prefetch = prefetcher.Ensure(prefetch, defaultPrefetchTimeout)
 	if strings.TrimSpace(repoSpec) == "" {
 		return fmt.Errorf("repo is required")
 	}
@@ -1022,10 +1023,10 @@ func runCreateReviewSelected(ctx context.Context, rootDir string, noPrompt bool,
 			return err
 		}
 	}
-	if _, err := prefetch.start(ctx, rootDir, selectedRepo.RepoURL); err != nil {
+	if _, err := prefetch.Start(ctx, rootDir, selectedRepo.RepoURL); err != nil {
 		return err
 	}
-	if err := prefetch.wait(ctx, selectedRepo.RepoURL); err != nil {
+	if err := prefetch.Wait(ctx, selectedRepo.RepoURL); err != nil {
 		return err
 	}
 

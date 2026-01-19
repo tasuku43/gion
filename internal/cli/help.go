@@ -35,6 +35,9 @@ func printGlobalHelp(w io.Writer) {
 	fmt.Fprintln(w, helpCommand(theme, useColor, "repo <subcommand>", "repo commands (get/ls)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "template <subcommand>", "template commands (ls/add/rm/validate)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "doctor [--fix | --self]", "check workspace/repo health"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "plan", "show manifest diff (no changes)"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "import", "rebuild manifest from filesystem"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "apply", "apply manifest to filesystem"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "version", "print gwst version"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "help [command]", "show help for a command"))
 	fmt.Fprintln(w, "")
@@ -68,6 +71,12 @@ func printCommandHelp(cmd string, w io.Writer) bool {
 		printTemplateHelp(w)
 	case "doctor":
 		printDoctorHelp(w)
+	case "plan":
+		printPlanHelp(w)
+	case "import":
+		printImportHelp(w)
+	case "apply":
+		printApplyHelp(w)
 	case "init":
 		printInitHelp(w)
 	case "version":
@@ -179,6 +188,18 @@ func printDoctorHelp(w io.Writer) {
 
 func printInitHelp(w io.Writer) {
 	fmt.Fprintln(w, "Usage: gwst init")
+}
+
+func printImportHelp(w io.Writer) {
+	fmt.Fprintln(w, "Usage: gwst import")
+}
+
+func printPlanHelp(w io.Writer) {
+	fmt.Fprintln(w, "Usage: gwst plan")
+}
+
+func printApplyHelp(w io.Writer) {
+	fmt.Fprintln(w, "Usage: gwst apply")
 }
 
 func helpTheme(w io.Writer) (ui.Theme, bool) {

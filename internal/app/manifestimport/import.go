@@ -23,14 +23,7 @@ func Import(ctx context.Context, rootDir string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := manifest.Save(rootDir, file); err != nil {
-		return Result{}, err
-	}
-	return Result{
-		Path:     manifest.Path(rootDir),
-		Manifest: file,
-		Warnings: warnings,
-	}, nil
+	return Write(rootDir, file, warnings)
 }
 
 func Build(ctx context.Context, rootDir string) (manifest.File, []error, error) {
@@ -112,4 +105,19 @@ func Build(ctx context.Context, rootDir string) (manifest.File, []error, error) 
 	}
 
 	return file, warnings, nil
+}
+
+func Write(rootDir string, file manifest.File, warnings []error) (Result, error) {
+	if err := manifest.Save(rootDir, file); err != nil {
+		return Result{}, err
+	}
+	return Result{
+		Path:     manifest.Path(rootDir),
+		Manifest: file,
+		Warnings: warnings,
+	}, nil
+}
+
+func Path(rootDir string) string {
+	return manifest.Path(rootDir)
 }

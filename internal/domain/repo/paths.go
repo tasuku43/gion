@@ -56,3 +56,16 @@ func normalizeForDisplay(input string) (repospec.Spec, bool) {
 	}
 	return spec, true
 }
+
+// SpecFromKey converts a repo key (host/owner/repo.git) into a cloneable spec.
+func SpecFromKey(repoKey string) string {
+	trimmed := strings.TrimSuffix(strings.TrimSpace(repoKey), ".git")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) < 3 {
+		return strings.TrimSpace(repoKey)
+	}
+	host := parts[0]
+	owner := parts[1]
+	repoName := parts[2]
+	return fmt.Sprintf("git@%s:%s/%s.git", host, owner, repoName)
+}
