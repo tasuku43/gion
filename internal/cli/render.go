@@ -395,7 +395,7 @@ func repoRiskSummary(repo workspace.RepoStatus) (string, string, treeLineStyle) 
 	if repo.AheadCount > 0 {
 		return "unpushed", fmt.Sprintf("(ahead=%d)", repo.AheadCount), treeLineWarn
 	}
-	return "", "", treeLineNormal
+	return "clean", "", treeLineSuccess
 }
 
 func firstNonZeroCountKV(items []struct {
