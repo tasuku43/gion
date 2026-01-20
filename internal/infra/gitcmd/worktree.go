@@ -6,6 +6,18 @@ import (
 	"strings"
 )
 
+// WorktreePrune cleans up stale worktree metadata.
+func WorktreePrune(ctx context.Context, dir string) error {
+	res, err := Run(ctx, []string{"worktree", "prune"}, Options{Dir: dir})
+	if err != nil {
+		if strings.TrimSpace(res.Stderr) != "" {
+			return fmt.Errorf("git worktree prune failed: %w: %s", err, strings.TrimSpace(res.Stderr))
+		}
+		return fmt.Errorf("git worktree prune failed: %w", err)
+	}
+	return nil
+}
+
 // WorktreeListPorcelain lists worktrees in porcelain format.
 func WorktreeListPorcelain(ctx context.Context, dir string) (string, error) {
 	res, err := Run(ctx, []string{"worktree", "list", "--porcelain"}, Options{Dir: dir})
