@@ -278,7 +278,6 @@ func renderPlanWorkspaceAddRepos(renderer *ui.Renderer, changes []manifestplan.R
 			name = strings.TrimSpace(change.ToRepo)
 		}
 		renderer.TreeLineBranchMuted(prefix, name, change.ToBranch)
-		renderer.TreeLine(renderer.MutedText(detailPrefix), renderer.MutedText("sync: pending (workspace not created)"))
 		if strings.TrimSpace(change.ToRepo) != "" {
 			renderer.TreeLine(renderer.MutedText(detailPrefix), renderer.MutedText("repo: "+strings.TrimSpace(change.ToRepo)))
 		}
