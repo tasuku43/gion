@@ -257,6 +257,7 @@ func renderPlanWorkspaceAddRepos(renderer *ui.Renderer, changes []manifestplan.R
 	if renderer == nil || len(changes) == 0 {
 		return
 	}
+	detailPrefix := "   "
 	var adds []manifestplan.RepoChange
 	for _, change := range changes {
 		if change.Kind != manifestplan.RepoAdd {
@@ -277,9 +278,9 @@ func renderPlanWorkspaceAddRepos(renderer *ui.Renderer, changes []manifestplan.R
 			name = strings.TrimSpace(change.ToRepo)
 		}
 		renderer.TreeLineBranchMuted(prefix, name, change.ToBranch)
-		renderer.TreeLine(renderer.MutedText("  | "), renderer.MutedText("sync: pending (workspace not created)"))
+		renderer.TreeLine(detailPrefix, renderer.MutedText("sync: pending (workspace not created)"))
 		if strings.TrimSpace(change.ToRepo) != "" {
-			renderer.TreeLine(renderer.MutedText("  | "), renderer.MutedText("repo: "+strings.TrimSpace(change.ToRepo)))
+			renderer.TreeLine(detailPrefix, renderer.MutedText("repo: "+strings.TrimSpace(change.ToRepo)))
 		}
 	}
 }
@@ -298,6 +299,7 @@ func renderWorkspaceRiskDetails(renderer *ui.Renderer, status workspace.StatusRe
 	if renderer == nil {
 		return
 	}
+	detailPrefix := "   "
 	if len(status.Repos) == 0 {
 		for _, warn := range status.Warnings {
 			msg := strings.TrimSpace(compactError(warn))
@@ -325,7 +327,7 @@ func renderWorkspaceRiskDetails(renderer *ui.Renderer, status workspace.StatusRe
 			if strings.TrimSpace(ansi.Strip(line)) == "" {
 				continue
 			}
-			renderer.TreeLine(renderer.MutedText("  | "), line)
+			renderer.TreeLine(detailPrefix, line)
 		}
 	}
 	for _, warn := range status.Warnings {
