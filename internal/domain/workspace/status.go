@@ -32,6 +32,7 @@ type RepoStatus struct {
 	BehindCount    int
 	WorktreePath   string
 	RawStatus      string
+	ChangedFiles   []string
 	Error          error
 }
 
@@ -78,6 +79,7 @@ func Status(ctx context.Context, rootDir, workspaceID string) (StatusResult, err
 
 		repoStatus.RawStatus = statusOut
 		repoStatus.Branch, repoStatus.Upstream, repoStatus.Head, repoStatus.Detached, repoStatus.HeadMissing, repoStatus.Dirty, repoStatus.UntrackedCount, repoStatus.StagedCount, repoStatus.UnstagedCount, repoStatus.UnmergedCount, repoStatus.AheadCount, repoStatus.BehindCount = parseStatusPorcelainV2(statusOut, repoStatus.Branch)
+		repoStatus.ChangedFiles = parseChangedFilesPorcelainV2(statusOut)
 		result.Repos = append(result.Repos, repoStatus)
 	}
 
@@ -178,6 +180,68 @@ func parseStatusPorcelainV2(output, fallbackBranch string) (string, string, stri
 	}
 
 	return branch, upstream, head, detached, headMissing, dirty, untracked, staged, unstaged, unmerged, ahead, behind
+}
+
+func parseChangedFilesPorcelainV2(output string) []string {
+	var files []string
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "# ") {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, "? "):
+			path := strings.TrimSpace(strings.TrimPrefix(line, "? "))
+			if path != "" {
+				files = append(files, fmt.Sprintf("?? %s", path))
+			}
+		case strings.HasPrefix(line, "u "):
+			fields := strings.Fields(line)
+			if len(fields) < 3 {
+				continue
+			}
+			xy := shortXY(fields[1])
+			path := fields[len(fields)-1]
+			if strings.TrimSpace(path) != "" {
+				files = append(files, fmt.Sprintf("%s %s", xy, path))
+			}
+		case strings.HasPrefix(line, "1 "):
+			fields := strings.Fields(line)
+			if len(fields) < 3 {
+				continue
+			}
+			xy := shortXY(fields[1])
+			path := fields[len(fields)-1]
+			if strings.TrimSpace(path) != "" {
+				files = append(files, fmt.Sprintf("%s %s", xy, path))
+			}
+		case strings.HasPrefix(line, "2 "):
+			fields := strings.Fields(line)
+			if len(fields) < 4 {
+				continue
+			}
+			xy := shortXY(fields[1])
+			oldPath := fields[len(fields)-2]
+			newPath := fields[len(fields)-1]
+			if strings.TrimSpace(oldPath) == "" || strings.TrimSpace(newPath) == "" {
+				continue
+			}
+			files = append(files, fmt.Sprintf("%s %s -> %s", xy, oldPath, newPath))
+		}
+	}
+	return files
+}
+
+func shortXY(xy string) string {
+	value := strings.TrimSpace(xy)
+	if value == "" {
+		return "??"
+	}
+	value = strings.ReplaceAll(value, ".", " ")
+	return value
 }
 
 func shortSHA(oid string) string {

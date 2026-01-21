@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-isatty"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/tasuku43/gwst/internal/app/doctor"
@@ -174,24 +175,6 @@ func renderDiffLines(renderer *ui.Renderer, lines []string) {
 	}
 }
 
-func renderPlanChanges(renderer *ui.Renderer, changes []manifestplan.WorkspaceChange) {
-	if renderer == nil {
-		return
-	}
-	for _, change := range changes {
-		switch change.Kind {
-		case manifestplan.WorkspaceAdd:
-			renderer.BulletSuccess(fmt.Sprintf("+ add workspace %s", change.WorkspaceID))
-			renderPlanRepoChanges(renderer, change.Repos)
-		case manifestplan.WorkspaceRemove:
-			renderer.BulletError(fmt.Sprintf("- remove workspace %s", change.WorkspaceID))
-		case manifestplan.WorkspaceUpdate:
-			renderer.BulletAccent(fmt.Sprintf("~ update workspace %s", change.WorkspaceID))
-			renderPlanRepoChanges(renderer, change.Repos)
-		}
-	}
-}
-
 func renderPlanRepoChanges(renderer *ui.Renderer, changes []manifestplan.RepoChange) {
 	if renderer == nil || len(changes) == 0 {
 		return
@@ -234,6 +217,382 @@ func formatPlanRepoUpdate(change manifestplan.RepoChange) string {
 	default:
 		return fmt.Sprintf("~ update repo %s: %s (%s) -> %s (%s)", change.Alias, fromRepo, fromBranch, toRepo, toBranch)
 	}
+}
+
+func renderPlanChanges(ctx context.Context, rootDir string, renderer *ui.Renderer, plan manifestplan.Result) {
+	if renderer == nil {
+		return
+	}
+	for _, change := range plan.Changes {
+		switch change.Kind {
+		case manifestplan.WorkspaceAdd:
+			desc := strings.TrimSpace(planWorkspaceDescription(plan, change.WorkspaceID))
+			line := fmt.Sprintf("+ add workspace %s", change.WorkspaceID)
+			if desc != "" {
+				line += " - " + desc
+			}
+			renderer.BulletSuccess(line)
+			renderPlanWorkspaceAddRepos(renderer, change.Repos)
+		case manifestplan.WorkspaceRemove:
+			status, _ := loadWorkspaceStatusForRemoval(ctx, rootDir, change.WorkspaceID)
+			desc := strings.TrimSpace(planWorkspaceDescription(plan, change.WorkspaceID))
+			line := fmt.Sprintf("- remove workspace %s", change.WorkspaceID)
+			if desc != "" {
+				line += " - " + desc
+			}
+			renderer.BulletError(line)
+			renderWorkspaceRiskDetails(renderer, status)
+		case manifestplan.WorkspaceUpdate:
+			renderer.BulletAccent(fmt.Sprintf("~ update workspace %s", change.WorkspaceID))
+			renderPlanWorkspaceUpdateRepos(renderer, change)
+		}
+	}
+}
+
+func renderPlanWorkspaceAddRepos(renderer *ui.Renderer, changes []manifestplan.RepoChange) {
+	if renderer == nil || len(changes) == 0 {
+		return
+	}
+	var adds []manifestplan.RepoChange
+	for _, change := range changes {
+		if change.Kind != manifestplan.RepoAdd {
+			continue
+		}
+		adds = append(adds, change)
+	}
+	if len(adds) == 0 {
+		return
+	}
+	for i, change := range adds {
+		prefix := "├─ "
+		if i == len(adds)-1 {
+			prefix = "└─ "
+		}
+		detailPrefix := detailTreePrefix(i == len(adds)-1)
+		name := strings.TrimSpace(change.Alias)
+		if name == "" {
+			name = strings.TrimSpace(change.ToRepo)
+		}
+		renderer.TreeLineBranchMuted(prefix, name, change.ToBranch)
+		if strings.TrimSpace(change.ToRepo) != "" {
+			renderer.TreeLine(renderer.MutedText(detailPrefix), renderer.MutedText("repo: "+strings.TrimSpace(change.ToRepo)))
+		}
+	}
+}
+
+func renderPlanWorkspaceUpdateRepos(renderer *ui.Renderer, change manifestplan.WorkspaceChange) {
+	if renderer == nil || len(change.Repos) == 0 {
+		return
+	}
+
+	for i, repoChange := range change.Repos {
+		prefix := "├─ "
+		if i == len(change.Repos)-1 {
+			prefix = "└─ "
+		}
+		detailPrefix := detailTreePrefix(i == len(change.Repos)-1)
+
+		name := strings.TrimSpace(repoChange.Alias)
+		if name == "" {
+			name = strings.TrimSpace(repoChange.ToRepo)
+		}
+		branch := strings.TrimSpace(repoChange.FromBranch)
+		if branch == "" {
+			branch = strings.TrimSpace(repoChange.ToBranch)
+		}
+		renderer.TreeLineBranchMuted(prefix, name, branch)
+
+		if summary := formatRepoChangeSummary(repoChange); strings.TrimSpace(summary) != "" {
+			style := repoChangeSummaryStyle(renderer, repoChange.Kind)
+			renderer.TreeLine(renderer.MutedText(detailPrefix), renderer.MutedText("change: ")+style(summary))
+		}
+
+		switch repoChange.Kind {
+		case manifestplan.RepoAdd:
+			if strings.TrimSpace(repoChange.ToRepo) != "" {
+				renderer.TreeLine(renderer.MutedText(detailPrefix), renderer.MutedText("repo: "+strings.TrimSpace(repoChange.ToRepo)))
+			}
+		case manifestplan.RepoRemove, manifestplan.RepoUpdate:
+			// For updates, show only what's changing (no risk/sync/files).
+		}
+	}
+}
+
+func repoChangeSummaryStyle(renderer *ui.Renderer, kind manifestplan.RepoChangeKind) func(string) string {
+	if renderer == nil {
+		return func(s string) string { return s }
+	}
+	switch kind {
+	case manifestplan.RepoAdd:
+		return renderer.SuccessText
+	case manifestplan.RepoRemove:
+		return renderer.ErrorText
+	case manifestplan.RepoUpdate:
+		// Keep updates readable without competing with other semantic uses of Accent (e.g. risk: clean).
+		return func(s string) string { return s }
+	default:
+		return func(s string) string { return s }
+	}
+}
+
+func formatRepoChangeSummary(change manifestplan.RepoChange) string {
+	switch change.Kind {
+	case manifestplan.RepoAdd:
+		if strings.TrimSpace(change.ToRepo) != "" && strings.TrimSpace(change.ToBranch) != "" {
+			return fmt.Sprintf("add repo %s branch %s", strings.TrimSpace(change.ToRepo), strings.TrimSpace(change.ToBranch))
+		}
+		if strings.TrimSpace(change.ToRepo) != "" {
+			return fmt.Sprintf("add repo %s", strings.TrimSpace(change.ToRepo))
+		}
+		return "add repo"
+	case manifestplan.RepoRemove:
+		if strings.TrimSpace(change.FromRepo) != "" && strings.TrimSpace(change.FromBranch) != "" {
+			return fmt.Sprintf("remove repo %s branch %s", strings.TrimSpace(change.FromRepo), strings.TrimSpace(change.FromBranch))
+		}
+		if strings.TrimSpace(change.FromRepo) != "" {
+			return fmt.Sprintf("remove repo %s", strings.TrimSpace(change.FromRepo))
+		}
+		return "remove repo"
+	case manifestplan.RepoUpdate:
+		fromRepo := strings.TrimSpace(change.FromRepo)
+		toRepo := strings.TrimSpace(change.ToRepo)
+		fromBranch := strings.TrimSpace(change.FromBranch)
+		toBranch := strings.TrimSpace(change.ToBranch)
+		switch {
+		case fromRepo == toRepo && fromBranch != toBranch:
+			return fmt.Sprintf("branch %s -> %s", fromBranch, toBranch)
+		case fromRepo != toRepo && fromBranch == toBranch:
+			return fmt.Sprintf("repo %s -> %s", fromRepo, toRepo)
+		default:
+			return fmt.Sprintf("repo %s (%s) -> %s (%s)", fromRepo, fromBranch, toRepo, toBranch)
+		}
+	default:
+		return ""
+	}
+}
+
+func workspaceChangeHasDestructiveRepoChange(change manifestplan.WorkspaceChange) bool {
+	for _, repoChange := range change.Repos {
+		switch repoChange.Kind {
+		case manifestplan.RepoRemove, manifestplan.RepoUpdate:
+			return true
+		}
+	}
+	return false
+}
+
+func renderWorkspaceRiskDetails(renderer *ui.Renderer, status workspace.StatusResult) {
+	if renderer == nil {
+		return
+	}
+	if len(status.Repos) == 0 {
+		for _, warn := range status.Warnings {
+			msg := strings.TrimSpace(compactError(warn))
+			if msg == "" {
+				continue
+			}
+			renderer.TreeLine(renderer.MutedText("└─ "), renderer.ErrorText(fmt.Sprintf("status error: %s", msg)))
+		}
+		return
+	}
+	for i, repoEntry := range status.Repos {
+		prefix := "├─ "
+		if i == len(status.Repos)-1 {
+			prefix = "└─ "
+		}
+		name := strings.TrimSpace(repoEntry.Alias)
+		if name == "" {
+			name = filepath.Base(repoEntry.WorktreePath)
+		}
+		label := formatRepoLabel(name, repoEntry.Branch)
+		renderer.TreeLineBranchMuted(prefix, label, "")
+
+		detailPrefix := detailTreePrefix(i == len(status.Repos)-1)
+		lines := buildRepoRiskDetailLines(renderer, repoEntry)
+		for _, line := range lines {
+			if strings.TrimSpace(ansi.Strip(line)) == "" {
+				continue
+			}
+			renderer.TreeLine(renderer.MutedText(detailPrefix), line)
+		}
+	}
+	for _, warn := range status.Warnings {
+		msg := strings.TrimSpace(compactError(warn))
+		if msg == "" {
+			continue
+		}
+		renderer.TreeLine(renderer.MutedText("└─ "), renderer.WarnText(fmt.Sprintf("warning: %s", msg)))
+	}
+}
+
+func detailTreePrefix(isLast bool) string {
+	if isLast {
+		return "   "
+	}
+	return "│  "
+}
+
+func buildRepoRiskDetailLines(r *ui.Renderer, repo workspace.RepoStatus) []string {
+	if r == nil {
+		return nil
+	}
+	if repo.Error != nil {
+		return []string{r.ErrorText(fmt.Sprintf("status error: %s", compactError(repo.Error)))}
+	}
+
+	var lines []string
+
+	if riskLine := formatRiskLine(r, repo); strings.TrimSpace(ansi.Strip(riskLine)) != "" {
+		lines = append(lines, riskLine)
+	}
+	if repo.Detached {
+		lines = append(lines, r.WarnText("note: detached HEAD"))
+	}
+	if repo.HeadMissing {
+		lines = append(lines, r.WarnText("note: head missing"))
+	}
+	if strings.TrimSpace(repo.Upstream) == "" {
+		lines = append(lines, r.WarnText("note: upstream not set"))
+	}
+	if repo.AheadCount > 0 || repo.BehindCount > 0 {
+		lines = append(lines, formatSyncSummaryLine(r, repo))
+	} else if strings.TrimSpace(repo.Upstream) != "" {
+		lines = append(lines, formatSyncSummaryLine(r, repo))
+	}
+
+	if repo.Dirty {
+		lines = append(lines, r.MutedText("files:"))
+		if len(repo.ChangedFiles) == 0 {
+			lines = append(lines, r.MutedText("  (file list unavailable)"))
+			return lines
+		}
+		for _, file := range repo.ChangedFiles {
+			if strings.TrimSpace(file) == "" {
+				continue
+			}
+			lines = append(lines, "  "+formatChangedFileLine(r, file))
+		}
+	}
+	return lines
+}
+
+func formatRiskLine(r *ui.Renderer, repo workspace.RepoStatus) string {
+	label := r.MutedText("risk:")
+	kind, detail, severity := repoRiskSummary(repo)
+	if kind == "" {
+		return ""
+	}
+	style := r.WarnText
+	switch severity {
+	case treeLineError:
+		style = r.ErrorText
+	case treeLineSuccess:
+		style = r.AccentText
+	case treeLineNormal:
+		style = func(s string) string { return s }
+	}
+	text := label + " " + style(kind)
+	if strings.TrimSpace(detail) != "" {
+		text += " " + style(detail)
+	}
+	return text
+}
+
+func repoRiskSummary(repo workspace.RepoStatus) (string, string, treeLineStyle) {
+	if repo.Error != nil || repo.Detached || repo.HeadMissing {
+		return "unknown", "", treeLineError
+	}
+	if strings.TrimSpace(repo.Upstream) == "" {
+		return "upstream missing", "", treeLineWarn
+	}
+	if repo.Dirty {
+		detail := firstNonZeroCountKV([]struct {
+			key   string
+			value int
+		}{
+			{key: "staged", value: repo.StagedCount},
+			{key: "unstaged", value: repo.UnstagedCount},
+			{key: "untracked", value: repo.UntrackedCount},
+			{key: "unmerged", value: repo.UnmergedCount},
+		})
+		if detail != "" {
+			return "dirty", "(" + detail + ")", treeLineWarn
+		}
+		return "dirty", "", treeLineWarn
+	}
+	if repo.AheadCount > 0 && repo.BehindCount > 0 {
+		return "diverged", fmt.Sprintf("(ahead=%d behind=%d)", repo.AheadCount, repo.BehindCount), treeLineWarn
+	}
+	if repo.AheadCount > 0 {
+		return "unpushed", fmt.Sprintf("(ahead=%d)", repo.AheadCount), treeLineWarn
+	}
+	// Clean repos are not risks; keep the output focused by omitting the line.
+	return "", "", treeLineNormal
+}
+
+func firstNonZeroCountKV(items []struct {
+	key   string
+	value int
+}) string {
+	for _, item := range items {
+		if item.value > 0 {
+			return fmt.Sprintf("%s=%d", item.key, item.value)
+		}
+	}
+	return ""
+}
+
+func formatSyncSummaryLine(r *ui.Renderer, repo workspace.RepoStatus) string {
+	label := r.MutedText("sync:")
+	upstream := "upstream=none"
+	if strings.TrimSpace(repo.Upstream) != "" {
+		upstream = "upstream=" + repo.Upstream
+	}
+
+	parts := []string{label, r.MutedText(upstream)}
+	if repo.AheadCount > 0 {
+		parts = append(parts, r.WarnText(fmt.Sprintf("ahead=%d", repo.AheadCount)))
+	} else {
+		parts = append(parts, r.MutedText("ahead=0"))
+	}
+	if repo.BehindCount > 0 {
+		parts = append(parts, r.MutedText(fmt.Sprintf("behind=%d", repo.BehindCount)))
+	} else {
+		parts = append(parts, r.MutedText("behind=0"))
+	}
+	return strings.Join(parts, " ")
+}
+
+func formatChangedFileLine(r *ui.Renderer, line string) string {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return ""
+	}
+	status, rest := splitChangedFileStatus(trimmed)
+	if strings.TrimSpace(status) == "" {
+		return trimmed
+	}
+	style := r.WarnText
+	if strings.Contains(status, "U") || strings.Contains(status, "D") {
+		style = r.ErrorText
+	}
+	if strings.TrimSpace(rest) == "" {
+		return style(status)
+	}
+	return style(status) + " " + rest
+}
+
+func splitChangedFileStatus(line string) (string, string) {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "??") {
+		return "??", strings.TrimSpace(trimmed[2:])
+	}
+	if len(trimmed) < 2 {
+		return trimmed, ""
+	}
+	status := strings.TrimRight(trimmed[:2], " ")
+	rest := strings.TrimSpace(trimmed[2:])
+	return status, rest
 }
 
 func renderWarningsSection(r *ui.Renderer, title string, warnings []string, leadBlank bool) {

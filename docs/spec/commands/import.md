@@ -12,7 +12,7 @@ Rebuild `gwst.yaml` from the filesystem and `.gwst/metadata.json` to restore the
 ## Behavior
 - Scans `<root>/workspaces` to build the current filesystem state.
 - For each workspace:
-  - Loads `.gwst/metadata.json` when present to restore `mode`, `description`, `preset_name`, `source_url`.
+  - Loads `.gwst/metadata.json` when present to restore optional metadata fields (`mode`, `description`, `preset_name`, `source_url`).
   - Derives repo branches from each worktree's Git state.
 - Rewrites `<root>/gwst.yaml` as a whole, reflecting the current filesystem state.
 - By default, shows a summary of changes and prompts for confirmation.

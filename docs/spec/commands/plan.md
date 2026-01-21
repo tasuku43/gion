@@ -1,6 +1,6 @@
 ---
 title: "gwst plan"
-status: planned
+status: implemented
 ---
 
 ## Synopsis
@@ -17,6 +17,11 @@ Compute and display the diff between `gwst.yaml` and the filesystem without appl
   - `remove`: exists on filesystem but not in manifest.
   - `update`: exists in both but differs by repo alias, repo key, or branch.
 - Renders a human-readable plan summary and exits without changes.
+  - `remove` actions include a risk summary by inspecting each repo in the workspace:
+    - Prints `risk:` only when non-clean (e.g., `dirty`, `unpushed`, `diverged`, `unknown`).
+    - `sync:` (ahead/behind) if applicable.
+    - `changes: clean` if no working tree changes.
+    - For dirty repos, `changes:` counts and `files:` with the modified/untracked/conflicted file list.
 - `--no-prompt` is accepted but has no effect (kept for CLI consistency).
 
 ## Success Criteria

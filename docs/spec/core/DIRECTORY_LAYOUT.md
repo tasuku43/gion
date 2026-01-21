@@ -33,7 +33,7 @@ Each workspace is a directory under `workspaces/` and contains one or more repo 
 GWST_ROOT/workspaces/<WORKSPACE_ID>/
   <alias1>/
   <alias2>/
-  .gwst/metadata.json   # workspace metadata (mode, description, source_url, preset)
+  .gwst/metadata.json   # workspace metadata (optional: mode, description, source_url, preset_name)
 ```
 
 `gwst open` runs a subshell with `GWST_WORKSPACE=<WORKSPACE_ID>` set for the child process.

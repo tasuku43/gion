@@ -43,3 +43,22 @@ func TestParseStatusPorcelainV2Counts(t *testing.T) {
 		t.Fatalf("behind = %d, want 1", behind)
 	}
 }
+
+func TestParseChangedFilesPorcelainV2(t *testing.T) {
+	out := "# branch.oid 94a67ef\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +2 -1\n1 .M N... 100644 100644 100644 abcdef0 abcdef0 file.txt\n? new.txt\nu UU N... 100644 100644 100644 abcdef0 abcdef0 abcdef0 conflict.txt\n2 R. N... 100644 100644 100644 abcdef0 abcdef0 R100 old.txt new.txt\n"
+	got := parseChangedFilesPorcelainV2(out)
+	want := []string{
+		" M file.txt",
+		"?? new.txt",
+		"UU conflict.txt",
+		"R  old.txt -> new.txt",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("len(files) = %d, want %d: %#v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("files[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}

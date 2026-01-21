@@ -91,15 +91,9 @@ func Build(ctx context.Context, rootDir string) (manifest.File, []error, error) 
 			return repoEntries[i].Alias < repoEntries[j].Alias
 		})
 
-		mode := strings.TrimSpace(meta.Mode)
-		if mode == "" {
-			mode = workspace.MetadataModeRepo
-			warnings = append(warnings, fmt.Errorf("workspace %s metadata missing mode; defaulting to %s", wsID, mode))
-		}
-
 		wsEntry := manifest.Workspace{
 			Description: strings.TrimSpace(meta.Description),
-			Mode:        mode,
+			Mode:        strings.TrimSpace(meta.Mode),
 			PresetName:  strings.TrimSpace(meta.PresetName),
 			SourceURL:   strings.TrimSpace(meta.SourceURL),
 			Repos:       repoEntries,

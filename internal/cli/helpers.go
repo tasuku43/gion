@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tasuku43/gwst/internal/app/manifestplan"
 	"github.com/tasuku43/gwst/internal/domain/repo"
 	"github.com/tasuku43/gwst/internal/domain/workspace"
 	"github.com/tasuku43/gwst/internal/infra/output"
@@ -209,4 +210,14 @@ func splitNonEmptyLines(text string) []string {
 		out = append(out, line)
 	}
 	return out
+}
+
+func planWorkspaceDescription(plan manifestplan.Result, workspaceID string) string {
+	if ws, ok := plan.Actual.Workspaces[workspaceID]; ok {
+		return ws.Description
+	}
+	if ws, ok := plan.Desired.Workspaces[workspaceID]; ok {
+		return ws.Description
+	}
+	return ""
 }

@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/mattn/go-isatty"
 	"github.com/tasuku43/gwst/internal/app/apply"
 	"github.com/tasuku43/gwst/internal/app/manifestplan"
-	"github.com/tasuku43/gwst/internal/domain/workspace"
 	"github.com/tasuku43/gwst/internal/infra/output"
 	"github.com/tasuku43/gwst/internal/ui"
 )
@@ -44,12 +42,12 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 		renderer.Blank()
 	}
 
-	renderer.Section("Diff")
+	renderer.Section("Plan")
 	if len(plan.Changes) == 0 {
 		renderer.Bullet("no changes")
 		return nil
 	}
-	renderPlanChanges(renderer, plan.Changes)
+	renderPlanChanges(ctx, rootDir, renderer, plan)
 
 	destructive := planHasDestructiveChanges(plan)
 	if destructive && noPrompt {
@@ -63,16 +61,7 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 		}
 		var confirm bool
 		var err error
-		if destructive {
-			lines := buildApplyDestructiveConfirmLines(ctx, rootDir, plan, useColor, theme)
-			if len(lines) > 0 {
-				confirm, err = ui.PromptConfirmInlineWithRaw(label, lines, theme, useColor)
-			} else {
-				confirm, err = ui.PromptConfirmInline(label, theme, useColor)
-			}
-		} else {
-			confirm, err = ui.PromptConfirmInline(label, theme, useColor)
-		}
+		confirm, err = ui.PromptConfirmInlinePlan(label, theme, useColor)
 		if err != nil {
 			return err
 		}
@@ -82,7 +71,7 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	}
 
 	renderer.Blank()
-	renderer.Section("Steps")
+	renderer.Section("Apply")
 	if err := apply.Apply(ctx, rootDir, plan, apply.Options{
 		AllowDirty:       destructive,
 		AllowStatusError: destructive,
@@ -97,8 +86,24 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 
 	renderer.Blank()
 	renderer.Section("Result")
-	renderer.Bullet("applied")
+	adds, updates, removes := countWorkspaceChangeKinds(plan)
+	renderer.BulletSuccess(fmt.Sprintf("applied: add=%d update=%d remove=%d", adds, updates, removes))
+	renderer.Bullet("gwst.yaml rewritten")
 	return nil
+}
+
+func countWorkspaceChangeKinds(plan manifestplan.Result) (adds, updates, removes int) {
+	for _, change := range plan.Changes {
+		switch change.Kind {
+		case manifestplan.WorkspaceAdd:
+			adds++
+		case manifestplan.WorkspaceUpdate:
+			updates++
+		case manifestplan.WorkspaceRemove:
+			removes++
+		}
+	}
+	return adds, updates, removes
 }
 
 func planHasDestructiveChanges(plan manifestplan.Result) bool {
@@ -118,83 +123,30 @@ func planHasDestructiveChanges(plan manifestplan.Result) bool {
 func hasDestructiveRepoChange(changes []manifestplan.RepoChange) bool {
 	for _, change := range changes {
 		switch change.Kind {
-		case manifestplan.RepoRemove, manifestplan.RepoUpdate:
+		case manifestplan.RepoRemove:
+			return true
+		case manifestplan.RepoUpdate:
+			if isInPlaceBranchRename(change) {
+				continue
+			}
 			return true
 		}
 	}
 	return false
 }
 
-func buildApplyDestructiveConfirmLines(ctx context.Context, rootDir string, plan manifestplan.Result, useColor bool, theme ui.Theme) []string {
-	if len(plan.Changes) == 0 {
-		return nil
+func isInPlaceBranchRename(change manifestplan.RepoChange) bool {
+	if change.Kind != manifestplan.RepoUpdate {
+		return false
 	}
-
-	type cachedStatus struct {
-		status workspace.StatusResult
-		state  workspace.WorkspaceState
+	if strings.TrimSpace(change.FromRepo) == "" || strings.TrimSpace(change.ToRepo) == "" {
+		return false
 	}
-	statusCache := make(map[string]cachedStatus)
-	getStatus := func(workspaceID string) cachedStatus {
-		if cached, ok := statusCache[workspaceID]; ok {
-			return cached
-		}
-		status, state := loadWorkspaceStatusForRemoval(ctx, rootDir, workspaceID)
-		cached := cachedStatus{status: status, state: state}
-		statusCache[workspaceID] = cached
-		return cached
+	if strings.TrimSpace(change.FromBranch) == "" || strings.TrimSpace(change.ToBranch) == "" {
+		return false
 	}
-
-	var choices []ui.WorkspaceChoice
-	for _, change := range plan.Changes {
-		switch change.Kind {
-		case manifestplan.WorkspaceRemove:
-			cached := getStatus(change.WorkspaceID)
-			choice := buildApplyWorkspaceChoice(ctx, change.WorkspaceID, planWorkspaceDescription(plan, change.WorkspaceID), cached.status)
-			choice.Warning, choice.WarningStrong = workspaceRemoveWarningLabel(cached.state)
-			choices = append(choices, choice)
-		case manifestplan.WorkspaceUpdate:
-			if !hasDestructiveRepoChange(change.Repos) {
-				continue
-			}
-			cached := getStatus(change.WorkspaceID)
-			choice := buildApplyWorkspaceChoice(ctx, change.WorkspaceID, planWorkspaceDescription(plan, change.WorkspaceID), cached.status)
-			choice.Warning, choice.WarningStrong = workspaceRemoveWarningLabel(cached.state)
-			choices = append(choices, choice)
-		}
+	if strings.TrimSpace(change.FromRepo) != strings.TrimSpace(change.ToRepo) {
+		return false
 	}
-	if len(choices) == 0 {
-		return nil
-	}
-	return ui.WorkspaceChoiceConfirmLines(choices, useColor, theme)
-}
-
-func planWorkspaceDescription(plan manifestplan.Result, workspaceID string) string {
-	if ws, ok := plan.Actual.Workspaces[workspaceID]; ok {
-		return ws.Description
-	}
-	if ws, ok := plan.Desired.Workspaces[workspaceID]; ok {
-		return ws.Description
-	}
-	return ""
-}
-
-func buildApplyWorkspaceChoice(ctx context.Context, workspaceID, description string, status workspace.StatusResult) ui.WorkspaceChoice {
-	choice := ui.WorkspaceChoice{
-		ID:          workspaceID,
-		Description: description,
-	}
-	for _, repoEntry := range status.Repos {
-		name := strings.TrimSpace(repoEntry.Alias)
-		if name == "" {
-			name = filepath.Base(repoEntry.WorktreePath)
-		}
-		label := formatRepoLabel(name, repoEntry.Branch)
-		choice.Repos = append(choice.Repos, ui.PromptChoice{
-			Label:   label,
-			Value:   name,
-			Details: buildRepoStatusDetails(ctx, repoEntry),
-		})
-	}
-	return choice
+	return strings.TrimSpace(change.FromBranch) != strings.TrimSpace(change.ToBranch)
 }

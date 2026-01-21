@@ -1,6 +1,6 @@
 ---
 title: "gwst apply"
-status: planned
+status: implemented
 ---
 
 ## Synopsis
@@ -20,8 +20,16 @@ Reconcile the filesystem to match `gwst.yaml` by computing a diff, showing a pla
 - By default, prompts for confirmation if any changes exist.
   - `remove` actions are marked as destructive.
   - If only non-destructive adds are present, prompt can be skipped with `--no-prompt`.
+  - For destructive actions, the prompt does not repeat per-repo git status output; users should review the plan output above before confirming.
 - If confirmed, applies actions in a stable order: removes, then updates, then adds.
+  - When a repo update is a branch rename only (same repo key, different branch), gwst renames the branch in-place (no worktree remove/add) to match common local development workflows.
 - Updates `gwst.yaml` by rewriting the full file after successful apply.
+
+## Output (IA)
+- `Plan` section: plan summary (same as `gwst plan`).
+  - When interactive, the final confirmation prompt is rendered at the end of `Plan` (with a blank line before it).
+- `Apply` section: execution steps, with partial git command logs nested under each step.
+- `Result` section: completion summary (e.g. applied counts) and manifest rewrite note.
 
 ## Flags
 - `--no-prompt`: skip confirmation (errors if any removals are present).

@@ -41,6 +41,10 @@ func (r *Renderer) Section(title string) {
 		debuglog.SetPhase("inputs")
 	case "info":
 		debuglog.SetPhase("info")
+	case "plan":
+		debuglog.SetPhase("plan")
+	case "apply":
+		debuglog.SetPhase("steps")
 	case "steps":
 		debuglog.SetPhase("steps")
 	case "result":
@@ -208,6 +212,26 @@ func (r *Renderer) style(text string, style lipgloss.Style) string {
 		return text
 	}
 	return style.Render(text)
+}
+
+func (r *Renderer) MutedText(text string) string {
+	return r.style(text, r.theme.Muted)
+}
+
+func (r *Renderer) AccentText(text string) string {
+	return r.style(text, r.theme.Accent)
+}
+
+func (r *Renderer) SuccessText(text string) string {
+	return r.style(text, r.theme.Success)
+}
+
+func (r *Renderer) WarnText(text string) string {
+	return r.style(text, r.theme.Warn)
+}
+
+func (r *Renderer) ErrorText(text string) string {
+	return r.style(text, r.theme.Error)
 }
 
 func (r *Renderer) bullet(text string) {

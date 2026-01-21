@@ -5,6 +5,29 @@
 - Language: Go
 - Goal: Manage workspaces (task-based directories) backed by bare repo stores + git worktrees.
 
+## IaC-first direction (Plan / Apply / Import)
+- これからのgwstは **IaC的な「宣言 → 差分 → 反映」** を中心に設計を寄せていく。
+- `gwst.yaml` がワークスペースの **desired state（在庫台帳 / inventory）**:
+  - Location: `<GWST_ROOT>/gwst.yaml`
+  - Normal commands（create/add/rm...）: filesystemが真実で、成功後に`gwst.yaml`を更新して追従
+  - `gwst apply`: `gwst.yaml`が真実で、差分を計算してfilesystemへ反映
+  - `gwst import`: filesystem（+ `.gwst/metadata.json`）が真実で、`gwst.yaml`を再構築
+- コマンドの役割:
+  - `gwst plan`: **read-only**（副作用なし）。`gwst.yaml` vs filesystem の diff を表示して終わる
+  - `gwst apply`: **reconcile**。出力は `Plan`→(confirm y/n)→`Apply`→`Result`
+    - confirm promptは `Plan` セクション末尾で表示（プロンプト前に空行）
+    - `Apply` は Steps + 部分的な git コマンドログ（ツリー表示）
+    - `Result` は完了サマリ（applied counts / manifest rewrite等）
+  - `gwst import`: **rebuild inventory**。現状のfilesystemから`gwst.yaml`を復元/正規化する導線
+- 非交渉の原則:
+  - idempotent（同じapplyを繰り返しても変化しない）
+  - destructive changesは明示的確認が必要（`--no-prompt`で破壊的変更は不可）
+  - drift検知（plan）と復元（apply/import）を第一級に扱う
+- Specs (source of truth):
+  - `docs/spec/core/GWST.md`
+  - `docs/spec/commands/plan.md`, `docs/spec/commands/apply.md`, `docs/spec/commands/import.md`
+  - `docs/spec/ui/UI.md`
+
 ## Non-negotiables (safety)
 - Do NOT run destructive commands (e.g., `rm -rf`, `sudo`, `chmod -R`, `dd`, disk operations).
 - Do NOT modify files outside the repository root.

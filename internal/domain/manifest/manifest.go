@@ -20,7 +20,7 @@ type File struct {
 
 type Workspace struct {
 	Description string `yaml:"description,omitempty"`
-	Mode        string `yaml:"mode"`
+	Mode        string `yaml:"mode,omitempty"`
 	PresetName  string `yaml:"preset_name,omitempty"`
 	SourceURL   string `yaml:"source_url,omitempty"`
 	Repos       []Repo `yaml:"repos"`
