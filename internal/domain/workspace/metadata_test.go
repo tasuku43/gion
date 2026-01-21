@@ -25,6 +25,9 @@ func TestListIncludesDescription(t *testing.T) {
 	if err := os.MkdirAll(ws2, 0o755); err != nil {
 		t.Fatalf("create WS-2 dir: %v", err)
 	}
+	if err := SaveMetadata(ws2, Metadata{Description: "desc only"}); err != nil {
+		t.Fatalf("save metadata (desc only): %v", err)
+	}
 
 	ws3 := filepath.Join(wsRoot, "WS-3")
 	if err := os.MkdirAll(ws3, 0o755); err != nil {
@@ -59,7 +62,7 @@ func TestListIncludesDescription(t *testing.T) {
 	if ws1Desc != "test description" {
 		t.Fatalf("WS-1 description = %q, want %q", ws1Desc, "test description")
 	}
-	if ws2Desc != "" {
-		t.Fatalf("WS-2 description = %q, want empty", ws2Desc)
+	if ws2Desc != "desc only" {
+		t.Fatalf("WS-2 description = %q, want %q", ws2Desc, "desc only")
 	}
 }

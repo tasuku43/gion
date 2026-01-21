@@ -31,12 +31,12 @@ Each workspace stores minimal metadata under its `.gwst` directory so informatio
 ## Fields
 
 - `description` (optional): workspace description.
-- `mode` (required): one of `preset`, `repo`, `review`, `issue`, `resume`, `add`.
+- `mode` (optional): one of `preset`, `repo`, `review`, `issue`, `resume`, `add`.
 - `preset_name` (optional): set only when `mode=preset`.
 - `source_url` (optional): set when created from a URL (issue/review) or other modes with known origin.
 
 ## Validation rules
 
-- `mode` must be one of the supported values.
+- If `mode` is present, it must be one of the supported values.
 - `preset_name` is required when `mode=preset`.
 - `source_url` must be a valid URL when present.

@@ -95,13 +95,12 @@ func normalizeMetadata(meta Metadata) Metadata {
 }
 
 func validateMetadata(meta Metadata) error {
-	if meta.Mode == "" {
-		return fmt.Errorf("metadata mode is required")
-	}
-	switch meta.Mode {
-	case MetadataModePreset, MetadataModeRepo, MetadataModeReview, MetadataModeIssue, MetadataModeResume, MetadataModeAdd:
-	default:
-		return fmt.Errorf("unsupported metadata mode: %s", meta.Mode)
+	if meta.Mode != "" {
+		switch meta.Mode {
+		case MetadataModePreset, MetadataModeRepo, MetadataModeReview, MetadataModeIssue, MetadataModeResume, MetadataModeAdd:
+		default:
+			return fmt.Errorf("unsupported metadata mode: %s", meta.Mode)
+		}
 	}
 	if meta.Mode == MetadataModePreset && meta.PresetName == "" {
 		return fmt.Errorf("metadata preset_name is required for preset mode")
