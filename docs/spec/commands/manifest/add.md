@@ -70,7 +70,7 @@ Notes:
 2. Collect inputs (repo/preset selection, URLs, workspace id, description, branches, base).
 3. Validate inputs:
    - Mode must be uniquely determined.
-   - `WORKSPACE_ID` must be a valid git branch name.
+   - `WORKSPACE_ID` must be a valid workspace ID (safe directory name). It does not have to be a valid git branch name.
    - `--base` must be `origin/<branch>` when provided.
    - Branch names must be valid git branch names.
 4. Collision checks:
