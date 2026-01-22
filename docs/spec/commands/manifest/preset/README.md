@@ -1,6 +1,6 @@
 ---
 title: "gwst manifest preset"
-status: planned
+status: implemented
 aliases:
   - "gwst manifest pre"
   - "gwst manifest p"

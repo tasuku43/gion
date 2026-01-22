@@ -83,7 +83,7 @@ func Run() error {
 	case "repo":
 		return runRepo(ctx, rootDir, args[1:])
 	case "preset":
-		return runPreset(ctx, rootDir, args[1:], noPrompt)
+		return runPresetRemoved(args[1:])
 	case "manifest", "man", "m":
 		return runManifest(ctx, rootDir, args[1:], noPrompt)
 	case "create":
@@ -91,7 +91,7 @@ func Run() error {
 	case "add":
 		return runWorkspaceAdd(ctx, rootDir, args[1:])
 	case "ls":
-		return runWorkspaceList(ctx, rootDir, args[1:])
+		return runLsRemoved(args[1:])
 	case "status":
 		return runWorkspaceStatus(ctx, rootDir, args[1:])
 	case "rm":

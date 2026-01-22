@@ -1,11 +1,9 @@
 ---
 title: "gwst manifest preset ls"
-status: planned
+status: implemented
 aliases:
   - "gwst manifest pre ls"
   - "gwst manifest p ls"
-pending:
-  - output-and-ordering
 ---
 
 ## Synopsis

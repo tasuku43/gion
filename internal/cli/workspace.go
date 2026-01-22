@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -93,35 +91,6 @@ func runWorkspaceAdd(ctx context.Context, rootDir string, args []string) error {
 	renderSuggestions(renderer, useColor, []string{
 		fmt.Sprintf("gwst open %s", workspaceID),
 	})
-	return nil
-}
-
-func runWorkspaceList(ctx context.Context, rootDir string, args []string) error {
-	lsFlags := flag.NewFlagSet("ls", flag.ContinueOnError)
-	lsFlags.SetOutput(os.Stdout)
-	var showDetails bool
-	var helpFlag bool
-	lsFlags.BoolVar(&showDetails, "details", false, "show git status details")
-	lsFlags.BoolVar(&helpFlag, "help", false, "show help")
-	lsFlags.BoolVar(&helpFlag, "h", false, "show help")
-	if err := lsFlags.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return nil
-		}
-		return err
-	}
-	if helpFlag {
-		printLsHelp(os.Stdout)
-		return nil
-	}
-	if lsFlags.NArg() != 0 {
-		return fmt.Errorf("usage: gwst ls [--details]")
-	}
-	entries, warnings, err := workspace.List(rootDir)
-	if err != nil {
-		return err
-	}
-	writeWorkspaceListText(ctx, rootDir, entries, warnings, showDetails)
 	return nil
 }
 

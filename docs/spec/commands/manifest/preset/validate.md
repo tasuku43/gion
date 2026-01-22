@@ -1,11 +1,9 @@
 ---
 title: "gwst manifest preset validate"
-status: planned
+status: implemented
 aliases:
   - "gwst manifest pre validate"
   - "gwst manifest p validate"
-pending:
-  - validation-rules-and-output
 ---
 
 ## Synopsis

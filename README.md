@@ -185,7 +185,7 @@ Or run `gwst create` with no args to pick a mode and fill inputs interactively.
 List workspaces:
 
 ```bash
-gwst ls
+gwst manifest ls
 ```
 
 Open a workspace (prompts if omitted):

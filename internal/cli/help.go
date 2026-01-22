@@ -28,13 +28,11 @@ func printGlobalHelp(w io.Writer) {
 	fmt.Fprintln(w, helpCommand(theme, useColor, "create [mode flags] [args]", "create workspace (preset/review/issue/repo)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "open [<WORKSPACE_ID>] [--shell]", "open workspace in subshell"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "add [<WORKSPACE_ID>] [<repo>]", "add repo worktree to workspace"))
-	fmt.Fprintln(w, helpCommand(theme, useColor, "ls [--details]", "list workspaces (with repos/status details)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "status [<WORKSPACE_ID>]", "check dirty/untracked status"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "rm [<WORKSPACE_ID>]", "remove workspace (confirms on warnings)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "path --workspace", "print selected workspace path"))
-	fmt.Fprintln(w, helpCommand(theme, useColor, "manifest <subcommand>", "gwst.yaml inventory commands (ls)"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "manifest <subcommand>", "gwst.yaml inventory commands (aliases: man, m)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "repo <subcommand>", "repo commands (get/ls)"))
-	fmt.Fprintln(w, helpCommand(theme, useColor, "preset <subcommand>", "preset commands (ls/add/rm/validate)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "doctor [--fix | --self]", "check workspace/repo health"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "plan", "show gwst.yaml diff (no changes)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "import", "rebuild gwst.yaml from filesystem"))
@@ -70,7 +68,7 @@ func printCommandHelp(cmd string, w io.Writer) bool {
 		printRepoHelp(w)
 	case "preset":
 		printPresetHelp(w)
-	case "manifest":
+	case "manifest", "man", "m":
 		printManifestHelp(w)
 	case "doctor":
 		printDoctorHelp(w)
@@ -108,8 +106,11 @@ func printAddHelp(w io.Writer) {
 
 func printLsHelp(w io.Writer) {
 	theme, useColor := helpTheme(w)
-	fmt.Fprintln(w, "Usage: gwst ls [--details]")
-	fmt.Fprintln(w, helpFlag(theme, useColor, "--details", "show git status details"))
+	fmt.Fprintln(w, "gwst ls is removed.")
+	fmt.Fprintln(w, "Use: gwst manifest ls")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Legacy usage (no longer supported): gwst ls [--details]")
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--details", "show git status details (removed)"))
 }
 
 func printStatusHelp(w io.Writer) {
@@ -153,22 +154,19 @@ func printRepoLsHelp(w io.Writer) {
 }
 
 func printPresetHelp(w io.Writer) {
-	theme, useColor := helpTheme(w)
-	fmt.Fprintln(w, "Usage: gwst preset <subcommand>")
-	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Subcommands:"))
-	fmt.Fprintln(w, helpCommand(theme, useColor, "ls", "list presets"))
-	fmt.Fprintln(w, helpCommand(theme, useColor, "add [<name>]", "add a preset"))
-	fmt.Fprintln(w, helpCommand(theme, useColor, "rm [<name>]", "remove presets"))
-	fmt.Fprintln(w, helpCommand(theme, useColor, "validate", "validate gwst.yaml"))
+	fmt.Fprintln(w, "gwst preset is removed.")
+	fmt.Fprintln(w, "Use: gwst manifest preset")
 }
 
 func printManifestHelp(w io.Writer) {
 	theme, useColor := helpTheme(w)
 	fmt.Fprintln(w, "Usage: gwst manifest <subcommand>")
 	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Aliases: gwst man, gwst m")
+	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Subcommands:"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "ls", "list workspace inventory with drift tags"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "preset <subcommand>", "preset inventory commands (aliases: pre, p)"))
 }
 
 func printManifestLsHelp(w io.Writer) {
@@ -184,6 +182,44 @@ func printManifestLsHelp(w io.Writer) {
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Tips:"))
 	fmt.Fprintln(w, helpFlag(theme, useColor, "gwst plan", "show the full diff details for drift/missing/extra"))
+}
+
+func printManifestPresetHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gwst manifest preset <subcommand>")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Aliases: gwst manifest pre, gwst manifest p")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Subcommands:"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "ls", "list manifest presets"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "add [<name>]", "add a preset entry to gwst.yaml"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "rm [<name> ...]", "remove preset entries from gwst.yaml"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "validate", "validate presets in gwst.yaml"))
+}
+
+func printManifestPresetLsHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gwst manifest preset ls [--no-prompt]")
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-prompt", "accepted for compatibility (no effect)"))
+}
+
+func printManifestPresetAddHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gwst manifest preset add [<name>] [--repo <repo> ...] [--no-prompt]")
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--repo <repo>", "repo spec (repeatable)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-prompt", "disable interactive prompt"))
+}
+
+func printManifestPresetRmHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gwst manifest preset rm [<name> ...] [--no-prompt]")
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-prompt", "disable interactive prompt"))
+}
+
+func printManifestPresetValidateHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gwst manifest preset validate [--no-prompt]")
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-prompt", "accepted for compatibility (no effect)"))
 }
 
 func printPresetLsHelp(w io.Writer) {

@@ -1,11 +1,9 @@
 ---
 title: "gwst manifest preset rm"
-status: planned
+status: implemented
 aliases:
   - "gwst manifest pre rm"
   - "gwst manifest p rm"
-pending:
-  - interactive-selection-and-output
 ---
 
 ## Synopsis

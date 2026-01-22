@@ -14,7 +14,7 @@ import (
 	"github.com/tasuku43/gwst/internal/ui"
 )
 
-func runManifest(ctx context.Context, rootDir string, args []string, _ bool) error {
+func runManifest(ctx context.Context, rootDir string, args []string, noPrompt bool) error {
 	if len(args) == 0 || isHelpArg(args[0]) {
 		printManifestHelp(os.Stdout)
 		return nil
@@ -22,6 +22,8 @@ func runManifest(ctx context.Context, rootDir string, args []string, _ bool) err
 	switch args[0] {
 	case "ls":
 		return runManifestLs(ctx, rootDir, args[1:])
+	case "preset", "pre", "p":
+		return runManifestPreset(ctx, rootDir, args[1:], noPrompt)
 	default:
 		return fmt.Errorf("unknown manifest subcommand: %s", args[0])
 	}

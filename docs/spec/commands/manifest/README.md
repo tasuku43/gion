@@ -3,7 +3,6 @@ title: "gwst manifest"
 status: planned
 pending:
   - workspace-inventory-subcommands
-  - preset-inventory-subcommands
 aliases:
   - man
   - m

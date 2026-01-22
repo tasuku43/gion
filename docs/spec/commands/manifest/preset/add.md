@@ -1,11 +1,9 @@
 ---
 title: "gwst manifest preset add"
-status: planned
+status: implemented
 aliases:
   - "gwst manifest pre add"
   - "gwst manifest p add"
-pending:
-  - interactive-selection-and-output
 ---
 
 ## Synopsis
