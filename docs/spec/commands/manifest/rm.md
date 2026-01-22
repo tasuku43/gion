@@ -24,6 +24,8 @@ Remove workspace entries from the inventory (`gwst.yaml`) using an interactive U
 - By default, runs `gwst apply` to reconcile the filesystem with the updated manifest.
   - Destructive behavior is enforced by `gwst apply` (and `--no-prompt` must error if removals exist).
 - With `--no-apply`, stops after rewriting `gwst.yaml` and prints a suggestion to run `gwst apply` next.
+- When `--no-prompt` is set:
+  - If no `<WORKSPACE_ID>` args are provided, error (cannot enter interactive selection).
 
 ## Detailed flow (conceptual)
 1. Determine targets (args vs interactive selection).
@@ -53,6 +55,7 @@ This command should preserve the spirit of the legacy `gwst rm` UX:
 - Keep the selection UI lightweight: show only a short aggregated status tag next to each workspace when non-clean (e.g. `[dirty]`, `[unpushed]`, `[diverged]`, `[unknown]`); omit the tag for clean.
   - Repo-level details are optional; plan output follows and is the primary place for deep review.
 - Detailed risk output should primarily come from the `gwst apply` plan output (same format as `gwst plan`), so users can review before confirming destructive removals.
+- Status aggregation priority (if multiple conditions apply): `unknown` > `dirty` > `diverged` > `unpushed` (clean is omitted).
 
 Example (interactive selection, conceptual):
 ```
@@ -66,7 +69,7 @@ Inputs
 - When apply is run and confirmed, filesystem no longer contains removed workspaces.
 
 ## Failure Modes
-- Workspace selection empty/canceled (interactive).
+- Workspace selection empty/canceled (interactive): exit 0 (no changes).
 - Any selected workspace ID is missing from `gwst.yaml` (no changes are made).
 - Manifest write failure.
 - `gwst apply` failure (git/filesystem).

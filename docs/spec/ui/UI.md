@@ -113,6 +113,8 @@ Rules:
 - `<status>` is a short aggregated label based on workspace scan:
   - `dirty`, `unpushed`, `diverged`, `unknown`
   - `clean` should be treated as the default and omitted (no status tag).
+- If multiple conditions apply, the status tag should be the highest priority item:
+  - `unknown` > `dirty` > `diverged` > `unpushed` (clean is omitted).
 
 Color guidance (TTY):
 - `<WORKSPACE_ID>`: default text color.
