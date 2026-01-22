@@ -24,7 +24,11 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	if len(args) != 0 {
 		return fmt.Errorf("usage: gwst apply")
 	}
-	_, err := runApplyInternal(ctx, rootDir, nil, noPrompt)
+	plan, err := manifestplan.Plan(ctx, rootDir)
+	if err != nil {
+		return err
+	}
+	_, err = runApplyInternalWithPlan(ctx, rootDir, nil, noPrompt, plan)
 	return err
 }
 
@@ -94,11 +98,7 @@ type applyInternalResult struct {
 	Canceled   bool
 }
 
-func runApplyInternal(ctx context.Context, rootDir string, renderer *ui.Renderer, noPrompt bool) (applyInternalResult, error) {
-	plan, err := manifestplan.Plan(ctx, rootDir)
-	if err != nil {
-		return applyInternalResult{}, err
-	}
+func runApplyInternalWithPlan(ctx context.Context, rootDir string, renderer *ui.Renderer, noPrompt bool, plan manifestplan.Result) (applyInternalResult, error) {
 
 	theme := ui.DefaultTheme()
 	useColor := isatty.IsTerminal(os.Stdout.Fd())

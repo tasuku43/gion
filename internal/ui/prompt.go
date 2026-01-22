@@ -1340,7 +1340,7 @@ func (m presetRepoSelectModel) View() string {
 	}
 
 	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
-	frame.AppendInfoRaw(
+	frame.AppendInputsRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
 	)
 	return frame.Render()
@@ -1653,7 +1653,7 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	}
 
 	infoPrefix := mutedToken(model.theme, model.useColor, output.StepPrefix)
-	frame.AppendInfoRaw(
+	frame.AppendInputsRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
 	)
 	return frame.Render()
@@ -1706,11 +1706,11 @@ func renderIssueBranchEditFrame(model issueBranchSelectModel, headerLines ...str
 		if model.useColor {
 			msg = model.theme.Error.Render(msg)
 		}
-		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), msg))
+		frame.AppendInputsRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), msg))
 	}
 
 	infoPrefix := mutedToken(model.theme, model.useColor, output.StepPrefix)
-	frame.AppendInfoRaw(
+	frame.AppendInputsRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D", output.Indent, infoPrefix),
 	)
 	return frame.Render()
@@ -2309,27 +2309,18 @@ func (m workspaceSelectModel) filterWorkspaces() []WorkspaceChoice {
 	return out
 }
 
-type multiSelectStage int
-
-const (
-	multiSelectStageSelect multiSelectStage = iota
-	multiSelectStageConfirm
-)
-
 type workspaceMultiSelectModel struct {
-	title            string
-	workspaces       []WorkspaceChoice
-	blocked          []BlockedChoice
-	filtered         []WorkspaceChoice
-	selected         []WorkspaceChoice
-	selectedIDs      []string
-	cursor           int
-	err              error
-	errorLine        string
-	canceled         bool
-	stage            multiSelectStage
-	confirmModel     confirmInlineModel
-	confirmInputsRaw []string
+	title       string
+	workspaces  []WorkspaceChoice
+	blocked     []BlockedChoice
+	filtered    []WorkspaceChoice
+	selected    []WorkspaceChoice
+	selectedIDs []string
+	cursor      int
+	err         error
+	errorLine   string
+	canceled    bool
+	finalizing  bool
 
 	theme    Theme
 	useColor bool
@@ -2367,23 +2358,6 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = size.Height
 		return m, nil
 	}
-	if m.stage == multiSelectStageConfirm {
-		model, _ := m.confirmModel.Update(msg)
-		m.confirmModel = model.(confirmInlineModel)
-		if m.confirmModel.err != nil {
-			if errors.Is(m.confirmModel.err, ErrPromptCanceled) {
-				m.canceled = true
-			}
-			return m, tea.Quit
-		}
-		if m.confirmModel.done {
-			if !m.confirmModel.value {
-				m.canceled = true
-			}
-			return m, tea.Quit
-		}
-		return m, nil
-	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -2395,7 +2369,8 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errorLine = "select at least one workspace"
 				return m, nil
 			}
-			return m.startConfirmIfNeeded()
+			m.finalizing = true
+			return m, tea.Quit
 		case tea.KeyUp:
 			if m.cursor > 0 {
 				m.cursor--
@@ -2413,7 +2388,8 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.errorLine = "select at least one workspace"
 					return m, nil
 				}
-				return m.startConfirmIfNeeded()
+				m.finalizing = true
+				return m, tea.Quit
 			}
 			if len(m.filtered) == 0 {
 				return m, nil
@@ -2442,16 +2418,23 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m workspaceMultiSelectModel) View() string {
-	if m.stage == multiSelectStageConfirm {
+	if m.finalizing {
 		frame := NewFrame(m.theme, m.useColor)
-		label := promptLabel(m.theme, m.useColor, m.confirmModel.label)
-		line := fmt.Sprintf("%s (y/n): %s", label, m.confirmModel.input.View())
-		frame.SetInputsPrompt(line)
-		if len(m.confirmInputsRaw) > 0 {
-			frame.AppendInputsRaw(m.confirmInputsRaw...)
+		frame.NoBlankAfterInfo = true
+		label := promptLabel(m.theme, m.useColor, "workspace")
+		frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+		selectedLines := collectLines(func(b *strings.Builder) {
+			renderSelectedWorkspaceTree(b, m.selected, m.useColor, m.theme)
+		})
+		if m.useColor {
+			frame.SetInfo(m.theme.Accent.Render("selected"))
+		} else {
+			frame.SetInfo("selected")
 		}
+		frame.AppendInfoRaw(selectedLines...)
 		return frame.Render()
 	}
+
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
 	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
@@ -2491,67 +2474,13 @@ func (m workspaceMultiSelectModel) View() string {
 	}
 
 	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
-	frame.AppendInfoRaw(
-		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
-	)
+	frame.AppendInputsRaw(fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix))
 
-	if len(m.blocked) > 0 {
+	if len(blockedLines) > 0 {
 		frame.AppendInfo("blocked workspaces")
 		frame.AppendInfoRaw(blockedLines...)
 	}
 	return frame.Render()
-}
-
-func (m workspaceMultiSelectModel) startConfirmIfNeeded() (workspaceMultiSelectModel, tea.Cmd) {
-	label, needConfirm := confirmLabelForSelection(m.selected)
-	if !needConfirm {
-		return m, tea.Quit
-	}
-	m.confirmModel = newConfirmInlineModel(label, m.theme, m.useColor, false, nil, nil)
-	m.confirmInputsRaw = WorkspaceChoiceConfirmLines(m.selected, m.useColor, m.theme)
-	m.stage = multiSelectStageConfirm
-	return m, nil
-}
-
-func confirmLabelForSelection(selected []WorkspaceChoice) (string, bool) {
-	if len(selected) == 0 {
-		return "", false
-	}
-	if len(selected) == 1 {
-		warn := strings.TrimSpace(selected[0].Warning)
-		if warn == "" {
-			return "", false
-		}
-		switch strings.ToLower(warn) {
-		case "dirty changes":
-			return "This workspace has uncommitted changes. Remove anyway?", true
-		case "unpushed commits":
-			return "This workspace has unpushed commits. Remove anyway?", true
-		case "diverged or upstream missing":
-			return "This workspace has diverged from upstream. Remove anyway?", true
-		case "status unknown":
-			return "Workspace status could not be read. Remove anyway?", true
-		default:
-			return "This workspace has warnings. Remove anyway?", true
-		}
-	}
-	hasWarning := false
-	hasStrong := false
-	for _, item := range selected {
-		if strings.TrimSpace(item.Warning) != "" {
-			hasWarning = true
-		}
-		if item.WarningStrong {
-			hasStrong = true
-		}
-	}
-	if !hasWarning {
-		return fmt.Sprintf("Remove %d workspaces?", len(selected)), true
-	}
-	if hasStrong {
-		return fmt.Sprintf("Selected workspaces include uncommitted changes or status errors. Remove %d workspaces anyway?", len(selected)), true
-	}
-	return fmt.Sprintf("Selected workspaces have warnings. Remove %d workspaces anyway?", len(selected)), true
 }
 
 func (m workspaceMultiSelectModel) filterWorkspaces() []WorkspaceChoice {
@@ -3053,17 +2982,30 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 	start, end := listWindow(len(items), cursor, maxVisible)
 	for i := start; i < end; i++ {
 		item := items[i]
+		workspaceConnector := "├─"
+		isLastWorkspace := i == end-1
+		if isLastWorkspace {
+			workspaceConnector = "└─"
+		}
+		connectorToken := workspaceConnector
+		if useColor {
+			connectorToken = theme.Muted.Render(workspaceConnector)
+		}
+		workspaceStem := "│ "
+		if isLastWorkspace {
+			workspaceStem = "  "
+		}
+
 		displayID := item.ID
-		hasWarn := strings.TrimSpace(item.Warning) != ""
+		warnValue := shortWarningTag(item.Warning)
+		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
 		warnStyle := theme.SoftWarn
 		if item.WarningStrong {
 			warnStyle = theme.Warn
 		}
 		warnTag := ""
 		if hasWarn {
-			warnTag = "[" + shortWarningTag(item.Warning) + "]"
-		} else {
-			warnTag = "[clean]"
+			warnTag = "[" + warnValue + "]"
 		}
 		if useColor {
 			if hasWarn {
@@ -3096,21 +3038,40 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 				display += " - " + desc
 			}
 		}
-		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), display))
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, connectorToken, display))
 		if len(item.Repos) == 0 {
 			continue
 		}
 		for j, repo := range item.Repos {
-			connector := "├─"
-			if j == len(item.Repos)-1 {
-				connector = "└─"
+			repoConnector := "├─"
+			isLastRepo := j == len(item.Repos)-1
+			if isLastRepo {
+				repoConnector = "└─"
 			}
-			line := fmt.Sprintf("%s%s %s", output.Indent+output.Indent+output.Indent, connector, repo.Label)
+			line := fmt.Sprintf("%s%s%s %s", output.Indent+output.Indent, workspaceStem, repoConnector, repo.Label)
 			if useColor {
 				line = theme.Muted.Render(line)
 			}
 			b.WriteString(line)
 			b.WriteString("\n")
+			if len(repo.Details) == 0 {
+				continue
+			}
+			repoStem := "│  "
+			if isLastRepo {
+				repoStem = "   "
+			}
+			for _, detail := range repo.Details {
+				if strings.TrimSpace(detail) == "" {
+					continue
+				}
+				detailLine := fmt.Sprintf("%s%s%s%s", output.Indent+output.Indent, workspaceStem, repoStem, detail)
+				if useColor {
+					detailLine = theme.Muted.Render(detailLine)
+				}
+				b.WriteString(detailLine)
+				b.WriteString("\n")
+			}
 		}
 	}
 }
@@ -3124,18 +3085,31 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
 		return
 	}
-	for _, item := range items {
+	for i, item := range items {
+		workspaceConnector := "├─"
+		isLastWorkspace := i == len(items)-1
+		if isLastWorkspace {
+			workspaceConnector = "└─"
+		}
+		connectorToken := workspaceConnector
+		if useColor {
+			connectorToken = theme.Muted.Render(workspaceConnector)
+		}
+		workspaceStem := "│ "
+		if isLastWorkspace {
+			workspaceStem = "  "
+		}
+
 		displayID := item.ID
-		hasWarn := strings.TrimSpace(item.Warning) != ""
+		warnValue := shortWarningTag(item.Warning)
+		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
 		warnStyle := theme.SoftWarn
 		if item.WarningStrong {
 			warnStyle = theme.Warn
 		}
 		warnTag := ""
 		if hasWarn {
-			warnTag = "[" + shortWarningTag(item.Warning) + "]"
-		} else {
-			warnTag = "[clean]"
+			warnTag = "[" + warnValue + "]"
 		}
 		if useColor && hasWarn {
 			displayID = warnStyle.Render(displayID)
@@ -3160,13 +3134,14 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 				display += " - " + desc
 			}
 		}
-		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), display))
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, connectorToken, display))
 		for j, repo := range item.Repos {
-			connector := "├─"
-			if j == len(item.Repos)-1 {
-				connector = "└─"
+			repoConnector := "├─"
+			isLastRepo := j == len(item.Repos)-1
+			if isLastRepo {
+				repoConnector = "└─"
 			}
-			line := fmt.Sprintf("%s%s %s", output.Indent+output.Indent+output.Indent, connector, repo.Label)
+			line := fmt.Sprintf("%s%s%s %s", output.Indent+output.Indent, workspaceStem, repoConnector, repo.Label)
 			if useColor {
 				line = theme.Muted.Render(line)
 			}
@@ -3175,12 +3150,15 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 			if len(repo.Details) == 0 {
 				continue
 			}
-			detailPrefix := output.Indent + output.Indent + output.Indent + output.Indent
+			repoStem := "│  "
+			if isLastRepo {
+				repoStem = "   "
+			}
 			for _, detail := range repo.Details {
 				if strings.TrimSpace(detail) == "" {
 					continue
 				}
-				detailLine := fmt.Sprintf("%s| %s", detailPrefix, detail)
+				detailLine := fmt.Sprintf("%s%s%s%s", output.Indent+output.Indent, workspaceStem, repoStem, detail)
 				if useColor {
 					detailLine = theme.Muted.Render(detailLine)
 				}
