@@ -111,17 +111,17 @@ Rules:
 - `<description>` is optional; omit ` - <description>` when empty.
 - Repo details should not be shown in the picker (deep review happens in the subsequent plan output).
 - `<status>` is a short aggregated label based on workspace scan:
-  - `clean`, `dirty`, `unpushed`, `diverged`, `unknown`
+  - `dirty`, `unpushed`, `diverged`, `unknown`
+  - `clean` should be treated as the default and omitted (no status tag).
 
 Color guidance (TTY):
 - `<WORKSPACE_ID>`: default text color.
-- `[clean]`: muted gray.
 - `[unpushed]` / `[diverged]`: warn (yellow).
 - `[dirty]` / `[unknown]`: error (red).
 - ` - <description>`: muted gray.
 
 Example:
-`PROJ-123[clean] - fix login flow`
+`PROJ-123 - fix login flow`
 
 ## Examples
 

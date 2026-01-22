@@ -50,7 +50,7 @@ When apply runs, `gwst manifest rm` should emit an `Info` section after `Inputs`
 ## Risk context (guidance)
 This command should preserve the spirit of the legacy `gwst rm` UX:
 - In interactive selection, show warning indicators for risky workspaces (dirty/unpushed/diverged/unknown).
-- Keep the selection UI lightweight: show only a short aggregated status tag next to each workspace (e.g. `[clean]`, `[dirty]`, `[unpushed]`, `[diverged]`, `[unknown]`).
+- Keep the selection UI lightweight: show only a short aggregated status tag next to each workspace when non-clean (e.g. `[dirty]`, `[unpushed]`, `[diverged]`, `[unknown]`); omit the tag for clean.
   - Repo-level details are optional; plan output follows and is the primary place for deep review.
 - Detailed risk output should primarily come from the `gwst apply` plan output (same format as `gwst plan`), so users can review before confirming destructive removals.
 
@@ -58,7 +58,7 @@ Example (interactive selection, conceptual):
 ```
 Inputs
   • workspace: s
-    └─ PROJ-123[clean] - fix login flow
+    └─ PROJ-123 - fix login flow
 ```
 
 ## Success Criteria
