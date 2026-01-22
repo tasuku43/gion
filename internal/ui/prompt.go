@@ -403,15 +403,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, nil
 					}
 				}
-				if prevIndex, exists := m.usedBranches[value]; exists {
-					label := fmt.Sprintf("branch %q already used for repo #%d; use again?", value, prevIndex+1)
-					m.pendingBranch = value
-					m.confirmModel = newConfirmInlineModel(label, m.theme, m.useColor, false, nil, nil)
-					m.stage = createStagePresetBranchConfirm
-					return m, nil
-				}
 				m.branches[m.branchIndex] = value
-				m.usedBranches[value] = m.branchIndex
 				m.branchIndex++
 				m.errorLine = ""
 				if m.branchIndex >= len(m.presetRepos) {
