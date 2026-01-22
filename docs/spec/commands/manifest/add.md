@@ -33,6 +33,11 @@ For URL-based modes, workspace IDs are derived mechanically:
 - `--review`: `<OWNER>-<REPO>-REVIEW-PR-<number>` (owner/repo uppercased)
 - `--issue`: `<OWNER>-<REPO>-ISSUE-<number>` (owner/repo uppercased)
 
+### GitHub-only modes (review / issue)
+- `--review` and `--issue` are GitHub-only modes.
+- URL parsing and picker flows accept GitHub URLs only.
+- These modes require an authenticated GitHub CLI (`gh`) to fetch PR/issue metadata.
+
 ## Behavior (high level)
 - Runs the same interactive selection and input UX as the legacy `gwst create` (mode picker + mode-specific prompts).
 - Produces a workspace definition (mode, description, optional metadata, repo list with alias/repo_key/branch) and writes it to `<root>/gwst.yaml`.
