@@ -2418,60 +2418,67 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m workspaceMultiSelectModel) View() string {
+	if m.finalizing {
+		frame := NewFrame(m.theme, m.useColor)
+		frame.NoBlankAfterInfo = true
+		label := promptLabel(m.theme, m.useColor, "workspace")
+		frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+		selectedLines := collectLines(func(b *strings.Builder) {
+			renderSelectedWorkspaceTree(b, m.selected, m.useColor, m.theme)
+		})
+		if m.useColor {
+			frame.SetInfo(m.theme.Accent.Render("selected"))
+		} else {
+			frame.SetInfo("selected")
+		}
+		frame.AppendInfoRaw(selectedLines...)
+		return frame.Render()
+	}
+
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
 	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
 	selectedLines := collectLines(func(b *strings.Builder) {
 		renderSelectedWorkspaceTree(b, m.selected, m.useColor, m.theme)
 	})
-	if m.finalizing {
-		frame.AppendInputsRaw(selectedLines...)
-		return frame.Render()
-	}
 	var blockedLines []string
-	inputLines := 1 + len(selectedLines) + 1
+	infoLines := 1 + len(selectedLines) + 1
 	if m.errorLine != "" {
-		inputLines++
+		infoLines++
 	}
 	if len(m.blocked) > 0 {
 		blockedLines = collectLines(func(b *strings.Builder) {
 			renderBlockedChoiceList(b, m.blocked, m.useColor, m.theme)
 		})
-		inputLines += 1 + len(blockedLines)
+		infoLines += 1 + len(blockedLines)
 	}
-	maxLines := listMaxLines(m.height, 1, inputLines)
+	maxLines := listMaxLines(m.height, 1, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
 
-	if len(selectedLines) > 0 {
-		selectedLabel := "selected"
-		if m.useColor {
-			selectedLabel = m.theme.Accent.Render(selectedLabel)
-		}
-		frame.AppendInputsRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), selectedLabel))
-		frame.AppendInputsRaw(selectedLines...)
+	if m.useColor {
+		frame.SetInfo(m.theme.Accent.Render("selected"))
+	} else {
+		frame.SetInfo("selected")
 	}
+	frame.AppendInfoRaw(selectedLines...)
 
 	if m.errorLine != "" {
 		msg := m.errorLine
 		if m.useColor {
 			msg = m.theme.Error.Render(msg)
 		}
-		frame.AppendInputsRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
+		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
 	}
 
 	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
 	frame.AppendInputsRaw(fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix))
 
 	if len(blockedLines) > 0 {
-		blockedLabel := "blocked workspaces"
-		if m.useColor {
-			blockedLabel = m.theme.Warn.Render(blockedLabel)
-		}
-		frame.AppendInputsRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), blockedLabel))
-		frame.AppendInputsRaw(blockedLines...)
+		frame.AppendInfo("blocked workspaces")
+		frame.AppendInfoRaw(blockedLines...)
 	}
 	return frame.Render()
 }

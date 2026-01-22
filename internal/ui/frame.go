@@ -15,6 +15,8 @@ type Frame struct {
 
 	theme    Theme
 	useColor bool
+
+	NoBlankAfterInfo bool
 }
 
 func NewFrame(theme Theme, useColor bool) *Frame {
@@ -108,7 +110,9 @@ func (f *Frame) WriteTo(w io.Writer) (int64, error) {
 		for _, line := range f.Info {
 			renderLine(r, line)
 		}
-		r.Blank()
+		if !f.NoBlankAfterInfo {
+			r.Blank()
+		}
 	}
 
 	if len(f.Steps) > 0 {

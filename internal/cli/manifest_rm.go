@@ -139,7 +139,9 @@ func runManifestRm(ctx context.Context, rootDir string, args []string, globalNoP
 				r.Bullet("no changes")
 			},
 			RenderInfoBeforeApply: func(r *ui.Renderer, _ manifestplan.Result, _ bool) {
-				r.Section("Info")
+				if !selectedFromPrompt {
+					r.Section("Info")
+				}
 				r.Bullet(fmt.Sprintf("manifest: updated gwst.yaml (removed %d workspace(s))", len(selectedIDs)))
 				r.Bullet("apply: reconciling entire root (destructive removals require confirmation)")
 			},
