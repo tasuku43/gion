@@ -24,6 +24,8 @@ This backlog tracks the work to shift gwst from "direct filesystem commands" to 
 Policy:
 - Keep this branch focused on specs/docs as much as possible.
 - Do implementation work in a separate PR/branch and track it here explicitly.
+- Legacy command implementations may be deleted as part of each ticket (prefer hard errors with a clear suggested replacement).
+- Prefer reusing/migrating existing implementation and interactive input UX into the new `gwst manifest ...` commands, so we can delete legacy code without regressions.
 
 ### Specs / Docs (this branch)
 - [x] Finalize `gwst manifest add` details (no-prompt requirements, multi-select UX, error messages, output IA).
@@ -39,7 +41,7 @@ Policy:
 - [x] Implement CLI routing + aliases (`manifest`/`man`/`m`, `manifest preset`/`pre`/`p`). (spec: `docs/spec/commands/manifest/README.md`)
 - [x] Remove legacy `gwst ls` command (hard error + suggestion to use `gwst manifest ls`). (spec: `docs/spec/commands/ls.md`)
 - [x] Implement `gwst manifest ls`. (spec: `docs/spec/commands/manifest/ls.md`, UI: `docs/spec/ui/UI.md`)
-- [ ] Implement `gwst manifest add`. (spec: `docs/spec/commands/manifest/add.md`, UI: `docs/spec/ui/UI.md`)
+- [x] Implement `gwst manifest add`. (spec: `docs/spec/commands/manifest/add.md`, UI: `docs/spec/ui/UI.md`)
 - [ ] Implement `gwst manifest rm`. (spec: `docs/spec/commands/manifest/rm.md`, UI: `docs/spec/ui/UI.md`)
 - [x] Implement `gwst manifest preset` subcommands. (specs: `docs/spec/commands/manifest/preset/*.md`)
 

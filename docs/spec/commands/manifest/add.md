@@ -1,6 +1,6 @@
 ---
 title: "gwst manifest add"
-status: planned
+status: implemented
 aliases:
   - "gwst man add"
   - "gwst m add"

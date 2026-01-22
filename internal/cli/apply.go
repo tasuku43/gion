@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -21,75 +22,8 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	if len(args) != 0 {
 		return fmt.Errorf("usage: gwst apply")
 	}
-
-	plan, err := manifestplan.Plan(ctx, rootDir)
-	if err != nil {
-		return err
-	}
-
-	theme := ui.DefaultTheme()
-	useColor := isatty.IsTerminal(os.Stdout.Fd())
-	renderer := ui.NewRenderer(os.Stdout, theme, useColor)
-	output.SetStepLogger(renderer)
-	defer output.SetStepLogger(nil)
-
-	var warningLines []string
-	for _, warn := range plan.Warnings {
-		warningLines = append(warningLines, warn.Error())
-	}
-	if len(warningLines) > 0 {
-		renderWarningsSection(renderer, "warnings", warningLines, false)
-		renderer.Blank()
-	}
-
-	renderer.Section("Plan")
-	if len(plan.Changes) == 0 {
-		renderer.Bullet("no changes")
-		return nil
-	}
-	renderPlanChanges(ctx, rootDir, renderer, plan)
-
-	destructive := planHasDestructiveChanges(plan)
-	if destructive && noPrompt {
-		return fmt.Errorf("destructive changes require confirmation")
-	}
-	if !noPrompt {
-		renderer.Blank()
-		label := "Apply changes? (default: No)"
-		if destructive {
-			label = "Apply destructive changes? (default: No)"
-		}
-		var confirm bool
-		var err error
-		confirm, err = ui.PromptConfirmInlinePlan(label, theme, useColor)
-		if err != nil {
-			return err
-		}
-		if !confirm {
-			return nil
-		}
-	}
-
-	renderer.Blank()
-	renderer.Section("Apply")
-	if err := apply.Apply(ctx, rootDir, plan, apply.Options{
-		AllowDirty:       destructive,
-		AllowStatusError: destructive,
-		PrefetchTimeout:  defaultPrefetchTimeout,
-		Step:             output.Step,
-	}); err != nil {
-		return err
-	}
-	if err := rebuildManifest(ctx, rootDir); err != nil {
-		return err
-	}
-
-	renderer.Blank()
-	renderer.Section("Result")
-	adds, updates, removes := countWorkspaceChangeKinds(plan)
-	renderer.BulletSuccess(fmt.Sprintf("applied: add=%d update=%d remove=%d", adds, updates, removes))
-	renderer.Bullet("gwst.yaml rewritten")
-	return nil
+	_, err := runApplyInternal(ctx, rootDir, nil, noPrompt)
+	return err
 }
 
 func countWorkspaceChangeKinds(plan manifestplan.Result) (adds, updates, removes int) {
@@ -149,4 +83,87 @@ func isInPlaceBranchRename(change manifestplan.RepoChange) bool {
 		return false
 	}
 	return strings.TrimSpace(change.FromBranch) != strings.TrimSpace(change.ToBranch)
+}
+
+type applyInternalResult struct {
+	HadChanges bool
+	Confirmed  bool
+	Applied    bool
+	Canceled   bool
+}
+
+func runApplyInternal(ctx context.Context, rootDir string, renderer *ui.Renderer, noPrompt bool) (applyInternalResult, error) {
+	plan, err := manifestplan.Plan(ctx, rootDir)
+	if err != nil {
+		return applyInternalResult{}, err
+	}
+
+	theme := ui.DefaultTheme()
+	useColor := isatty.IsTerminal(os.Stdout.Fd())
+	if renderer == nil {
+		renderer = ui.NewRenderer(os.Stdout, theme, useColor)
+	}
+	output.SetStepLogger(renderer)
+	defer output.SetStepLogger(nil)
+
+	var warningLines []string
+	for _, warn := range plan.Warnings {
+		warningLines = append(warningLines, warn.Error())
+	}
+	if len(warningLines) > 0 {
+		renderWarningsSection(renderer, "warnings", warningLines, false)
+		renderer.Blank()
+	}
+
+	renderer.Section("Plan")
+	if len(plan.Changes) == 0 {
+		renderer.Bullet("no changes")
+		return applyInternalResult{HadChanges: false, Confirmed: false, Applied: false}, nil
+	}
+	renderPlanChanges(ctx, rootDir, renderer, plan)
+
+	destructive := planHasDestructiveChanges(plan)
+	if destructive && noPrompt {
+		return applyInternalResult{HadChanges: true}, fmt.Errorf("destructive changes require confirmation")
+	}
+	confirmed := noPrompt
+	if !noPrompt {
+		renderer.Blank()
+		label := "Apply changes? (default: No)"
+		if destructive {
+			label = "Apply destructive changes? (default: No)"
+		}
+		confirm, err := ui.PromptConfirmInlinePlan(label, theme, useColor)
+		if err != nil {
+			if errors.Is(err, ui.ErrPromptCanceled) {
+				return applyInternalResult{HadChanges: true, Confirmed: false, Applied: false, Canceled: true}, nil
+			}
+			return applyInternalResult{HadChanges: true}, err
+		}
+		confirmed = confirm
+		if !confirm {
+			return applyInternalResult{HadChanges: true, Confirmed: false, Applied: false}, nil
+		}
+	}
+
+	renderer.Blank()
+	renderer.Section("Apply")
+	if err := apply.Apply(ctx, rootDir, plan, apply.Options{
+		AllowDirty:       destructive,
+		AllowStatusError: destructive,
+		PrefetchTimeout:  defaultPrefetchTimeout,
+		Step:             output.Step,
+	}); err != nil {
+		return applyInternalResult{HadChanges: true, Confirmed: confirmed, Applied: false}, err
+	}
+	if err := rebuildManifest(ctx, rootDir); err != nil {
+		return applyInternalResult{HadChanges: true, Confirmed: confirmed, Applied: false}, err
+	}
+
+	renderer.Blank()
+	renderer.Section("Result")
+	adds, updates, removes := countWorkspaceChangeKinds(plan)
+	renderer.BulletSuccess(fmt.Sprintf("applied: add=%d update=%d remove=%d", adds, updates, removes))
+	renderer.Bullet("gwst.yaml rewritten")
+	return applyInternalResult{HadChanges: true, Confirmed: confirmed, Applied: true}, nil
 }

@@ -166,6 +166,7 @@ func printManifestHelp(w io.Writer) {
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Subcommands:"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "ls", "list workspace inventory with drift tags"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "add [mode flags] [args]", "add workspace to gwst.yaml then apply (default)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "preset <subcommand>", "preset inventory commands (aliases: pre, p)"))
 }
 
@@ -182,6 +183,19 @@ func printManifestLsHelp(w io.Writer) {
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Tips:"))
 	fmt.Fprintln(w, helpFlag(theme, useColor, "gwst plan", "show the full diff details for drift/missing/extra"))
+}
+
+func printManifestAddHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gwst manifest add [--preset <name> | --review [<PR URL>] | --issue <ISSUE_URL> | --repo <repo>] [<WORKSPACE_ID>] [--branch <name>] [--base <ref>] [--no-apply] [--no-prompt]")
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--preset <name>", "preset name"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--review [<PR URL>]", "add review workspace from PR (GitHub only)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--issue <ISSUE_URL>", "add issue workspace from issue (GitHub only)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--repo <repo>", "add workspace from a repo"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--branch <name>", "override branch name (repo/issue modes only)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--base <ref>", "override base ref (issue mode; applies to all repos in no-prompt)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-apply", "update gwst.yaml only (do not run gwst apply)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-prompt", "disable interactive prompt"))
 }
 
 func printManifestPresetHelp(w io.Writer) {
