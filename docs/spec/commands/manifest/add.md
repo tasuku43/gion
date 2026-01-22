@@ -62,7 +62,8 @@ Defaults and `--branch` rules:
   - Default branch is `<WORKSPACE_ID>`.
   - When prompts are allowed, the command asks for the repo branch.
     - The input is pre-filled with `<WORKSPACE_ID>` and the cursor is positioned so users can press Enter to accept, or type a suffix without retyping.
-  - `--branch` is not supported in MVP (error if provided).
+  - `--branch <name>` overrides the default and skips the branch prompt.
+  - With `--no-prompt`, `--branch` is optional; when omitted, the default is used.
 - `--review`:
   - Branch defaults to the PR head ref (tracking `origin/<head_ref>`).
   - `--branch` is not supported (error if provided).
