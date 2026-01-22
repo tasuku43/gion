@@ -10,7 +10,9 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/tasuku43/gwst/internal/app/apply"
 	"github.com/tasuku43/gwst/internal/app/manifestplan"
+	"github.com/tasuku43/gwst/internal/domain/repo"
 	"github.com/tasuku43/gwst/internal/infra/output"
+	"github.com/tasuku43/gwst/internal/infra/prefetcher"
 	"github.com/tasuku43/gwst/internal/ui"
 )
 
@@ -122,6 +124,14 @@ func runApplyInternal(ctx context.Context, rootDir string, renderer *ui.Renderer
 	}
 	renderPlanChanges(ctx, rootDir, renderer, plan)
 
+	// Start background fetch while the user reviews the plan.
+	// This preserves the "gwst create" UX win (fetch overlaps with reading time),
+	// while keeping `gwst plan` itself side-effect free.
+	prefetch := prefetcher.New(defaultPrefetchTimeout)
+	if _, err := prefetch.StartAll(ctx, rootDir, repoSpecsForApplyPlan(plan)); err != nil {
+		return applyInternalResult{HadChanges: true}, err
+	}
+
 	destructive := planHasDestructiveChanges(plan)
 	if destructive && noPrompt {
 		return applyInternalResult{HadChanges: true}, fmt.Errorf("destructive changes require confirmation")
@@ -166,4 +176,40 @@ func runApplyInternal(ctx context.Context, rootDir string, renderer *ui.Renderer
 	renderer.BulletSuccess(fmt.Sprintf("applied: add=%d update=%d remove=%d", adds, updates, removes))
 	renderer.Bullet("gwst.yaml rewritten")
 	return applyInternalResult{HadChanges: true, Confirmed: confirmed, Applied: true}, nil
+}
+
+func repoSpecsForApplyPlan(plan manifestplan.Result) []string {
+	unique := map[string]struct{}{}
+	for _, change := range plan.Changes {
+		switch change.Kind {
+		case manifestplan.WorkspaceAdd:
+			ws, ok := plan.Desired.Workspaces[change.WorkspaceID]
+			if !ok {
+				continue
+			}
+			for _, repoEntry := range ws.Repos {
+				spec := repo.SpecFromKey(repoEntry.RepoKey)
+				if strings.TrimSpace(spec) == "" {
+					continue
+				}
+				unique[spec] = struct{}{}
+			}
+		case manifestplan.WorkspaceUpdate:
+			for _, repoChange := range change.Repos {
+				switch repoChange.Kind {
+				case manifestplan.RepoAdd, manifestplan.RepoUpdate:
+					spec := repo.SpecFromKey(repoChange.ToRepo)
+					if strings.TrimSpace(spec) == "" {
+						continue
+					}
+					unique[spec] = struct{}{}
+				}
+			}
+		}
+	}
+	var specs []string
+	for spec := range unique {
+		specs = append(specs, spec)
+	}
+	return specs
 }
