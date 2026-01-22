@@ -1,6 +1,6 @@
 ---
 title: "gwst manifest ls"
-status: planned
+status: implemented
 aliases:
   - "gwst man ls"
   - "gwst m ls"
@@ -40,7 +40,7 @@ Uses the common sectioned layout. No interactive UI is required.
   - counts for `applied`, `missing`, `drift`, `extra`
   - optional per-workspace notes (e.g. `extra: <id>`, scan warnings)
 - `Result`:
-  - workspace list in manifest order (inventory order)
+  - workspace list sorted by workspace id
   - each workspace line includes:
     - `<WORKSPACE_ID>`
     - drift status in parentheses: `(applied|drift|missing)`

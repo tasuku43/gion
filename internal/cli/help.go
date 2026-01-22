@@ -32,6 +32,7 @@ func printGlobalHelp(w io.Writer) {
 	fmt.Fprintln(w, helpCommand(theme, useColor, "status [<WORKSPACE_ID>]", "check dirty/untracked status"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "rm [<WORKSPACE_ID>]", "remove workspace (confirms on warnings)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "path --workspace", "print selected workspace path"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "manifest <subcommand>", "gwst.yaml inventory commands (ls)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "repo <subcommand>", "repo commands (get/ls)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "preset <subcommand>", "preset commands (ls/add/rm/validate)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "doctor [--fix | --self]", "check workspace/repo health"))
@@ -69,6 +70,8 @@ func printCommandHelp(cmd string, w io.Writer) bool {
 		printRepoHelp(w)
 	case "preset":
 		printPresetHelp(w)
+	case "manifest":
+		printManifestHelp(w)
 	case "doctor":
 		printDoctorHelp(w)
 	case "plan":
@@ -158,6 +161,29 @@ func printPresetHelp(w io.Writer) {
 	fmt.Fprintln(w, helpCommand(theme, useColor, "add [<name>]", "add a preset"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "rm [<name>]", "remove presets"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "validate", "validate gwst.yaml"))
+}
+
+func printManifestHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gwst manifest <subcommand>")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Subcommands:"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "ls", "list workspace inventory with drift tags"))
+}
+
+func printManifestLsHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gwst manifest ls [--no-prompt]")
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-prompt", "accepted for compatibility (no effect)"))
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Statuses:"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "applied", "manifest and filesystem match (no diff)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "drift", "both exist but differ (would be update in plan/apply)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "missing", "in manifest but missing on filesystem (would be add in plan/apply)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "extra", "on filesystem but missing in manifest (use import to capture)"))
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Tips:"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "gwst plan", "show the full diff details for drift/missing/extra"))
 }
 
 func printPresetLsHelp(w io.Writer) {

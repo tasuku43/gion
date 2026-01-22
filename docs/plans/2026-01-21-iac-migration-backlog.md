@@ -38,7 +38,7 @@ Policy:
 ### Implementation (separate PR)
 - [ ] Implement CLI routing + aliases (`manifest`/`man`/`m`, `manifest preset`/`pre`/`p`). (spec: `docs/spec/commands/manifest/README.md`)
 - [ ] Remove legacy `gwst ls` command (hard error + suggestion to use `gwst manifest ls`). (spec: `docs/spec/commands/ls.md`)
-- [ ] Implement `gwst manifest ls`. (spec: `docs/spec/commands/manifest/ls.md`, UI: `docs/spec/ui/UI.md`)
+- [x] Implement `gwst manifest ls`. (spec: `docs/spec/commands/manifest/ls.md`, UI: `docs/spec/ui/UI.md`)
 - [ ] Implement `gwst manifest add`. (spec: `docs/spec/commands/manifest/add.md`, UI: `docs/spec/ui/UI.md`)
 - [ ] Implement `gwst manifest rm`. (spec: `docs/spec/commands/manifest/rm.md`, UI: `docs/spec/ui/UI.md`)
 - [ ] Implement `gwst manifest preset` subcommands. (specs: `docs/spec/commands/manifest/preset/*.md`)

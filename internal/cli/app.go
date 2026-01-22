@@ -84,6 +84,8 @@ func Run() error {
 		return runRepo(ctx, rootDir, args[1:])
 	case "preset":
 		return runPreset(ctx, rootDir, args[1:], noPrompt)
+	case "manifest", "man", "m":
+		return runManifest(ctx, rootDir, args[1:], noPrompt)
 	case "create":
 		return runCreate(ctx, rootDir, args[1:], noPrompt)
 	case "add":
