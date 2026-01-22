@@ -26,7 +26,7 @@ Policy:
 - Do implementation work in a separate PR/branch and track it here explicitly.
 
 ### Specs / Docs (this branch)
-- [ ] Finalize `gwst manifest add` details (no-prompt requirements, multi-select UX, error messages, output IA).
+- [x] Finalize `gwst manifest add` details (no-prompt requirements, multi-select UX, error messages, output IA).
 - [ ] Decide `--base` scope for multi-repo (preset): apply to all repos vs per-repo base selection.
 - [x] Confirm base tracking model: workspace-level `.gwst/metadata.json base_branch` (and `gwst.yaml repos[].base_ref`).
 - [ ] Specify `gwst manifest rm` UX and how risk context is shown (in rm vs rely on apply plan).

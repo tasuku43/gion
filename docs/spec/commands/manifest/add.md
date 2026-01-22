@@ -5,12 +5,8 @@ aliases:
   - "gwst man add"
   - "gwst m add"
 pending:
-  - mode-selection
   - interactive-flows-from-create
-  - multi-select-batch-apply
-  - apply-handoff
-  - existing-filesystem-collision
-  - multi-select-partial-success
+  - error-messages-and-output
 ---
 
 ## Synopsis
@@ -42,6 +38,23 @@ Create the desired workspace inventory in `gwst.yaml` using an interactive UX (s
 - With `--no-apply`, stops after rewriting `gwst.yaml` and prints a suggestion to run `gwst apply` (or `gwst plan`) next.
 - When `--no-prompt` is set, all required inputs must be provided via flags/args; missing values are errors (no interactive fallback).
 - `--workspace-id` is not supported; use the positional `[<WORKSPACE_ID>]` instead (error if provided).
+
+## Detailed flow (conceptual)
+1. Determine mode (flag or interactive picker).
+2. Collect inputs (repo/preset selection, URLs, workspace id, description, branches, base).
+3. Validate inputs:
+   - Mode must be uniquely determined.
+   - `WORKSPACE_ID` must be a valid git branch name.
+   - `--base` must be `origin/<branch>` when provided.
+   - Branch names must be valid git branch names.
+4. Collision checks:
+   - If `WORKSPACE_ID` exists in `gwst.yaml`, error.
+   - If `<root>/workspaces/<WORKSPACE_ID>` exists but is missing from `gwst.yaml`, error and suggest `gwst import`.
+5. Rewrite `gwst.yaml` (full-file rewrite).
+6. If `--no-apply` is set: stop after manifest rewrite.
+7. Otherwise run `gwst apply` for the entire root:
+   - This may include unrelated drift in the same root.
+   - Confirmation and destructive rules are handled by `gwst apply`.
 
 ## Base ref (`--base`) and default branch behavior
 - By default, new branches are created from the repo's default branch (detected from `refs/remotes/origin/HEAD` when available).
@@ -87,6 +100,42 @@ Defaults and `--branch` rules:
 - Always uses the common sectioned layout from `docs/spec/ui/UI.md`.
 - `Inputs`: interactive UX inputs (mode, repo/preset, workspace id, branch/base, etc).
 - `Plan`/`Apply`/`Result`: delegated to `gwst apply` when apply is run.
+
+### Output: `--no-apply`
+When `--no-apply` is set, `gwst manifest add` does not run apply and prints a short summary instead.
+
+Example:
+```
+Inputs
+  • mode: repo
+  • repo: git@github.com:org/repo.git
+  • workspace id: PROJ-123
+  • branch: PROJ-123
+
+Result
+  • updated gwst.yaml
+
+Suggestion
+  gwst apply
+```
+
+### Output: with apply (default)
+When apply runs, `gwst manifest add` prints `Inputs` first, then streams `gwst apply` output (`Info`/`Plan`/`Apply`/`Result`).
+`gwst manifest add` itself does not attempt to summarize the plan beyond what `gwst apply` prints.
+
+## Error messages (guidance)
+`gwst manifest add` should keep errors actionable and include the next command when possible.
+
+Common cases:
+- Conflicting mode flags: error and mention the allowed set (`--preset`/`--repo`/`--review`/`--issue`).
+- Missing mode with `--no-prompt`: error and suggest providing a mode flag.
+- Missing required inputs with `--no-prompt`:
+  - `--repo` with no repo argument → error.
+  - `--issue`/`--review` with no URL → error.
+- Workspace already exists in manifest: error and include the workspace id.
+- Workspace exists on filesystem but missing in manifest: error and suggest `gwst import`.
+- Apply fails after manifest rewrite:
+  - Treat as apply failure and keep the manifest change (users can re-run `gwst apply`).
 
 ## Success Criteria
 - `gwst.yaml` contains the intended workspace entry in normalized form.
