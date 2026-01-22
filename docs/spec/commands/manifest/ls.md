@@ -29,6 +29,7 @@ This is the primary "what do I have and is it applied?" command.
   - Risk tags are shown only when the workspace exists on the filesystem.
 - Also detects filesystem-only workspaces (present on filesystem, missing in manifest) and reports them as `extra`.
   - `extra` entries are informational only; use `gwst import` to capture them into the manifest, or `gwst apply` (with confirmation) to remove them.
+- `extra` entries are included in `Result` after the manifest entries so users can see the full picture of "what exists under this root".
 - No changes are made (read-only).
 - `--no-prompt` is accepted but has no effect (kept for CLI consistency).
 
@@ -45,6 +46,9 @@ Uses the common sectioned layout. No interactive UI is required.
     - drift status in parentheses: `(applied|drift|missing)`
     - optional risk tag in brackets when non-clean: `[dirty|unpushed|diverged|unknown]`
     - optional description suffix: ` - <description>`
+  - extra entries are appended after the manifest list:
+    - sorted by workspace id
+    - shown as `<WORKSPACE_ID> (extra)` with an optional risk tag
 
 Example:
 ```
@@ -53,12 +57,12 @@ Info
   • drift: 1
   • missing: 1
   • extra: 1
-  • extra: PROJ-OLD
 
 Result
   • PROJ-123 (applied) - fix login flow
   • PROJ-124 (drift) [dirty] - wip refactor
   • PROJ-125 (missing) - onboarding
+  • PROJ-OLD (extra) [unknown]
 ```
 
 ## Success Criteria
