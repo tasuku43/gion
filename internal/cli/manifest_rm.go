@@ -54,6 +54,7 @@ func runManifestRm(ctx context.Context, rootDir string, args []string, globalNoP
 	}
 
 	selectedIDs := uniqueNonEmptyStrings(rmFlags.Args())
+	selectedFromPrompt := false
 	if len(selectedIDs) == 0 {
 		if noPrompt {
 			return fmt.Errorf("workspace id is required when --no-prompt is set")
@@ -71,6 +72,7 @@ func runManifestRm(ctx context.Context, rootDir string, args []string, globalNoP
 		if len(selected) == 0 {
 			return nil
 		}
+		selectedFromPrompt = true
 		selectedIDs = uniqueNonEmptyStrings(selected)
 	}
 	if len(selectedIDs) == 0 {
@@ -99,8 +101,23 @@ func runManifestRm(ctx context.Context, rootDir string, args []string, globalNoP
 	inputs := func(r *ui.Renderer) {
 		r.Section("Inputs")
 		for _, id := range selectedIDs {
-			r.Bullet(fmt.Sprintf("workspace: %s", id))
+			desc := ""
+			if entry, ok := desired.Workspaces[id]; ok {
+				desc = strings.TrimSpace(entry.Description)
+			}
+			kind := bestEffortWorkspaceRiskKind(ctx, rootDir, id)
+			tag := formatManifestRmRiskTag(r, kind)
+			line := id + tag
+			if desc != "" {
+				line += " - " + desc
+			}
+			r.Bullet(fmt.Sprintf("workspace: %s", line))
 		}
+	}
+
+	var showPrelude func(*ui.Renderer)
+	if !selectedFromPrompt {
+		showPrelude = inputs
 	}
 
 	return applyManifestMutation(ctx, rootDir, updated, manifestMutationOptions{
@@ -108,7 +125,7 @@ func runManifestRm(ctx context.Context, rootDir string, args []string, globalNoP
 		NoPrompt:      noPrompt,
 		OriginalBytes: originalBytes,
 		Hooks: manifestMutationHooks{
-			ShowPrelude: inputs,
+			ShowPrelude: showPrelude,
 			RenderNoApply: func(r *ui.Renderer) {
 				r.Section("Result")
 				r.Bullet(fmt.Sprintf("updated gwst.yaml (removed %d workspace(s))", len(selectedIDs)))
@@ -128,6 +145,22 @@ func runManifestRm(ctx context.Context, rootDir string, args []string, globalNoP
 			},
 		},
 	})
+}
+
+func formatManifestRmRiskTag(r *ui.Renderer, kind workspace.WorkspaceStateKind) string {
+	if r == nil {
+		return ""
+	}
+	switch kind {
+	case workspace.WorkspaceStateUnknown:
+		return r.ErrorText(fmt.Sprintf("[%s]", kind))
+	case workspace.WorkspaceStateDirty:
+		return r.ErrorText(fmt.Sprintf("[%s]", kind))
+	case workspace.WorkspaceStateDiverged, workspace.WorkspaceStateUnpushed:
+		return r.WarnText(fmt.Sprintf("[%s]", kind))
+	default:
+		return ""
+	}
 }
 
 func buildManifestRmWorkspaceChoices(ctx context.Context, rootDir string, desired manifest.File) []ui.WorkspaceChoice {
