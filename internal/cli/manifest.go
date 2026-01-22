@@ -24,6 +24,8 @@ func runManifest(ctx context.Context, rootDir string, args []string, noPrompt bo
 		return runManifestLs(ctx, rootDir, args[1:])
 	case "add":
 		return runManifestAdd(ctx, rootDir, args[1:], noPrompt)
+	case "rm":
+		return runManifestRm(ctx, rootDir, args[1:], noPrompt)
 	case "preset", "pre", "p":
 		return runManifestPreset(ctx, rootDir, args[1:], noPrompt)
 	default:

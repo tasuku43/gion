@@ -1340,7 +1340,7 @@ func (m presetRepoSelectModel) View() string {
 	}
 
 	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
-	frame.AppendInfoRaw(
+	frame.AppendInputsRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
 	)
 	return frame.Render()
@@ -1653,7 +1653,7 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	}
 
 	infoPrefix := mutedToken(model.theme, model.useColor, output.StepPrefix)
-	frame.AppendInfoRaw(
+	frame.AppendInputsRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
 	)
 	return frame.Render()
@@ -1706,11 +1706,11 @@ func renderIssueBranchEditFrame(model issueBranchSelectModel, headerLines ...str
 		if model.useColor {
 			msg = model.theme.Error.Render(msg)
 		}
-		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), msg))
+		frame.AppendInputsRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), msg))
 	}
 
 	infoPrefix := mutedToken(model.theme, model.useColor, output.StepPrefix)
-	frame.AppendInfoRaw(
+	frame.AppendInputsRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D", output.Indent, infoPrefix),
 	)
 	return frame.Render()
@@ -2491,7 +2491,7 @@ func (m workspaceMultiSelectModel) View() string {
 	}
 
 	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
-	frame.AppendInfoRaw(
+	frame.AppendInputsRaw(
 		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
 	)
 

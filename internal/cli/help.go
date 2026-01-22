@@ -167,6 +167,7 @@ func printManifestHelp(w io.Writer) {
 	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Subcommands:"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "ls", "list workspace inventory with drift tags"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "add [mode flags] [args]", "add workspace to gwst.yaml then apply (default)"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "rm [<WORKSPACE_ID> ...]", "remove workspace entries from gwst.yaml then apply (default)"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "preset <subcommand>", "preset inventory commands (aliases: pre, p)"))
 }
 
@@ -194,6 +195,13 @@ func printManifestAddHelp(w io.Writer) {
 	fmt.Fprintln(w, helpFlag(theme, useColor, "--repo <repo>", "add workspace from a repo"))
 	fmt.Fprintln(w, helpFlag(theme, useColor, "--branch <name>", "override branch name (repo/issue modes only)"))
 	fmt.Fprintln(w, helpFlag(theme, useColor, "--base <ref>", "override base ref (issue mode; applies to all repos in no-prompt)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-apply", "update gwst.yaml only (do not run gwst apply)"))
+	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-prompt", "disable interactive prompt"))
+}
+
+func printManifestRmHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gwst manifest rm [<WORKSPACE_ID> ...] [--no-apply] [--no-prompt]")
 	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-apply", "update gwst.yaml only (do not run gwst apply)"))
 	fmt.Fprintln(w, helpFlag(theme, useColor, "--no-prompt", "disable interactive prompt"))
 }

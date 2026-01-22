@@ -15,7 +15,6 @@ import (
 	"github.com/tasuku43/gwst/internal/domain/preset"
 	"github.com/tasuku43/gwst/internal/domain/repo"
 	"github.com/tasuku43/gwst/internal/domain/workspace"
-	"github.com/tasuku43/gwst/internal/infra/output"
 	"github.com/tasuku43/gwst/internal/infra/paths"
 	"github.com/tasuku43/gwst/internal/ui"
 )
@@ -97,58 +96,34 @@ func runManifestAdd(ctx context.Context, rootDir string, args []string, globalNo
 		return fmt.Errorf("read gwst.yaml: %w", err)
 	}
 
-	writeAndMaybeApply := func(updated manifest.File, showInputs func(*ui.Renderer), addedWorkspaceIDs []string) error {
-		if err := manifest.Save(rootDir, updated); err != nil {
-			return err
-		}
-
-		if noApply {
-			renderer := ui.NewRenderer(os.Stdout, theme, useColor)
-			if showInputs != nil {
-				showInputs(renderer)
-				renderer.Blank()
-			}
-			renderer.Section("Result")
-			renderer.Bullet("updated gwst.yaml")
-			renderer.Blank()
-			renderer.Section("Suggestion")
-			renderer.Bullet("gwst apply")
-			return nil
-		}
-
-		renderer := ui.NewRenderer(os.Stdout, theme, useColor)
-		if showInputs != nil {
-			showInputs(renderer)
-			renderer.Blank()
-		}
-		renderer.Section("Info")
-		renderer.Bullet("manifest: updated gwst.yaml")
-		if planIncludesUnrelatedChanges(ctx, rootDir, addedWorkspaceIDs) {
-			renderer.BulletWarn("apply: plan includes unrelated changes")
-		}
-		renderer.Blank()
-
-		output.SetStepLogger(renderer)
-		defer output.SetStepLogger(nil)
-
-		res, err := runApplyInternal(ctx, rootDir, renderer, noPrompt)
-		if err != nil {
-			return err
-		}
-		if res.Canceled || (res.HadChanges && !res.Confirmed) {
-			if err := os.WriteFile(manifestPath, originalBytes, 0o644); err != nil {
-				return fmt.Errorf("restore gwst.yaml: %w", err)
-			}
-			renderer.Blank()
-			renderer.Section("Result")
-			if res.Canceled {
-				renderer.Bullet("gwst.yaml rolled back (apply canceled)")
-			} else {
-				renderer.Bullet("gwst.yaml rolled back (apply declined)")
-			}
-			return nil
-		}
-		return nil
+	apply := func(updated manifest.File, showInputs func(*ui.Renderer), addedWorkspaceIDs []string) error {
+		return applyManifestMutation(ctx, rootDir, updated, manifestMutationOptions{
+			NoApply:       noApply,
+			NoPrompt:      noPrompt,
+			OriginalBytes: originalBytes,
+			Hooks: manifestMutationHooks{
+				ShowPrelude: showInputs,
+				RenderNoApply: func(r *ui.Renderer) {
+					r.Section("Result")
+					r.Bullet("updated gwst.yaml")
+					r.Blank()
+					r.Section("Suggestion")
+					r.Bullet("gwst apply")
+				},
+				RenderNoChanges: func(r *ui.Renderer) {
+					r.Section("Result")
+					r.Bullet("updated gwst.yaml")
+					r.Bullet("no changes")
+				},
+				RenderInfoBeforeApply: func(r *ui.Renderer, plan manifestplan.Result, planOK bool) {
+					r.Section("Info")
+					r.Bullet("manifest: updated gwst.yaml")
+					if planOK && planIncludesChangesOutsideWorkspaceIDs(plan, addedWorkspaceIDs) {
+						r.BulletWarn("apply: plan includes unrelated changes")
+					}
+				},
+			},
+		})
 	}
 
 	// Interactive mode picker / unified prompt flow.
@@ -247,13 +222,13 @@ func runManifestAdd(ctx context.Context, rootDir string, args []string, globalNo
 
 		switch mode {
 		case "preset":
-			return manifestAddPreset(ctx, rootDir, tmplName, tmplWorkspaceID, tmplDesc, tmplBranches, baseRef, writeAndMaybeApply, originalBytes)
+			return manifestAddPreset(ctx, rootDir, tmplName, tmplWorkspaceID, tmplDesc, tmplBranches, baseRef, apply, originalBytes)
 		case "repo":
-			return manifestAddRepo(ctx, rootDir, repoSelected, tmplWorkspaceID, tmplDesc, tmplBranches, baseRef, writeAndMaybeApply, originalBytes)
+			return manifestAddRepo(ctx, rootDir, repoSelected, tmplWorkspaceID, tmplDesc, tmplBranches, baseRef, apply, originalBytes)
 		case "review":
-			return manifestAddReviewSelected(ctx, rootDir, reviewRepo, reviewPRs, writeAndMaybeApply, originalBytes)
+			return manifestAddReviewSelected(ctx, rootDir, reviewRepo, reviewPRs, apply, originalBytes)
 		case "issue":
-			return manifestAddIssueSelected(ctx, rootDir, issueRepo, issueSelections, baseRef, writeAndMaybeApply, originalBytes)
+			return manifestAddIssueSelected(ctx, rootDir, issueRepo, issueSelections, baseRef, apply, originalBytes)
 		default:
 			return fmt.Errorf("unknown mode: %s", mode)
 		}
@@ -299,7 +274,7 @@ func runManifestAdd(ctx context.Context, rootDir string, args []string, globalNo
 			}
 			renderTreeLines(r, branchLines, treeLineNormal)
 		}
-		return manifestAddPresetWithFile(ctx, rootDir, presetName.value, workspaceID, "", tmpl, branches, baseRef, writeAndMaybeApply, renderInputs)
+		return manifestAddPresetWithFile(ctx, rootDir, presetName.value, workspaceID, "", tmpl, branches, baseRef, apply, renderInputs)
 	}
 
 	if repoMode {
@@ -341,7 +316,7 @@ func runManifestAdd(ctx context.Context, rootDir string, args []string, globalNo
 				r.Bullet(fmt.Sprintf("base: %s", baseRef))
 			}
 		}
-		return manifestAddRepoWithSpec(ctx, rootDir, repoSpecNorm, workspaceID, "", branchValue, baseRef, writeAndMaybeApply, renderInputs)
+		return manifestAddRepoWithSpec(ctx, rootDir, repoSpecNorm, workspaceID, "", branchValue, baseRef, apply, renderInputs)
 	}
 
 	if reviewMode {
@@ -361,7 +336,7 @@ func runManifestAdd(ctx context.Context, rootDir string, args []string, globalNo
 			}
 			return fmt.Errorf("PR URL is required")
 		}
-		return manifestAddReviewURL(ctx, rootDir, prURL, writeAndMaybeApply)
+		return manifestAddReviewURL(ctx, rootDir, prURL, apply)
 	}
 
 	if issueMode {
@@ -378,7 +353,7 @@ func runManifestAdd(ctx context.Context, rootDir string, args []string, globalNo
 			}
 			return fmt.Errorf("issue URL is required")
 		}
-		return manifestAddIssueURL(ctx, rootDir, issueURL, branch, baseRef, noPrompt, writeAndMaybeApply)
+		return manifestAddIssueURL(ctx, rootDir, issueURL, branch, baseRef, noPrompt, apply)
 	}
 
 	return fmt.Errorf("mode is required")
@@ -827,34 +802,4 @@ func manifestAddIssueSelected(ctx context.Context, rootDir string, repoSpec stri
 	}
 
 	return apply(updated, showInputs, addedWorkspaceIDs)
-}
-
-func planIncludesUnrelatedChanges(ctx context.Context, rootDir string, addedWorkspaceIDs []string) bool {
-	if len(addedWorkspaceIDs) == 0 {
-		return false
-	}
-	added := map[string]struct{}{}
-	for _, id := range addedWorkspaceIDs {
-		if strings.TrimSpace(id) == "" {
-			continue
-		}
-		added[id] = struct{}{}
-	}
-	if len(added) == 0 {
-		return false
-	}
-	plan, err := manifestplan.Plan(ctx, rootDir)
-	if err != nil {
-		return false
-	}
-	for _, change := range plan.Changes {
-		if strings.TrimSpace(change.WorkspaceID) == "" {
-			continue
-		}
-		if _, ok := added[change.WorkspaceID]; ok {
-			continue
-		}
-		return true
-	}
-	return false
 }
