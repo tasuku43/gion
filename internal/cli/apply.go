@@ -24,7 +24,11 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	if len(args) != 0 {
 		return fmt.Errorf("usage: gwst apply")
 	}
-	_, err := runApplyInternal(ctx, rootDir, nil, noPrompt)
+	plan, err := manifestplan.Plan(ctx, rootDir)
+	if err != nil {
+		return err
+	}
+	_, err = runApplyInternalWithPlan(ctx, rootDir, nil, noPrompt, plan)
 	return err
 }
 
