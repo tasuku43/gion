@@ -22,6 +22,11 @@ This is the primary "what do I have and is it applied?" command.
   - `applied`: no diff.
   - `missing`: present in manifest, missing on filesystem (would be `add` in plan/apply).
   - `drift`: present in both but differs (would be `update` in plan/apply).
+- Optionally (best-effort), computes a lightweight workspace risk tag by scanning attached repo worktrees:
+  - Uses the same labels as the workspace picker: `dirty`, `unpushed`, `diverged`, `unknown` (clean is omitted).
+  - Semantics and detection follow the `gwst manifest rm` "Workspace State Model" (no implicit fetch; do not warn for behind-only).
+  - Workspace risk tag is an aggregation of repo risks using the priority defined in `docs/spec/ui/UI.md` (unknown > dirty > diverged > unpushed).
+  - Risk tags are shown only when the workspace exists on the filesystem.
 - Also detects filesystem-only workspaces (present on filesystem, missing in manifest) and reports them as `extra`.
   - `extra` entries are informational only; use `gwst import` to capture them into the manifest, or `gwst apply` (with confirmation) to remove them.
 - No changes are made (read-only).
@@ -30,18 +35,30 @@ This is the primary "what do I have and is it applied?" command.
 ## Output
 Uses the common sectioned layout. No interactive UI is required.
 
-- `Info` (optional): counts for `applied`, `missing`, `drift`, `extra`.
-- `Result`: workspace list in inventory order (or sorted by ID), each with a short status tag.
+- `Info` (optional):
+  - counts for `applied`, `missing`, `drift`, `extra`
+  - optional per-workspace notes (e.g. `extra: <id>`, scan warnings)
+- `Result`:
+  - workspace list in manifest order (inventory order)
+  - each workspace line includes:
+    - `<WORKSPACE_ID>`
+    - drift status in parentheses: `(applied|drift|missing)`
+    - optional risk tag in brackets when non-clean: `[dirty|unpushed|diverged|unknown]`
+    - optional description suffix: ` - <description>`
 
 Example:
 ```
 Info
+  • applied: 3
+  • drift: 1
+  • missing: 1
+  • extra: 1
   • extra: PROJ-OLD
 
 Result
-  • PROJ-123 (applied)
-  • PROJ-124 (drift)
-  • PROJ-125 (missing)
+  • PROJ-123 (applied) - fix login flow
+  • PROJ-124 (drift) [dirty] - wip refactor
+  • PROJ-125 (missing) - onboarding
 ```
 
 ## Success Criteria
