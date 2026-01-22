@@ -2328,6 +2328,7 @@ type workspaceMultiSelectModel struct {
 	errorLine        string
 	canceled         bool
 	stage            multiSelectStage
+	confirmEnabled   bool
 	confirmModel     confirmInlineModel
 	confirmInputsRaw []string
 
@@ -2339,6 +2340,10 @@ type workspaceMultiSelectModel struct {
 }
 
 func newWorkspaceMultiSelectModel(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, theme Theme, useColor bool) workspaceMultiSelectModel {
+	return newWorkspaceMultiSelectModelWithConfirm(title, workspaces, blocked, true, theme, useColor)
+}
+
+func newWorkspaceMultiSelectModelWithConfirm(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, confirmEnabled bool, theme Theme, useColor bool) workspaceMultiSelectModel {
 	input := textinput.New()
 	input.Prompt = ""
 	input.Placeholder = "search"
@@ -2347,12 +2352,13 @@ func newWorkspaceMultiSelectModel(title string, workspaces []WorkspaceChoice, bl
 		input.PlaceholderStyle = theme.Muted
 	}
 	m := workspaceMultiSelectModel{
-		title:      title,
-		workspaces: workspaces,
-		blocked:    blocked,
-		theme:      theme,
-		useColor:   useColor,
-		input:      input,
+		title:          title,
+		workspaces:     workspaces,
+		blocked:        blocked,
+		confirmEnabled: confirmEnabled,
+		theme:          theme,
+		useColor:       useColor,
+		input:          input,
 	}
 	m.filtered = m.filterWorkspaces()
 	return m
@@ -2503,6 +2509,9 @@ func (m workspaceMultiSelectModel) View() string {
 }
 
 func (m workspaceMultiSelectModel) startConfirmIfNeeded() (workspaceMultiSelectModel, tea.Cmd) {
+	if !m.confirmEnabled {
+		return m, tea.Quit
+	}
 	label, needConfirm := confirmLabelForSelection(m.selected)
 	if !needConfirm {
 		return m, tea.Quit
@@ -3053,6 +3062,20 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 	start, end := listWindow(len(items), cursor, maxVisible)
 	for i := start; i < end; i++ {
 		item := items[i]
+		workspaceConnector := "├─"
+		isLastWorkspace := i == end-1
+		if isLastWorkspace {
+			workspaceConnector = "└─"
+		}
+		connectorToken := workspaceConnector
+		if useColor {
+			connectorToken = theme.Muted.Render(workspaceConnector)
+		}
+		workspaceStem := "│ "
+		if isLastWorkspace {
+			workspaceStem = "  "
+		}
+
 		displayID := item.ID
 		warnValue := shortWarningTag(item.Warning)
 		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
@@ -3095,16 +3118,17 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 				display += " - " + desc
 			}
 		}
-		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), display))
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, connectorToken, display))
 		if len(item.Repos) == 0 {
 			continue
 		}
 		for j, repo := range item.Repos {
-			connector := "├─"
-			if j == len(item.Repos)-1 {
-				connector = "└─"
+			repoConnector := "├─"
+			isLastRepo := j == len(item.Repos)-1
+			if isLastRepo {
+				repoConnector = "└─"
 			}
-			line := fmt.Sprintf("%s%s %s", output.Indent+output.Indent+output.Indent, connector, repo.Label)
+			line := fmt.Sprintf("%s%s%s %s", output.Indent+output.Indent, workspaceStem, repoConnector, repo.Label)
 			if useColor {
 				line = theme.Muted.Render(line)
 			}
@@ -3113,16 +3137,15 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 			if len(repo.Details) == 0 {
 				continue
 			}
-			detailPrefix := output.Indent + output.Indent + output.Indent
-			treePrefix := "│  "
-			if j == len(item.Repos)-1 {
-				treePrefix = "   "
+			repoStem := "│  "
+			if isLastRepo {
+				repoStem = "   "
 			}
 			for _, detail := range repo.Details {
 				if strings.TrimSpace(detail) == "" {
 					continue
 				}
-				detailLine := fmt.Sprintf("%s%s %s", detailPrefix, treePrefix, detail)
+				detailLine := fmt.Sprintf("%s%s%s%s", output.Indent+output.Indent, workspaceStem, repoStem, detail)
 				if useColor {
 					detailLine = theme.Muted.Render(detailLine)
 				}
@@ -3142,7 +3165,21 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
 		return
 	}
-	for _, item := range items {
+	for i, item := range items {
+		workspaceConnector := "├─"
+		isLastWorkspace := i == len(items)-1
+		if isLastWorkspace {
+			workspaceConnector = "└─"
+		}
+		connectorToken := workspaceConnector
+		if useColor {
+			connectorToken = theme.Muted.Render(workspaceConnector)
+		}
+		workspaceStem := "│ "
+		if isLastWorkspace {
+			workspaceStem = "  "
+		}
+
 		displayID := item.ID
 		warnValue := shortWarningTag(item.Warning)
 		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
@@ -3177,13 +3214,14 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 				display += " - " + desc
 			}
 		}
-		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), display))
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, connectorToken, display))
 		for j, repo := range item.Repos {
-			connector := "├─"
-			if j == len(item.Repos)-1 {
-				connector = "└─"
+			repoConnector := "├─"
+			isLastRepo := j == len(item.Repos)-1
+			if isLastRepo {
+				repoConnector = "└─"
 			}
-			line := fmt.Sprintf("%s%s %s", output.Indent+output.Indent+output.Indent, connector, repo.Label)
+			line := fmt.Sprintf("%s%s%s %s", output.Indent+output.Indent, workspaceStem, repoConnector, repo.Label)
 			if useColor {
 				line = theme.Muted.Render(line)
 			}
@@ -3192,16 +3230,15 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 			if len(repo.Details) == 0 {
 				continue
 			}
-			detailPrefix := output.Indent + output.Indent + output.Indent
-			treePrefix := "│  "
-			if j == len(item.Repos)-1 {
-				treePrefix = "   "
+			repoStem := "│  "
+			if isLastRepo {
+				repoStem = "   "
 			}
 			for _, detail := range repo.Details {
 				if strings.TrimSpace(detail) == "" {
 					continue
 				}
-				detailLine := fmt.Sprintf("%s%s %s", detailPrefix, treePrefix, detail)
+				detailLine := fmt.Sprintf("%s%s%s%s", output.Indent+output.Indent, workspaceStem, repoStem, detail)
 				if useColor {
 					detailLine = theme.Muted.Render(detailLine)
 				}

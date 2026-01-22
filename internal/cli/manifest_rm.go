@@ -65,7 +65,7 @@ func runManifestRm(ctx context.Context, rootDir string, args []string, globalNoP
 		theme := ui.DefaultTheme()
 		useColor := isatty.IsTerminal(os.Stdout.Fd())
 		choices := buildManifestRmWorkspaceChoices(ctx, rootDir, desired)
-		selected, err := ui.PromptWorkspaceMultiSelectWithBlocked("gwst manifest rm", choices, nil, theme, useColor)
+		selected, err := ui.PromptWorkspaceMultiSelectNoConfirmWithBlocked("gwst manifest rm", choices, nil, theme, useColor)
 		if err != nil {
 			return err
 		}
