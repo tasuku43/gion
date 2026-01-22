@@ -137,6 +137,13 @@ func runManifestAdd(ctx context.Context, rootDir string, args []string, globalNo
 			if err := os.WriteFile(manifestPath, originalBytes, 0o644); err != nil {
 				return fmt.Errorf("restore gwst.yaml: %w", err)
 			}
+			renderer.Blank()
+			renderer.Section("Result")
+			if res.Canceled {
+				renderer.Bullet("gwst.yaml rolled back (apply canceled)")
+			} else {
+				renderer.Bullet("gwst.yaml rolled back (apply declined)")
+			}
 			return nil
 		}
 		return nil
