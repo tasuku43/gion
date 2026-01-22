@@ -190,7 +190,7 @@ func TestWorkspaceAddFetchesEvenWithinGraceWhenFetchTrue(t *testing.T) {
 		t.Fatalf("repo get: %v", err)
 	}
 
-	// remote advances after the last fetch, but grace should skip re-fetch
+	// remote advances after the last fetch; even within grace, fetch=true should observe the remote.
 	if err := os.WriteFile(filepath.Join(seedDir, "README.md"), []byte("hello v2\n"), 0o644); err != nil {
 		t.Fatalf("write seed file v2: %v", err)
 	}
