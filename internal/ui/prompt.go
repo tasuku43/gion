@@ -2309,28 +2309,17 @@ func (m workspaceSelectModel) filterWorkspaces() []WorkspaceChoice {
 	return out
 }
 
-type multiSelectStage int
-
-const (
-	multiSelectStageSelect multiSelectStage = iota
-	multiSelectStageConfirm
-)
-
 type workspaceMultiSelectModel struct {
-	title            string
-	workspaces       []WorkspaceChoice
-	blocked          []BlockedChoice
-	filtered         []WorkspaceChoice
-	selected         []WorkspaceChoice
-	selectedIDs      []string
-	cursor           int
-	err              error
-	errorLine        string
-	canceled         bool
-	stage            multiSelectStage
-	confirmEnabled   bool
-	confirmModel     confirmInlineModel
-	confirmInputsRaw []string
+	title       string
+	workspaces  []WorkspaceChoice
+	blocked     []BlockedChoice
+	filtered    []WorkspaceChoice
+	selected    []WorkspaceChoice
+	selectedIDs []string
+	cursor      int
+	err         error
+	errorLine   string
+	canceled    bool
 
 	theme    Theme
 	useColor bool
@@ -2340,10 +2329,6 @@ type workspaceMultiSelectModel struct {
 }
 
 func newWorkspaceMultiSelectModel(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, theme Theme, useColor bool) workspaceMultiSelectModel {
-	return newWorkspaceMultiSelectModelWithConfirm(title, workspaces, blocked, true, theme, useColor)
-}
-
-func newWorkspaceMultiSelectModelWithConfirm(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, confirmEnabled bool, theme Theme, useColor bool) workspaceMultiSelectModel {
 	input := textinput.New()
 	input.Prompt = ""
 	input.Placeholder = "search"
@@ -2352,13 +2337,12 @@ func newWorkspaceMultiSelectModelWithConfirm(title string, workspaces []Workspac
 		input.PlaceholderStyle = theme.Muted
 	}
 	m := workspaceMultiSelectModel{
-		title:          title,
-		workspaces:     workspaces,
-		blocked:        blocked,
-		confirmEnabled: confirmEnabled,
-		theme:          theme,
-		useColor:       useColor,
-		input:          input,
+		title:      title,
+		workspaces: workspaces,
+		blocked:    blocked,
+		theme:      theme,
+		useColor:   useColor,
+		input:      input,
 	}
 	m.filtered = m.filterWorkspaces()
 	return m
@@ -2373,23 +2357,6 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = size.Height
 		return m, nil
 	}
-	if m.stage == multiSelectStageConfirm {
-		model, _ := m.confirmModel.Update(msg)
-		m.confirmModel = model.(confirmInlineModel)
-		if m.confirmModel.err != nil {
-			if errors.Is(m.confirmModel.err, ErrPromptCanceled) {
-				m.canceled = true
-			}
-			return m, tea.Quit
-		}
-		if m.confirmModel.done {
-			if !m.confirmModel.value {
-				m.canceled = true
-			}
-			return m, tea.Quit
-		}
-		return m, nil
-	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -2401,7 +2368,7 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errorLine = "select at least one workspace"
 				return m, nil
 			}
-			return m.startConfirmIfNeeded()
+			return m, tea.Quit
 		case tea.KeyUp:
 			if m.cursor > 0 {
 				m.cursor--
@@ -2419,7 +2386,7 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.errorLine = "select at least one workspace"
 					return m, nil
 				}
-				return m.startConfirmIfNeeded()
+				return m, tea.Quit
 			}
 			if len(m.filtered) == 0 {
 				return m, nil
@@ -2448,16 +2415,6 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m workspaceMultiSelectModel) View() string {
-	if m.stage == multiSelectStageConfirm {
-		frame := NewFrame(m.theme, m.useColor)
-		label := promptLabel(m.theme, m.useColor, m.confirmModel.label)
-		line := fmt.Sprintf("%s (y/n): %s", label, m.confirmModel.input.View())
-		frame.SetInputsPrompt(line)
-		if len(m.confirmInputsRaw) > 0 {
-			frame.AppendInputsRaw(m.confirmInputsRaw...)
-		}
-		return frame.Render()
-	}
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
 	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
@@ -2506,61 +2463,6 @@ func (m workspaceMultiSelectModel) View() string {
 		frame.AppendInfoRaw(blockedLines...)
 	}
 	return frame.Render()
-}
-
-func (m workspaceMultiSelectModel) startConfirmIfNeeded() (workspaceMultiSelectModel, tea.Cmd) {
-	if !m.confirmEnabled {
-		return m, tea.Quit
-	}
-	label, needConfirm := confirmLabelForSelection(m.selected)
-	if !needConfirm {
-		return m, tea.Quit
-	}
-	m.confirmModel = newConfirmInlineModel(label, m.theme, m.useColor, false, nil, nil)
-	m.confirmInputsRaw = WorkspaceChoiceConfirmLines(m.selected, m.useColor, m.theme)
-	m.stage = multiSelectStageConfirm
-	return m, nil
-}
-
-func confirmLabelForSelection(selected []WorkspaceChoice) (string, bool) {
-	if len(selected) == 0 {
-		return "", false
-	}
-	if len(selected) == 1 {
-		warn := strings.TrimSpace(selected[0].Warning)
-		if warn == "" {
-			return "", false
-		}
-		switch strings.ToLower(warn) {
-		case "dirty changes":
-			return "This workspace has uncommitted changes. Remove anyway?", true
-		case "unpushed commits":
-			return "This workspace has unpushed commits. Remove anyway?", true
-		case "diverged or upstream missing":
-			return "This workspace has diverged from upstream. Remove anyway?", true
-		case "status unknown":
-			return "Workspace status could not be read. Remove anyway?", true
-		default:
-			return "This workspace has warnings. Remove anyway?", true
-		}
-	}
-	hasWarning := false
-	hasStrong := false
-	for _, item := range selected {
-		if strings.TrimSpace(item.Warning) != "" {
-			hasWarning = true
-		}
-		if item.WarningStrong {
-			hasStrong = true
-		}
-	}
-	if !hasWarning {
-		return fmt.Sprintf("Remove %d workspaces?", len(selected)), true
-	}
-	if hasStrong {
-		return fmt.Sprintf("Selected workspaces include uncommitted changes or status errors. Remove %d workspaces anyway?", len(selected)), true
-	}
-	return fmt.Sprintf("Selected workspaces have warnings. Remove %d workspaces anyway?", len(selected)), true
 }
 
 func (m workspaceMultiSelectModel) filterWorkspaces() []WorkspaceChoice {

@@ -85,24 +85,6 @@ func PromptWorkspaceMultiSelectWithBlocked(title string, workspaces []WorkspaceC
 	return append([]string(nil), final.selectedIDs...), nil
 }
 
-func PromptWorkspaceMultiSelectNoConfirmWithBlocked(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, theme Theme, useColor bool) ([]string, error) {
-	debuglog.SetPrompt("workspace")
-	defer debuglog.ClearPrompt()
-	model := newWorkspaceMultiSelectModelWithConfirm(title, workspaces, blocked, false, theme, useColor)
-	out, err := runProgram(model)
-	if err != nil {
-		return nil, err
-	}
-	final := out.(workspaceMultiSelectModel)
-	if final.err != nil {
-		return nil, final.err
-	}
-	if final.canceled {
-		return nil, nil
-	}
-	return append([]string(nil), final.selectedIDs...), nil
-}
-
 func PromptConfirmInline(label string, theme Theme, useColor bool) (bool, error) {
 	debuglog.SetPrompt(label)
 	defer debuglog.ClearPrompt()
