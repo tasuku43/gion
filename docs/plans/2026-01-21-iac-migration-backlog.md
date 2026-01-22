@@ -36,12 +36,12 @@ Policy:
 - [x] Align `gwst import` spec with current implementation.
 
 ### Implementation (separate PR)
-- [ ] Implement CLI routing + aliases (`manifest`/`man`/`m`, `manifest preset`/`pre`/`p`).
-- [ ] Remove `gwst ls` command (hard error + suggestion to use `gwst manifest ls`).
-- [ ] Implement `gwst manifest ls`.
-- [ ] Implement `gwst manifest add`.
-- [ ] Implement `gwst manifest rm`.
-- [ ] Implement `gwst manifest preset` subcommands.
+- [ ] Implement CLI routing + aliases (`manifest`/`man`/`m`, `manifest preset`/`pre`/`p`). (spec: `docs/spec/commands/manifest/README.md`)
+- [ ] Remove legacy `gwst ls` command (hard error + suggestion to use `gwst manifest ls`). (spec: `docs/spec/commands/ls.md`)
+- [ ] Implement `gwst manifest ls`. (spec: `docs/spec/commands/manifest/ls.md`, UI: `docs/spec/ui/UI.md`)
+- [ ] Implement `gwst manifest add`. (spec: `docs/spec/commands/manifest/add.md`, UI: `docs/spec/ui/UI.md`)
+- [ ] Implement `gwst manifest rm`. (spec: `docs/spec/commands/manifest/rm.md`, UI: `docs/spec/ui/UI.md`)
+- [ ] Implement `gwst manifest preset` subcommands. (specs: `docs/spec/commands/manifest/preset/*.md`)
 
 ## Command migration map (high level)
 
@@ -76,10 +76,14 @@ Removed / replaced:
 ### 2) CLI surface (routing, help, aliases)
 - Add `manifest` command router with aliases `man` and `m`.
 - Add `manifest preset` router with aliases `pre` and `p`.
-- Remove `ls` command:
+- Remove legacy `ls` command:
   - `gwst ls` should error and suggest `gwst manifest ls`.
   - Remove from global help and command help.
 - Ensure help lists alias forms minimally (avoid clutter) but keeps discoverability.
+
+Spec references:
+- `docs/spec/commands/manifest/README.md`
+- `docs/spec/commands/ls.md` (removed/superseded behavior)
 
 ### 3) Manifest editing primitives (library layer)
 - Implement a manifest read/modify/write package:
@@ -96,11 +100,19 @@ Removed / replaced:
   - Repo key format must match store keys.
   - Alias uniqueness within a workspace.
 
+Spec references:
+- Core model: `docs/spec/core/GWST.md`, `docs/spec/core/METADATA.md`
+- UI output: `docs/spec/ui/UI.md`
+
 ### 4) `gwst manifest ls` (inventory list + drift badges)
 - Implement per-workspace summary classification:
   - `applied`, `missing`, `drift`, plus filesystem-only `extra`.
 - Keep it lightweight; full details remain in `gwst plan`.
 - Output must follow `docs/spec/ui/UI.md` section order.
+
+Spec references:
+- `docs/spec/commands/manifest/ls.md`
+- `docs/spec/ui/UI.md`
 
 ### 5) `gwst manifest add` (replace create flows)
 - Preserve the interactive selection UX from `gwst create`:
@@ -113,14 +125,20 @@ Removed / replaced:
 - GitHub PR URL handling:
   - Use `gh` for PR/issue metadata fetch (same as current create spec)
 
+Spec references:
+- `docs/spec/commands/manifest/add.md`
+- `docs/spec/ui/UI.md`
+
 ### 6) `gwst manifest rm` (replace rm flow)
 - Preserve the interactive selection UX from `gwst rm` (multi-select, warnings).
 - Replace destructive filesystem removal with:
   - Update `gwst.yaml` to remove the workspace entry(ies)
   - Run `gwst apply` (which handles destructive confirmation rules)
-- Ensure the UX still surfaces risk context:
-  - Either show summarized risk in manifest rm itself before apply
-  - Or rely on `gwst apply` plan output to show risk for removals (decision needed)
+- Ensure the UX still surfaces risk context (lightweight tags in selection; deep review in apply plan).
+
+Spec references:
+- `docs/spec/commands/manifest/rm.md`
+- `docs/spec/ui/UI.md`
 
 ### 7) Preset commands under `gwst manifest`
 - Implement:
@@ -128,14 +146,24 @@ Removed / replaced:
   - `gwst manifest preset rm`: remove preset entries
   - `gwst manifest preset ls`: list presets
   - `gwst manifest preset validate`: validate manifest presets
-- Decide if legacy `gwst preset ...` remains as alias temporarily or is removed immediately.
+
+Spec references:
+- `docs/spec/commands/manifest/preset/add.md`
+- `docs/spec/commands/manifest/preset/rm.md`
+- `docs/spec/commands/manifest/preset/ls.md`
+- `docs/spec/commands/manifest/preset/validate.md`
 
 ### 8) Apply / plan / import alignment
 - Ensure `gwst apply` remains the only executor:
   - Any manifest mutations that imply destructive actions must still require prompt through apply.
 - Confirm drift semantics:
   - How to classify workspace-level drift vs repo-level drift for list output.
-- Implement `gwst import` (currently planned) early if needed to support real-world drift capture.
+- `gwst import` is implemented; keep aligning behavior/output as needed.
+
+Spec references:
+- `docs/spec/commands/apply.md`
+- `docs/spec/commands/plan.md`
+- `docs/spec/commands/import.md`
 
 ### 9) Docs & guides
 - Update `docs/guides/USECASES.md` with new workflows:
