@@ -85,6 +85,7 @@ type inputsModel struct {
 type createFlowModel struct {
 	stage createFlowStage
 	mode  string
+	title string
 
 	presets []string
 	tmplErr error
@@ -148,6 +149,7 @@ func newCreateFlowModel(title string, presets []string, tmplErr error, repoChoic
 		repoChoices:        repoChoices,
 		repoErr:            repoErr,
 		defaultWorkspaceID: defaultWorkspaceID,
+		title:              title,
 		modeInput:          input,
 		reviewRepos:        reviewRepos,
 		issueRepos:         issueRepos,
@@ -168,7 +170,7 @@ func newCreateFlowModel(title string, presets []string, tmplErr error, repoChoic
 			if m.onReposResolved != nil {
 				m.onReposResolved(m.presetRepos)
 			}
-			m.presetModel = newInputsModelWithLabel("gwst create", nil, m.repoSelected, m.defaultWorkspaceID, "repo", m.theme, m.useColor)
+			m.presetModel = newInputsModelWithLabel(m.title, nil, m.repoSelected, m.defaultWorkspaceID, "repo", m.theme, m.useColor)
 			m.stage = createStageRepoWorkspace
 		} else {
 			m.startMode(startMode, presetName)
@@ -197,7 +199,7 @@ func (m *createFlowModel) startMode(mode, presetName string) {
 		}
 		m.mode = mode
 		m.stage = createStagePreset
-		m.presetModel = newInputsModel("gwst create", m.presets, presetName, m.defaultWorkspaceID, m.theme, m.useColor)
+		m.presetModel = newInputsModel(m.title, m.presets, presetName, m.defaultWorkspaceID, m.theme, m.useColor)
 	case "review":
 		if len(m.reviewRepos) == 0 {
 			m.err = fmt.Errorf("no GitHub repos found")
@@ -205,7 +207,7 @@ func (m *createFlowModel) startMode(mode, presetName string) {
 		}
 		m.mode = mode
 		m.stage = createStageReviewRepo
-		m.reviewRepoModel = newChoiceSelectModel("gwst create", "repo", m.reviewRepos, m.theme, m.useColor)
+		m.reviewRepoModel = newChoiceSelectModel(m.title, "repo", m.reviewRepos, m.theme, m.useColor)
 	case "issue":
 		if len(m.issueRepos) == 0 {
 			m.err = fmt.Errorf("no repos with supported hosts found")
@@ -213,7 +215,7 @@ func (m *createFlowModel) startMode(mode, presetName string) {
 		}
 		m.mode = mode
 		m.stage = createStageIssueRepo
-		m.issueRepoModel = newChoiceSelectModel("gwst create", "repo", m.issueRepos, m.theme, m.useColor)
+		m.issueRepoModel = newChoiceSelectModel(m.title, "repo", m.issueRepos, m.theme, m.useColor)
 	case "repo":
 		if m.repoErr != nil {
 			m.err = m.repoErr
@@ -225,7 +227,7 @@ func (m *createFlowModel) startMode(mode, presetName string) {
 		}
 		m.mode = mode
 		m.stage = createStageRepoSelect
-		m.repoSelectModel = newChoiceSelectModel("gwst create", "repo", m.repoChoices, m.theme, m.useColor)
+		m.repoSelectModel = newChoiceSelectModel(m.title, "repo", m.repoChoices, m.theme, m.useColor)
 	default:
 		m.err = fmt.Errorf("unknown mode: %s", mode)
 	}
@@ -299,21 +301,21 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, tea.Quit
 					}
 					m.stage = createStagePreset
-					m.presetModel = newInputsModel("gwst create", m.presets, "", "", m.theme, m.useColor)
+					m.presetModel = newInputsModel(m.title, m.presets, "", "", m.theme, m.useColor)
 				case "review":
 					if len(m.reviewRepos) == 0 {
 						m.err = fmt.Errorf("no GitHub repos found")
 						return m, tea.Quit
 					}
 					m.stage = createStageReviewRepo
-					m.reviewRepoModel = newChoiceSelectModel("gwst create", "repo", m.reviewRepos, m.theme, m.useColor)
+					m.reviewRepoModel = newChoiceSelectModel(m.title, "repo", m.reviewRepos, m.theme, m.useColor)
 				case "issue":
 					if len(m.issueRepos) == 0 {
 						m.err = fmt.Errorf("no repos with supported hosts found")
 						return m, tea.Quit
 					}
 					m.stage = createStageIssueRepo
-					m.issueRepoModel = newChoiceSelectModel("gwst create", "repo", m.issueRepos, m.theme, m.useColor)
+					m.issueRepoModel = newChoiceSelectModel(m.title, "repo", m.issueRepos, m.theme, m.useColor)
 				case "repo":
 					if m.repoErr != nil {
 						m.err = m.repoErr
@@ -324,7 +326,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, tea.Quit
 					}
 					m.stage = createStageRepoSelect
-					m.repoSelectModel = newChoiceSelectModel("gwst create", "repo", m.repoChoices, m.theme, m.useColor)
+					m.repoSelectModel = newChoiceSelectModel(m.title, "repo", m.repoChoices, m.theme, m.useColor)
 				default:
 					m.err = fmt.Errorf("unknown mode: %s", m.mode)
 					return m, tea.Quit
@@ -460,7 +462,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.err = fmt.Errorf("no pull requests found")
 				return m, tea.Quit
 			}
-			m.reviewPRModel = newMultiSelectModel("gwst create", "pull request", choices, m.theme, m.useColor)
+			m.reviewPRModel = newMultiSelectModel(m.title, "pull request", choices, m.theme, m.useColor)
 			m.stage = createStageReviewPRs
 		}
 		return m, nil
@@ -493,7 +495,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.err = fmt.Errorf("no issues found")
 				return m, tea.Quit
 			}
-			m.issueIssueModel = newIssueBranchSelectModel("gwst create", "issue", choices, m.validateBranch, m.theme, m.useColor)
+			m.issueIssueModel = newIssueBranchSelectModel(m.title, "issue", choices, m.validateBranch, m.theme, m.useColor)
 			m.stage = createStageIssueIssues
 		}
 		return m, nil
@@ -518,7 +520,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.onReposResolved != nil {
 				m.onReposResolved(m.presetRepos)
 			}
-			m.presetModel = newInputsModelWithLabel("gwst create", nil, m.repoSelected, m.defaultWorkspaceID, "repo", m.theme, m.useColor)
+			m.presetModel = newInputsModelWithLabel(m.title, nil, m.repoSelected, m.defaultWorkspaceID, "repo", m.theme, m.useColor)
 			m.stage = createStageRepoWorkspace
 		}
 		return m, nil
@@ -2504,247 +2506,6 @@ func (m workspaceMultiSelectModel) filterWorkspaces() []WorkspaceChoice {
 	return out
 }
 
-type addInputsStage int
-
-const (
-	addStageWorkspace addInputsStage = iota
-	addStageRepo
-	addStageDone
-)
-
-type addInputsModel struct {
-	title       string
-	workspaces  []WorkspaceChoice
-	repos       []PromptChoice
-	workspaceID string
-	repoSpec    string
-	repoLabel   string
-
-	stage    addInputsStage
-	theme    Theme
-	useColor bool
-
-	wsInput   textinput.Model
-	repoInput textinput.Model
-
-	wsFiltered   []WorkspaceChoice
-	repoFiltered []PromptChoice
-	cursor       int
-	wsRepoKeys   map[string]map[string]struct{}
-
-	err error
-
-	height int
-}
-
-func newAddInputsModel(title string, workspaces []WorkspaceChoice, repos []PromptChoice, workspaceID, repoSpec string, theme Theme, useColor bool) addInputsModel {
-	wsInput := textinput.New()
-	wsInput.Prompt = ""
-	wsInput.Placeholder = "search"
-	if useColor {
-		wsInput.PlaceholderStyle = theme.Muted
-	}
-
-	repoInput := textinput.New()
-	repoInput.Prompt = ""
-	repoInput.Placeholder = "search"
-	if useColor {
-		repoInput.PlaceholderStyle = theme.Muted
-	}
-
-	stage := addStageWorkspace
-	if strings.TrimSpace(workspaceID) != "" {
-		stage = addStageRepo
-		repoInput.Focus()
-	} else {
-		wsInput.Focus()
-	}
-
-	m := addInputsModel{
-		title:       title,
-		workspaces:  workspaces,
-		repos:       repos,
-		workspaceID: workspaceID,
-		repoSpec:    repoSpec,
-		stage:       stage,
-		theme:       theme,
-		useColor:    useColor,
-		wsInput:     wsInput,
-		repoInput:   repoInput,
-		wsRepoKeys:  buildWorkspaceRepoKeys(workspaces),
-	}
-	m.wsFiltered = m.filterWorkspaces()
-	m.repoFiltered = m.filterRepos()
-	return m
-}
-
-func (m addInputsModel) Init() tea.Cmd {
-	return textinput.Blink
-}
-
-func (m addInputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.height = msg.Height
-		return m, nil
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
-			m.err = ErrPromptCanceled
-			return m, tea.Quit
-		case tea.KeyUp:
-			if m.cursor > 0 {
-				m.cursor--
-			}
-			return m, nil
-		case tea.KeyDown:
-			if m.cursor < m.maxCursor() {
-				m.cursor++
-			}
-			return m, nil
-		case tea.KeyEnter:
-			if m.stage == addStageWorkspace {
-				if len(m.wsFiltered) == 0 {
-					return m, nil
-				}
-				m.workspaceID = m.wsFiltered[m.cursor].ID
-				m.stage = addStageRepo
-				m.cursor = 0
-				m.repoInput.Focus()
-				return m, nil
-			}
-			if m.stage == addStageRepo {
-				if len(m.repoFiltered) == 0 {
-					return m, nil
-				}
-				choice := m.repoFiltered[m.cursor]
-				m.repoSpec = choice.Value
-				m.repoLabel = choice.Label
-				m.stage = addStageDone
-				return m, tea.Quit
-			}
-		}
-	}
-
-	var cmd tea.Cmd
-	if m.stage == addStageWorkspace {
-		m.wsInput, cmd = m.wsInput.Update(msg)
-		m.wsFiltered = m.filterWorkspaces()
-		if m.cursor >= len(m.wsFiltered) {
-			m.cursor = max(0, len(m.wsFiltered)-1)
-		}
-	} else if m.stage == addStageRepo {
-		m.repoInput, cmd = m.repoInput.Update(msg)
-		m.repoFiltered = m.filterRepos()
-		if m.cursor >= len(m.repoFiltered) {
-			m.cursor = max(0, len(m.repoFiltered)-1)
-		}
-	}
-	return m, cmd
-}
-
-func (m addInputsModel) View() string {
-	frame := NewFrame(m.theme, m.useColor)
-	labelWorkspace := promptLabel(m.theme, m.useColor, "workspace id")
-	if m.stage == addStageWorkspace {
-		frame.SetInputsPrompt(fmt.Sprintf("%s: %s", labelWorkspace, m.wsInput.View()))
-		maxLines := listMaxLines(m.height, 1, 0)
-		rawLines := collectLines(func(b *strings.Builder) {
-			renderWorkspaceChoiceList(b, m.wsFiltered, m.cursor, maxLines, m.useColor, m.theme)
-		})
-		frame.AppendInputsRaw(rawLines...)
-	} else {
-		frame.SetInputsPrompt(fmt.Sprintf("%s: %s", labelWorkspace, m.workspaceID))
-		var repoDetailLines []string
-		if selected, ok := m.selectedWorkspace(); ok {
-			repoDetailLines = collectLines(func(b *strings.Builder) {
-				renderRepoDetailList(b, selected.Repos, output.Indent+output.Indent, m.useColor, m.theme)
-			})
-			frame.AppendInputsRaw(repoDetailLines...)
-		}
-
-		labelRepo := promptLabel(m.theme, m.useColor, "repo")
-		if m.stage == addStageRepo {
-			frame.AppendInputsPrompt(fmt.Sprintf("%s: %s", labelRepo, m.repoInput.View()))
-			inputLines := 1 + len(repoDetailLines) + 1
-			maxLines := listMaxLines(m.height, inputLines, 0)
-			rawLines := collectLines(func(b *strings.Builder) {
-				renderChoiceList(b, m.repoLabels(), m.cursor, maxLines, m.useColor, m.theme)
-			})
-			frame.AppendInputsRaw(rawLines...)
-		} else if m.repoLabel != "" {
-			frame.AppendInputsPrompt(fmt.Sprintf("%s: %s", labelRepo, m.repoLabel))
-		}
-	}
-
-	return frame.Render()
-}
-
-func (m addInputsModel) maxCursor() int {
-	if m.stage == addStageWorkspace {
-		return max(0, len(m.wsFiltered)-1)
-	}
-	if m.stage == addStageRepo {
-		return max(0, len(m.repoFiltered)-1)
-	}
-	return max(0, len(m.repoFiltered)-1)
-}
-
-func (m addInputsModel) filterWorkspaces() []WorkspaceChoice {
-	q := strings.ToLower(strings.TrimSpace(m.wsInput.Value()))
-	if q == "" {
-		return append([]WorkspaceChoice(nil), m.workspaces...)
-	}
-	var out []WorkspaceChoice
-	for _, item := range m.workspaces {
-		if strings.Contains(strings.ToLower(item.ID), q) || strings.Contains(strings.ToLower(item.Description), q) {
-			out = append(out, item)
-		}
-	}
-	return out
-}
-
-func (m addInputsModel) filterRepos() []PromptChoice {
-	q := strings.ToLower(strings.TrimSpace(m.repoInput.Value()))
-	blocked := m.wsRepoKeys[m.workspaceID]
-	if q == "" {
-		return filterRepoChoices(m.repos, blocked, "")
-	}
-	return filterRepoChoices(m.repos, blocked, q)
-}
-
-func (m addInputsModel) repoLabels() []string {
-	labels := make([]string, 0, len(m.repoFiltered))
-	for _, item := range m.repoFiltered {
-		labels = append(labels, item.Label)
-	}
-	return labels
-}
-
-func (m addInputsModel) currentRepoLabel() string {
-	if m.repoLabel != "" {
-		return m.repoLabel
-	}
-	if strings.TrimSpace(m.repoSpec) != "" {
-		return m.repoSpec
-	}
-	return ""
-}
-
-func formatAddInputsHeader(title, workspaceID, repoLabel string) string {
-	var parts []string
-	if strings.TrimSpace(workspaceID) != "" {
-		parts = append(parts, fmt.Sprintf("workspace id: %s", workspaceID))
-	}
-	if strings.TrimSpace(repoLabel) != "" {
-		parts = append(parts, fmt.Sprintf("repo: %s", repoLabel))
-	}
-	if len(parts) == 0 {
-		return title
-	}
-	return fmt.Sprintf("%s (%s)", title, strings.Join(parts, ", "))
-}
-
 func listWindow(total int, cursor int, maxVisible int) (int, int) {
 	if maxVisible <= 0 || total <= maxVisible {
 		return 0, total
@@ -3193,44 +2954,4 @@ func renderBlockedChoiceList(b *strings.Builder, items []BlockedChoice, useColor
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
-}
-
-func (m addInputsModel) selectedWorkspace() (WorkspaceChoice, bool) {
-	for _, ws := range m.workspaces {
-		if ws.ID == m.workspaceID {
-			return ws, true
-		}
-	}
-	return WorkspaceChoice{}, false
-}
-
-func buildWorkspaceRepoKeys(workspaces []WorkspaceChoice) map[string]map[string]struct{} {
-	out := make(map[string]map[string]struct{}, len(workspaces))
-	for _, ws := range workspaces {
-		keys := make(map[string]struct{})
-		for _, repo := range ws.Repos {
-			if strings.TrimSpace(repo.Value) == "" {
-				continue
-			}
-			keys[repo.Value] = struct{}{}
-		}
-		out[ws.ID] = keys
-	}
-	return out
-}
-
-func filterRepoChoices(items []PromptChoice, blocked map[string]struct{}, query string) []PromptChoice {
-	var out []PromptChoice
-	for _, item := range items {
-		if blocked != nil {
-			if _, exists := blocked[item.Label]; exists {
-				continue
-			}
-		}
-		if query != "" && !strings.Contains(strings.ToLower(item.Label), query) {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
 }

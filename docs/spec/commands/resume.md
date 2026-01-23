@@ -15,8 +15,8 @@ Rehydrate work from a remote branch or tag by fetching the ref into the bare sto
   - `<ref>`: remote branch or tag name. If it looks like a full ref (`refs/heads/...`, `refs/tags/...`, `origin/...`), it is used as-is; otherwise treated as a branch or tag on `origin`.
 - Workspace selection:
   - If `--workspace` is given, target that workspace (must exist).
-  - Otherwise, prompt to select a workspace (like `gwst add`). If none exist, error.
-- Prompt supports filtering (like `gwst add`): type-to-filter, Enter to select, selection removes the item, Ctrl+D/done to finish.
+  - Otherwise, prompt to select a workspace (filterable). If none exist, error.
+- Prompt supports filtering: type-to-filter, Enter to select, selection removes the item, Ctrl+D/done to finish.
 - Fetch:
   - Run `git fetch origin <ref>` in the bare store (creating the store via `gwst repo get` if missing; prompts unless `--no-prompt`, where it errors instead).
   - If the remote ref is already up to date (same object id locally), skip fetch.
@@ -28,7 +28,7 @@ Rehydrate work from a remote branch or tag by fetching the ref into the bare sto
     - With `--reuse`, do not create a new worktree; instead, print its path and suggest `cd` (no checkout/reset performed).
     - Without `--reuse`, error.
 - Base ref: when the branch doesn’t exist locally, create it from `origin/<ref>` (for branches) or from the fetched tag commit when `--branch` is specified for tags.
-  - If the remote branch/tag does not exist, error (advise to use `gwst create --preset` for new branches).
+  - If the remote branch/tag does not exist, error (advise to use `gwst manifest add --preset` for new branches).
 - Output: standard gwst style (no header line; steps, result, suggestion). Result lists workspace, alias, branch, and path.
 
 ## Success Criteria
