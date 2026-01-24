@@ -1,7 +1,6 @@
 # gion — inventory-driven Git workspaces with guardrails
 
-Create and delete whole workspaces (single- or multi-repo) safely using Git worktrees.
-Designed for human + agentic development: each task (or each agent) gets an isolated workspace directory.
+Git workspaces as code, with guardrails. Built on Git worktrees: define a YAML inventory, then plan/apply to reconcile safely.
 
 ## Demo
 
