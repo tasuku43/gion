@@ -50,6 +50,7 @@ const (
 
 type WorkspaceChoice struct {
 	ID            string
+	WorkspacePath string
 	Description   string
 	Repos         []PromptChoice
 	Warning       string
@@ -2133,6 +2134,18 @@ func runProgramWithOutput(model tea.Model, out io.Writer) (tea.Model, error) {
 	return unwrapWindowSizeModel(final), nil
 }
 
+func runProgramWithIO(model tea.Model, in io.Reader, out io.Writer, altScreen bool) (tea.Model, error) {
+	opts := []tea.ProgramOption{tea.WithInput(in), tea.WithOutput(out)}
+	if altScreen {
+		opts = append(opts, tea.WithAltScreen())
+	}
+	final, err := tea.NewProgram(windowSizeModel{inner: model}, opts...).Run()
+	if err != nil {
+		return final, err
+	}
+	return unwrapWindowSizeModel(final), nil
+}
+
 func collectLines(render func(*strings.Builder)) []string {
 	var b strings.Builder
 	render(&b)
@@ -2301,6 +2314,334 @@ func (m workspaceSelectModel) filterWorkspaces() []WorkspaceChoice {
 		}
 	}
 	return out
+}
+
+type workspaceRepoSelection struct {
+	WorkspaceIndex int
+	RepoIndex      int
+	Path           string
+}
+
+type workspaceRepoSelectModel struct {
+	title      string
+	workspaces []WorkspaceChoice
+	theme      Theme
+	useColor   bool
+
+	input      textinput.Model
+	filtered   []WorkspaceChoice
+	selections []workspaceRepoSelection
+	cursor     int
+	err        error
+
+	selectedPath string
+	height       int
+	lastQuery    string
+}
+
+func newWorkspaceRepoSelectModel(title string, workspaces []WorkspaceChoice, theme Theme, useColor bool) workspaceRepoSelectModel {
+	input := textinput.New()
+	input.Prompt = ""
+	input.Placeholder = "search"
+	input.Focus()
+	if useColor {
+		input.PlaceholderStyle = theme.Muted
+	}
+	m := workspaceRepoSelectModel{
+		title:      title,
+		workspaces: workspaces,
+		theme:      theme,
+		useColor:   useColor,
+		input:      input,
+	}
+	m.filtered = m.filterWorkspaces()
+	m.rebuildSelections()
+	m.lastQuery = strings.TrimSpace(m.input.Value())
+	if m.lastQuery != "" && len(m.selections) > 0 {
+		m.cursor = m.bestSelectionIndex(m.lastQuery)
+	}
+	return m
+}
+
+func (m workspaceRepoSelectModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m workspaceRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.height = msg.Height
+		return m, nil
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			m.err = ErrPromptCanceled
+			return m, tea.Quit
+		case tea.KeyUp:
+			if m.cursor > 0 {
+				m.cursor--
+			}
+			return m, nil
+		case tea.KeyDown:
+			if m.cursor < len(m.selections)-1 {
+				m.cursor++
+			}
+			return m, nil
+		case tea.KeyEnter:
+			if len(m.selections) == 0 {
+				return m, nil
+			}
+			m.selectedPath = m.selections[m.cursor].Path
+			return m, tea.Quit
+		}
+	}
+
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	m.filtered = m.filterWorkspaces()
+	m.rebuildSelections()
+	nextQuery := strings.TrimSpace(m.input.Value())
+	if nextQuery != m.lastQuery {
+		if nextQuery != "" && len(m.selections) > 0 {
+			m.cursor = m.bestSelectionIndex(nextQuery)
+		}
+		m.lastQuery = nextQuery
+	}
+	if m.cursor >= len(m.selections) {
+		m.cursor = max(0, len(m.selections)-1)
+	}
+	return m, cmd
+}
+
+func (m workspaceRepoSelectModel) View() string {
+	frame := NewFrame(m.theme, m.useColor)
+	label := promptLabel(m.theme, m.useColor, "workspace")
+	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+	maxLines := listMaxLines(m.height, 1, 0)
+	cursorWorkspace := 0
+	if len(m.selections) > 0 && m.cursor >= 0 && m.cursor < len(m.selections) {
+		cursorWorkspace = m.selections[m.cursor].WorkspaceIndex
+	}
+	rawLines := collectLines(func(b *strings.Builder) {
+		renderWorkspaceRepoChoiceList(b, m.filtered, m.cursor, cursorWorkspace, maxLines, m.useColor, m.theme)
+	})
+	frame.AppendInputsRaw(rawLines...)
+	return frame.Render()
+}
+
+func (m *workspaceRepoSelectModel) rebuildSelections() {
+	m.selections = m.selections[:0]
+	for wsIndex, ws := range m.filtered {
+		path := strings.TrimSpace(ws.WorkspacePath)
+		if path == "" {
+			path = strings.TrimSpace(ws.ID)
+		}
+		if path != "" {
+			m.selections = append(m.selections, workspaceRepoSelection{
+				WorkspaceIndex: wsIndex,
+				RepoIndex:      -1,
+				Path:           path,
+			})
+		}
+		for repoIndex, repo := range ws.Repos {
+			repoPath := strings.TrimSpace(repo.Value)
+			if repoPath == "" {
+				continue
+			}
+			m.selections = append(m.selections, workspaceRepoSelection{
+				WorkspaceIndex: wsIndex,
+				RepoIndex:      repoIndex,
+				Path:           repoPath,
+			})
+		}
+	}
+}
+
+func (m workspaceRepoSelectModel) filterWorkspaces() []WorkspaceChoice {
+	q := strings.ToLower(strings.TrimSpace(m.input.Value()))
+	if q == "" {
+		return cloneWorkspaceChoices(m.workspaces)
+	}
+	var out []WorkspaceChoice
+	for _, item := range m.workspaces {
+		wsMatch := workspaceChoiceMatches(item, q)
+		var repos []PromptChoice
+		if wsMatch {
+			repos = append(repos, item.Repos...)
+		} else {
+			for _, repo := range item.Repos {
+				if repoChoiceMatches(repo, q) {
+					repos = append(repos, repo)
+				}
+			}
+		}
+		if wsMatch || len(repos) > 0 {
+			cloned := item
+			cloned.Repos = repos
+			out = append(out, cloned)
+		}
+	}
+	return out
+}
+
+func (m workspaceRepoSelectModel) bestSelectionIndex(q string) int {
+	if len(m.selections) == 0 {
+		return 0
+	}
+	bestIndex := 0
+	bestScore := -1
+	query := strings.ToLower(strings.TrimSpace(q))
+	for i, sel := range m.selections {
+		text := m.selectionSearchText(sel)
+		score := fuzzyScore(strings.ToLower(text), query)
+		if score < 0 {
+			continue
+		}
+		if bestScore == -1 || score < bestScore || (score == bestScore && sel.RepoIndex >= 0 && m.selections[bestIndex].RepoIndex < 0) {
+			bestScore = score
+			bestIndex = i
+		}
+	}
+	if bestScore == -1 {
+		return 0
+	}
+	return bestIndex
+}
+
+func (m workspaceRepoSelectModel) selectionSearchText(sel workspaceRepoSelection) string {
+	if sel.WorkspaceIndex < 0 || sel.WorkspaceIndex >= len(m.filtered) {
+		return ""
+	}
+	ws := m.filtered[sel.WorkspaceIndex]
+	if sel.RepoIndex < 0 {
+		return workspaceSearchText(ws)
+	}
+	if sel.RepoIndex >= len(ws.Repos) {
+		return workspaceSearchText(ws)
+	}
+	repo := ws.Repos[sel.RepoIndex]
+	return repoSearchText(ws, repo)
+}
+
+func workspaceSearchText(ws WorkspaceChoice) string {
+	parts := []string{ws.ID, ws.Description}
+	return strings.TrimSpace(strings.Join(parts, " "))
+}
+
+func repoSearchText(ws WorkspaceChoice, repo PromptChoice) string {
+	parts := []string{
+		repo.Label,
+		repo.Description,
+	}
+	if len(repo.Details) > 0 {
+		parts = append(parts, repo.Details...)
+	}
+	if repo.Value != "" {
+		parts = append(parts, repo.Value)
+	}
+	parts = append(parts, ws.ID, ws.Description)
+	return strings.TrimSpace(strings.Join(parts, " "))
+}
+
+func cloneWorkspaceChoices(items []WorkspaceChoice) []WorkspaceChoice {
+	out := make([]WorkspaceChoice, 0, len(items))
+	for _, item := range items {
+		cloned := item
+		if len(item.Repos) > 0 {
+			cloned.Repos = append([]PromptChoice(nil), item.Repos...)
+		}
+		out = append(out, cloned)
+	}
+	return out
+}
+
+func workspaceChoiceMatches(item WorkspaceChoice, q string) bool {
+	if fuzzyMatch(strings.ToLower(item.ID), q) {
+		return true
+	}
+	if fuzzyMatch(strings.ToLower(item.Description), q) {
+		return true
+	}
+	return false
+}
+
+func repoChoiceMatches(repo PromptChoice, q string) bool {
+	if fuzzyMatch(strings.ToLower(repo.Label), q) {
+		return true
+	}
+	if fuzzyMatch(strings.ToLower(repo.Value), q) {
+		return true
+	}
+	if fuzzyMatch(strings.ToLower(repo.Description), q) {
+		return true
+	}
+	for _, detail := range repo.Details {
+		if fuzzyMatch(strings.ToLower(detail), q) {
+			return true
+		}
+	}
+	return false
+}
+
+func fuzzyMatch(haystack, needle string) bool {
+	q := strings.ToLower(strings.TrimSpace(needle))
+	if q == "" {
+		return true
+	}
+	q = strings.Join(strings.Fields(q), "")
+	if q == "" {
+		return true
+	}
+	if haystack == "" {
+		return false
+	}
+	j := 0
+	for i := 0; i < len(haystack) && j < len(q); i++ {
+		if haystack[i] == q[j] {
+			j++
+		}
+	}
+	return j == len(q)
+}
+
+func fuzzyScore(haystack, needle string) int {
+	q := strings.ToLower(strings.TrimSpace(needle))
+	if q == "" {
+		return 0
+	}
+	q = strings.Join(strings.Fields(q), "")
+	if q == "" {
+		return 0
+	}
+	if haystack == "" {
+		return -1
+	}
+	j := 0
+	first := -1
+	last := -1
+	prev := -1
+	gaps := 0
+	for i := 0; i < len(haystack) && j < len(q); i++ {
+		if haystack[i] == q[j] {
+			if first == -1 {
+				first = i
+			}
+			if prev != -1 {
+				gaps += i - prev - 1
+			}
+			prev = i
+			last = i
+			j++
+		}
+	}
+	if j != len(q) {
+		return -1
+	}
+	span := 0
+	if first >= 0 && last >= 0 {
+		span = last - first
+	}
+	return gaps + span + first*2
 }
 
 type workspaceMultiSelectModel struct {
@@ -2720,6 +3061,140 @@ func renderSelectedWorkspaceTree(b *strings.Builder, items []WorkspaceChoice, us
 		}
 		b.WriteString(line)
 		b.WriteString("\n")
+	}
+}
+
+func renderWorkspaceRepoChoiceList(b *strings.Builder, items []WorkspaceChoice, cursor int, cursorWorkspace int, maxVisible int, useColor bool, theme Theme) {
+	if len(items) == 0 {
+		msg := "no matches"
+		if useColor {
+			msg = theme.Muted.Render(msg)
+		}
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
+		return
+	}
+
+	start, end := listWindow(len(items), cursorWorkspace, maxVisible)
+	selectIndex := 0
+	for i := 0; i < start; i++ {
+		selectIndex++
+		selectIndex += len(items[i].Repos)
+	}
+
+	baseIndent := output.Indent + output.Indent
+	selectIndent := func(selected bool) string {
+		if !selected || useColor {
+			return baseIndent
+		}
+		return ">" + baseIndent[1:]
+	}
+
+	for i := start; i < end; i++ {
+		item := items[i]
+		workspaceConnector := "├─"
+		isLastWorkspace := i == end-1
+		if isLastWorkspace {
+			workspaceConnector = "└─"
+		}
+		connectorToken := workspaceConnector
+		if useColor {
+			connectorToken = theme.Muted.Render(workspaceConnector)
+		}
+		workspaceStem := "│ "
+		if isLastWorkspace {
+			workspaceStem = "  "
+		}
+
+		selectedWorkspace := selectIndex == cursor
+		displayID := item.ID
+		warnValue := shortWarningTag(item.Warning)
+		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
+		warnStyle := theme.SoftWarn
+		if item.WarningStrong {
+			warnStyle = theme.Warn
+		}
+		warnTag := ""
+		if hasWarn {
+			warnTag = "[" + warnValue + "]"
+		}
+		if useColor {
+			switch {
+			case hasWarn && selectedWorkspace:
+				displayID = warnStyle.Copy().Bold(true).Render(displayID)
+			case hasWarn:
+				displayID = warnStyle.Render(displayID)
+			case selectedWorkspace:
+				displayID = lipgloss.NewStyle().Bold(true).Render(displayID)
+			}
+		}
+		display := displayID
+		if warnTag != "" {
+			tag := warnTag
+			if useColor {
+				if hasWarn {
+					tag = warnStyle.Render(warnTag)
+				} else {
+					tag = theme.Accent.Render(warnTag)
+				}
+			}
+			display += tag
+		}
+		desc := strings.TrimSpace(item.Description)
+		if desc != "" {
+			if useColor {
+				display += theme.Muted.Render(" - " + desc)
+			} else {
+				display += " - " + desc
+			}
+		}
+		indent := selectIndent(selectedWorkspace)
+		b.WriteString(fmt.Sprintf("%s%s %s\n", indent, connectorToken, display))
+		selectIndex++
+
+		if len(item.Repos) == 0 {
+			continue
+		}
+		for j, repo := range item.Repos {
+			repoConnector := "├─"
+			isLastRepo := j == len(item.Repos)-1
+			if isLastRepo {
+				repoConnector = "└─"
+			}
+			selectedRepo := selectIndex == cursor
+			stemToken := workspaceStem
+			connector := repoConnector
+			if useColor {
+				stemToken = theme.Muted.Render(workspaceStem)
+				connector = theme.Muted.Render(repoConnector)
+			}
+			repoLabel := repo.Label
+			if useColor && selectedRepo {
+				repoLabel = lipgloss.NewStyle().Bold(true).Render(repoLabel)
+			}
+			indent := selectIndent(selectedRepo)
+			line := fmt.Sprintf("%s%s%s %s", indent, stemToken, connector, repoLabel)
+			b.WriteString(line)
+			b.WriteString("\n")
+			selectIndex++
+			if len(repo.Details) == 0 {
+				continue
+			}
+			repoStem := "│  "
+			if isLastRepo {
+				repoStem = "   "
+			}
+			for _, detail := range repo.Details {
+				if strings.TrimSpace(detail) == "" {
+					continue
+				}
+				detailLine := fmt.Sprintf("%s%s%s%s", output.Indent+output.Indent, workspaceStem, repoStem, detail)
+				if useColor {
+					detailLine = theme.Muted.Render(detailLine)
+				}
+				b.WriteString(detailLine)
+				b.WriteString("\n")
+			}
+		}
 	}
 }
 

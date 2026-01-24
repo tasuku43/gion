@@ -99,6 +99,35 @@ gion manifest add   # mode picker: repo / preset / review / issue
 gion manifest rm    # workspace multi-select
 ```
 
+### Quick navigation with giongo (optional)
+
+`giongo` is a small companion binary that lets you jump into a workspace or repo using a built-in picker.
+It does not change any state.
+
+Example (zsh function):
+
+```bash
+giongo() {
+  if [[ "$1" == "init" || "$1" == "--help" || "$1" == "-h" || "$1" == "--version" || "$1" == "--print" ]]; then
+    command giongo "$@"
+    return $?
+  fi
+  local dest
+  dest="$(command giongo --print "$@")" || return $?
+  [[ -n "$dest" ]] && cd "$dest"
+}
+```
+
+Shortcut (auto-generate the function for your shell):
+
+```bash
+eval "$(giongo init)"
+```
+
+Notes:
+- `giongo init` outputs a bash/zsh function definition.
+- For a permanent setup, paste the output into `~/.zshrc` or `~/.bashrc`.
+
 ## The “create in bulk” entry points
 
 ### 1) From PRs / issues (GitHub only)

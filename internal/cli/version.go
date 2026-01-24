@@ -19,11 +19,23 @@ var (
 )
 
 func versionLine() string {
+	return versionLineFor("gion")
+}
+
+func printVersion(w io.Writer) {
+	fmt.Fprintln(w, versionLine())
+}
+
+func versionLineFor(name string) string {
 	v := strings.TrimSpace(version)
 	if v == "" {
 		v = "dev"
 	}
-	parts := []string{fmt.Sprintf("gion %s", v)}
+	program := strings.TrimSpace(name)
+	if program == "" {
+		program = "gion"
+	}
+	parts := []string{fmt.Sprintf("%s %s", program, v)}
 	if c := strings.TrimSpace(commit); c != "" {
 		parts = append(parts, c)
 	}
@@ -34,6 +46,6 @@ func versionLine() string {
 	return strings.Join(parts, " ")
 }
 
-func printVersion(w io.Writer) {
-	fmt.Fprintln(w, versionLine())
+func printVersionFor(w io.Writer, name string) {
+	fmt.Fprintln(w, versionLineFor(name))
 }

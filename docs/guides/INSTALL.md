@@ -14,9 +14,10 @@ For compatibility policy, see `docs/spec/core/COMPATIBILITY.md`.
 ## Install via GitHub Releases (manual)
 
 1. Download a release archive for your OS/arch from GitHub Releases.
-2. Extract and place `gion` on your `PATH`.
+2. Extract and place `gion` and `giongo` on your `PATH`.
 3. Verify:
    - `gion version`
+   - `giongo --version`
 
 ## Install via Homebrew
 
@@ -43,3 +44,7 @@ Example (track latest):
 
 Verify:
 - `gion version`
+- `giongo --version`
+
+Shell integration (optional):
+- `eval "$(giongo init)"`

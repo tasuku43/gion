@@ -23,11 +23,28 @@ builds:
       - -X github.com/tasuku43/gwst/internal/cli.version={{ .Tag }}
       - -X github.com/tasuku43/gwst/internal/cli.commit={{ .ShortCommit }}
       - -X github.com/tasuku43/gwst/internal/cli.date={{ .Date }}
+  - id: giongo
+    main: ./cmd/giongo
+    binary: giongo
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/tasuku43/gwst/internal/cli.version={{ .Tag }}
+      - -X github.com/tasuku43/gwst/internal/cli.commit={{ .ShortCommit }}
+      - -X github.com/tasuku43/gwst/internal/cli.date={{ .Date }}
 
 archives:
   - id: gion
     ids:
       - gion
+      - giongo
     formats:
       - tar.gz
     name_template: >-
