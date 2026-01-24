@@ -45,6 +45,7 @@ const (
 
 type WorkspaceChoice struct {
 	ID            string
+	WorkspacePath string
 	Description   string
 	Repos         []PromptChoice
 	Warning       string
@@ -2311,6 +2312,202 @@ func (m workspaceSelectModel) filterWorkspaces() []WorkspaceChoice {
 	return out
 }
 
+type workspaceRepoSelection struct {
+	WorkspaceIndex int
+	RepoIndex      int
+	Path           string
+}
+
+type workspaceRepoSelectModel struct {
+	title      string
+	workspaces []WorkspaceChoice
+	theme      Theme
+	useColor   bool
+
+	input      textinput.Model
+	filtered   []WorkspaceChoice
+	selections []workspaceRepoSelection
+	cursor     int
+	err        error
+
+	selectedPath string
+	height       int
+}
+
+func newWorkspaceRepoSelectModel(title string, workspaces []WorkspaceChoice, theme Theme, useColor bool) workspaceRepoSelectModel {
+	input := textinput.New()
+	input.Prompt = ""
+	input.Placeholder = "search"
+	input.Focus()
+	if useColor {
+		input.PlaceholderStyle = theme.Muted
+	}
+	m := workspaceRepoSelectModel{
+		title:      title,
+		workspaces: workspaces,
+		theme:      theme,
+		useColor:   useColor,
+		input:      input,
+	}
+	m.filtered = m.filterWorkspaces()
+	m.rebuildSelections()
+	return m
+}
+
+func (m workspaceRepoSelectModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m workspaceRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.height = msg.Height
+		return m, nil
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			m.err = ErrPromptCanceled
+			return m, tea.Quit
+		case tea.KeyUp:
+			if m.cursor > 0 {
+				m.cursor--
+			}
+			return m, nil
+		case tea.KeyDown:
+			if m.cursor < len(m.selections)-1 {
+				m.cursor++
+			}
+			return m, nil
+		case tea.KeyEnter:
+			if len(m.selections) == 0 {
+				return m, nil
+			}
+			m.selectedPath = m.selections[m.cursor].Path
+			return m, tea.Quit
+		}
+	}
+
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	m.filtered = m.filterWorkspaces()
+	m.rebuildSelections()
+	if m.cursor >= len(m.selections) {
+		m.cursor = max(0, len(m.selections)-1)
+	}
+	return m, cmd
+}
+
+func (m workspaceRepoSelectModel) View() string {
+	frame := NewFrame(m.theme, m.useColor)
+	label := promptLabel(m.theme, m.useColor, "workspace")
+	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+	maxLines := listMaxLines(m.height, 1, 0)
+	cursorWorkspace := 0
+	if len(m.selections) > 0 && m.cursor >= 0 && m.cursor < len(m.selections) {
+		cursorWorkspace = m.selections[m.cursor].WorkspaceIndex
+	}
+	rawLines := collectLines(func(b *strings.Builder) {
+		renderWorkspaceRepoChoiceList(b, m.filtered, m.cursor, cursorWorkspace, maxLines, m.useColor, m.theme)
+	})
+	frame.AppendInputsRaw(rawLines...)
+	return frame.Render()
+}
+
+func (m *workspaceRepoSelectModel) rebuildSelections() {
+	m.selections = m.selections[:0]
+	for wsIndex, ws := range m.filtered {
+		path := strings.TrimSpace(ws.WorkspacePath)
+		if path == "" {
+			path = strings.TrimSpace(ws.ID)
+		}
+		if path != "" {
+			m.selections = append(m.selections, workspaceRepoSelection{
+				WorkspaceIndex: wsIndex,
+				RepoIndex:      -1,
+				Path:           path,
+			})
+		}
+		for repoIndex, repo := range ws.Repos {
+			repoPath := strings.TrimSpace(repo.Value)
+			if repoPath == "" {
+				continue
+			}
+			m.selections = append(m.selections, workspaceRepoSelection{
+				WorkspaceIndex: wsIndex,
+				RepoIndex:      repoIndex,
+				Path:           repoPath,
+			})
+		}
+	}
+}
+
+func (m workspaceRepoSelectModel) filterWorkspaces() []WorkspaceChoice {
+	q := strings.ToLower(strings.TrimSpace(m.input.Value()))
+	if q == "" {
+		return cloneWorkspaceChoices(m.workspaces)
+	}
+	var out []WorkspaceChoice
+	for _, item := range m.workspaces {
+		wsMatch := workspaceChoiceMatches(item, q)
+		var repos []PromptChoice
+		if wsMatch {
+			repos = append(repos, item.Repos...)
+		} else {
+			for _, repo := range item.Repos {
+				if repoChoiceMatches(repo, q) {
+					repos = append(repos, repo)
+				}
+			}
+		}
+		if wsMatch || len(repos) > 0 {
+			cloned := item
+			cloned.Repos = repos
+			out = append(out, cloned)
+		}
+	}
+	return out
+}
+
+func cloneWorkspaceChoices(items []WorkspaceChoice) []WorkspaceChoice {
+	out := make([]WorkspaceChoice, 0, len(items))
+	for _, item := range items {
+		cloned := item
+		if len(item.Repos) > 0 {
+			cloned.Repos = append([]PromptChoice(nil), item.Repos...)
+		}
+		out = append(out, cloned)
+	}
+	return out
+}
+
+func workspaceChoiceMatches(item WorkspaceChoice, q string) bool {
+	if strings.Contains(strings.ToLower(item.ID), q) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(item.Description), q) {
+		return true
+	}
+	return false
+}
+
+func repoChoiceMatches(repo PromptChoice, q string) bool {
+	if strings.Contains(strings.ToLower(repo.Label), q) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(repo.Value), q) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(repo.Description), q) {
+		return true
+	}
+	for _, detail := range repo.Details {
+		if strings.Contains(strings.ToLower(detail), q) {
+			return true
+		}
+	}
+	return false
+}
+
 type workspaceMultiSelectModel struct {
 	title       string
 	workspaces  []WorkspaceChoice
@@ -2728,6 +2925,132 @@ func renderSelectedWorkspaceTree(b *strings.Builder, items []WorkspaceChoice, us
 		}
 		b.WriteString(line)
 		b.WriteString("\n")
+	}
+}
+
+func renderWorkspaceRepoChoiceList(b *strings.Builder, items []WorkspaceChoice, cursor int, cursorWorkspace int, maxVisible int, useColor bool, theme Theme) {
+	if len(items) == 0 {
+		msg := "no matches"
+		if useColor {
+			msg = theme.Muted.Render(msg)
+		}
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
+		return
+	}
+
+	start, end := listWindow(len(items), cursorWorkspace, maxVisible)
+	selectIndex := 0
+	for i := 0; i < start; i++ {
+		selectIndex++
+		selectIndex += len(items[i].Repos)
+	}
+
+	for i := start; i < end; i++ {
+		item := items[i]
+		workspaceConnector := "├─"
+		isLastWorkspace := i == end-1
+		if isLastWorkspace {
+			workspaceConnector = "└─"
+		}
+		connectorToken := workspaceConnector
+		if useColor {
+			connectorToken = theme.Muted.Render(workspaceConnector)
+		}
+		workspaceStem := "│ "
+		if isLastWorkspace {
+			workspaceStem = "  "
+		}
+
+		selectedWorkspace := selectIndex == cursor
+		displayID := item.ID
+		warnValue := shortWarningTag(item.Warning)
+		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
+		warnStyle := theme.SoftWarn
+		if item.WarningStrong {
+			warnStyle = theme.Warn
+		}
+		warnTag := ""
+		if hasWarn {
+			warnTag = "[" + warnValue + "]"
+		}
+		if useColor {
+			switch {
+			case hasWarn && selectedWorkspace:
+				displayID = warnStyle.Copy().Bold(true).Render(displayID)
+			case hasWarn:
+				displayID = warnStyle.Render(displayID)
+			case selectedWorkspace:
+				displayID = lipgloss.NewStyle().Bold(true).Render(displayID)
+			}
+		}
+		display := displayID
+		if warnTag != "" {
+			tag := warnTag
+			if useColor {
+				if hasWarn {
+					tag = warnStyle.Render(warnTag)
+				} else {
+					tag = theme.Accent.Render(warnTag)
+				}
+			}
+			display += tag
+		}
+		desc := strings.TrimSpace(item.Description)
+		if desc != "" {
+			if useColor {
+				display += theme.Muted.Render(" - " + desc)
+			} else {
+				display += " - " + desc
+			}
+		}
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, connectorToken, display))
+		selectIndex++
+
+		if len(item.Repos) == 0 {
+			continue
+		}
+		for j, repo := range item.Repos {
+			repoConnector := "├─"
+			isLastRepo := j == len(item.Repos)-1
+			if isLastRepo {
+				repoConnector = "└─"
+			}
+			selectedRepo := selectIndex == cursor
+			connector := repoConnector
+			if useColor {
+				connector = theme.Muted.Render(repoConnector)
+			}
+			repoLabel := repo.Label
+			if useColor {
+				if selectedRepo {
+					repoLabel = lipgloss.NewStyle().Bold(true).Render(repoLabel)
+				} else {
+					repoLabel = theme.Muted.Render(repoLabel)
+				}
+			}
+			line := fmt.Sprintf("%s%s%s %s", output.Indent+output.Indent, workspaceStem, connector, repoLabel)
+			b.WriteString(line)
+			b.WriteString("\n")
+			selectIndex++
+			if len(repo.Details) == 0 {
+				continue
+			}
+			repoStem := "│  "
+			if isLastRepo {
+				repoStem = "   "
+			}
+			for _, detail := range repo.Details {
+				if strings.TrimSpace(detail) == "" {
+					continue
+				}
+				detailLine := fmt.Sprintf("%s%s%s%s", output.Indent+output.Indent, workspaceStem, repoStem, detail)
+				if useColor {
+					detailLine = theme.Muted.Render(detailLine)
+				}
+				b.WriteString(detailLine)
+				b.WriteString("\n")
+			}
+		}
 	}
 }
 

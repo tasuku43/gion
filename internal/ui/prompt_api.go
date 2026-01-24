@@ -37,6 +37,21 @@ func PromptWorkspace(title string, workspaces []WorkspaceChoice, theme Theme, us
 	return strings.TrimSpace(final.workspaceID), nil
 }
 
+func PromptWorkspaceRepoSelect(title string, workspaces []WorkspaceChoice, theme Theme, useColor bool) (string, error) {
+	debuglog.SetPrompt("workspace-repo")
+	defer debuglog.ClearPrompt()
+	model := newWorkspaceRepoSelectModel(title, workspaces, theme, useColor)
+	out, err := runProgram(model)
+	if err != nil {
+		return "", err
+	}
+	final := out.(workspaceRepoSelectModel)
+	if final.err != nil {
+		return "", final.err
+	}
+	return strings.TrimSpace(final.selectedPath), nil
+}
+
 func PromptWorkspaceWithBlocked(title string, workspaces []WorkspaceChoice, blocked []BlockedChoice, theme Theme, useColor bool) (string, error) {
 	debuglog.SetPrompt("workspace")
 	defer debuglog.ClearPrompt()
