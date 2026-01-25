@@ -83,6 +83,7 @@ func (r *Renderer) Prompt(text string) {
 	prefix := output.StepPrefix + " "
 	if r.useColor {
 		prefix = r.theme.Accent.Render(output.StepPrefix) + " "
+		text = r.theme.Accent.Render(text)
 	}
 	r.writeWithPrefix(output.Indent+prefix, text)
 }

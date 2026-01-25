@@ -101,13 +101,13 @@ func removeConfirmLabel(state workspace.WorkspaceState) string {
 func workspaceRemoveWarningLabel(state workspace.WorkspaceState) (string, bool) {
 	switch state.Kind {
 	case workspace.WorkspaceStateUnpushed:
-		return "unpushed commits", false
+		return "unpushed", false
 	case workspace.WorkspaceStateDiverged:
-		return "diverged or upstream missing", false
+		return "diverged", false
 	case workspace.WorkspaceStateUnknown:
-		return "status unknown", true
+		return "unknown", true
 	case workspace.WorkspaceStateDirty:
-		return "dirty changes", true
+		return "dirty", true
 	default:
 		return "", false
 	}
