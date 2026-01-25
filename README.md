@@ -1,40 +1,16 @@
-# gion — inventory-driven Git workspaces with guardrails
+# gion — Git workspaces (built on Git worktrees) as code, with guardrails.
 
-Git workspaces as code, with guardrails. Built on Git worktrees: define a YAML inventory, then plan/apply to reconcile safely.
+Git workspaces as code, with guardrails.  
+Built on Git worktrees: define a YAML inventory, then plan/apply to reconcile safely.
 
-## Demo
+## Demo (45s)
 
-https://github.com/user-attachments/assets/889e7f64-6222-4ad2-bc42-620dd1dd4139
+Coming soon (new demo video in progress).
 
-## The core: “make many, remove many” without fear
-
-gion’s strongest feature is not just creating worktrees — it’s making workspace lifecycle **repeatable and safe**:
-
-- **Declare** the desired workspaces in `gion.yaml` (inventory / desired state)
-- **Declare** the desired workspaces in `gion.yaml` (inventory / desired state)
-- **Diff** with `gion plan` (read-only)
-- **Reconcile** with `gion apply` (shows a plan; asks for confirmation for destructive changes)
-
-This is what lets you spin up dozens of workspaces for parallel work — and clean them up in bulk with guardrails.
-
-### Example: `gion plan` shows risk before removals
-
-When a plan includes removals, `gion plan` inspects each repo in the workspace and summarizes risk (dirty/unpushed/diverged/unknown) so you can review before running `apply`.
-
-How to generate this on your machine (optional):
-
-```bash
-gion manifest add --repo <REPO> <WORKSPACE_ID>
-# (optional) make the workspace risky: dirty changes / unpushed commits / etc.
-gion manifest rm <WORKSPACE_ID> --no-apply
-gion plan
-```
-
-<!-- BEGIN: gion plan removal-risk example (paste real output) -->
-```text
-PASTE REAL OUTPUT OF: gion plan
-```
-<!-- END: gion plan removal-risk example (paste real output) -->
+This demo shows:
+- Create many workspaces at once
+- Jump fast with `giongo`
+- Clean up in bulk with guardrails (plan warns before deletions)
 
 ## Quickstart (5 minutes)
 
@@ -46,62 +22,103 @@ brew install gion
 ```
 
 Other options:
-
 - Version pinning with mise (optional): `mise use -g github:tasuku43/gion@<version>`
 - Manual install via GitHub Releases (download archive → put `gion` on your PATH)
 - Build from source requires Go 1.24+
 
-For details and other options, see `docs/guides/INSTALL.md`.
-
-### 2) Initialize a root
+### 2) Prepare a repo store
 
 ```bash
-gion init
+gion repo get git@github.com:org/backend.git
 ```
 
-Root resolution order:
-1) `--root <path>`
-2) `GION_ROOT` environment variable
-3) `~/gion` (default)
-
-Default layout:
-
-```
-~/gion/
-├── bare/           # shared bare repo store
-├── workspaces/     # task workspaces (one directory per workspace id)
-└── gion.yaml      # inventory (desired state)
-```
-
-### 3) Create a workspace (interactive front-end to the inventory)
-
-The happy path is `gion manifest add`: it writes `gion.yaml` and (by default) runs `gion apply`.
-Run it with no args to choose a mode interactively (`repo` / `preset` / `review` / `issue`).
+### 3) Create a workspace (includes Plan + Apply by default)
 
 ```bash
 gion manifest add --repo git@github.com:org/backend.git PROJ-123
 ```
 
-### 4) Remove safely (bulk cleanup with a plan)
+### 4) Jump into a workspace (interactive)
+
+```bash
+cd "$(giongo --print)"
+```
+
+### 5) Remove safely (guardrails on by default)
 
 ```bash
 gion manifest rm PROJ-123
 ```
 
-`gion manifest rm` updates `gion.yaml` and (by default) runs `gion apply`, which prints a plan and enforces confirmation for destructive removals. Omit the workspace id to select interactively (multi-select).
+## What gion solves
 
-### Interactive shortcuts (omit args to prompt)
+- **Reproducibility:** workspace inventory is code (`gion.yaml`), synced safely via diffs
+- **Scale:** create/remove many worktrees without losing track
+- **Safety:** `plan` warns about risky deletions (dirty/unpushed/diverged/unknown)
+- **Bulk operations without fear:** visible guardrails for mass create/delete
+- **Multi-repo tasks:** group multiple repos under one workspace (see “From presets” below)
 
-gion falls back to interactive prompts when you omit required args (unless `--no-prompt` is set):
+## How it works (Declare → Diff → Reconcile)
+
+- **Declare** desired workspaces in `gion.yaml` (inventory / desired state)
+- **Diff** with `gion plan` (read-only)
+- **Reconcile** with `gion apply` (shows a plan; confirms destructive changes)
+
+## Create in bulk: entry points
+
+### From PRs / issues (GitHub only)
+
+Interactive bulk selection (multi-select in the picker):
 
 ```bash
-gion manifest add   # mode picker: repo / preset / review / issue
-gion manifest rm    # workspace multi-select
+gion manifest add
 ```
 
-### Quick navigation with giongo (optional)
+Notes:
+- Requires `gh` (authenticated) to fetch metadata.
+- The picker supports bulk selection of PRs/issues, then a single apply.
 
-`giongo` is a small companion binary that lets you jump into a workspace or repo using a built-in picker.
+Direct URL (single workspace):
+
+```bash
+gion manifest add --review https://github.com/owner/repo/pull/123
+gion manifest add --issue  https://github.com/owner/repo/issues/123
+```
+
+### From presets (multi-repo “task workspace”)
+
+```yaml
+presets:
+  app:
+    repos:
+      - git@github.com:org/backend.git
+      - git@github.com:org/frontend.git
+      - git@github.com:org/infra.git
+```
+
+```bash
+gion manifest add --preset app PROJ-123
+```
+
+## Details (create → move → delete)
+
+### Create
+
+Interactive front-end to the inventory:
+
+```bash
+gion manifest add
+```
+
+Run with flags to skip prompts:
+
+```bash
+gion manifest add --repo git@github.com:org/backend.git PROJ-123
+```
+
+### Move fast with giongo
+
+`giongo` is a small companion binary that jumps into a workspace or repo using a picker.  
 It does not change any state.
 
 Example (zsh function):
@@ -128,41 +145,7 @@ Notes:
 - `giongo init` outputs a bash/zsh function definition.
 - For a permanent setup, paste the output into `~/.zshrc` or `~/.bashrc`.
 
-## The “create in bulk” entry points
-
-### 1) From PRs / issues (GitHub only)
-
-These modes are built to create workspaces from your existing workflow.
-
-Direct URL (single workspace):
-
-```bash
-gion manifest add --review https://github.com/owner/repo/pull/123
-gion manifest add --issue  https://github.com/owner/repo/issues/123
-```
-
-Notes:
-- Requires `gh` (authenticated) to fetch metadata.
-- For bulk creation, run `gion manifest add` with no args and use the interactive picker (supports multi-select), then confirm a single `apply`.
-
-### 2) From presets (multi-repo “task workspace”)
-
-A preset is a lightweight “pseudo-monorepo” template: one task creates multiple repos together.
-
-```yaml
-presets:
-  app:
-    repos:
-      - git@github.com:org/backend.git
-      - git@github.com:org/frontend.git
-      - git@github.com:org/infra.git
-```
-
-```bash
-gion manifest add --preset app PROJ-123
-```
-
-## Power move: edit `gion.yaml` by hand (AI-friendly)
+### Edit the inventory directly (AI-friendly)
 
 `gion.yaml` is just YAML. You can edit it directly (humans or AI), then review/apply changes:
 
@@ -187,23 +170,31 @@ workspaces:
 
 Notes:
 - `gion.yaml` is gion-managed: commands rewrite the whole file, so comments/ordering may not be preserved.
-- If filesystem is the truth (someone changed worktrees manually), use `gion import` to rebuild `gion.yaml` from the current state and see a diff.
+- If your local manual changes are the source of truth, use `gion import` to follow them back into `gion.yaml`.
 
-### Example: `gion import` prints a unified diff
+### Cleanup
 
-How to generate this on your machine (optional):
+Manual removal (explicit human judgment):
 
 ```bash
-gion manifest add --repo <REPO> <WORKSPACE_ID>
-gion manifest rm <WORKSPACE_ID> --no-apply
-gion import
+gion manifest rm PROJ-123
 ```
 
-<!-- BEGIN: gion import unified-diff example (paste real output) -->
-```text
-PASTE REAL OUTPUT OF: gion import
+Automatic cleanup (conservative):
+
+```bash
+gion manifest gc
 ```
-<!-- END: gion import unified-diff example (paste real output) -->
+
+`gion manifest gc` removes workspace entries from `gion.yaml` only when they are highly likely safe to delete, then (by default) runs `gion apply` to reconcile.
+
+### Import
+
+If the filesystem is the source of truth, rebuild the inventory:
+
+```bash
+gion import
+```
 
 ## Requirements
 
