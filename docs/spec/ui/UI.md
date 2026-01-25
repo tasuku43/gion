@@ -48,7 +48,8 @@ Rules:
 - Result summary lines are bullets (use the same prefix as Steps)
 - Multi-line blocks (e.g. unified diffs) may be rendered as indented raw lines under `Result` without bullet prefixes
 - No success banner; success is implied in Result section
-- Long lines should wrap to the terminal width; continuation lines keep the same text indent (prefix width)
+- Long lines should wrap to the terminal width; continuation lines keep the same text indent (prefix width).
+  - Exception: interactive picker lists should truncate long lines with `...` to keep a stable cursor→row mapping.
 
 Notes:
 - IaC-style commands use `Plan`/`Apply`:

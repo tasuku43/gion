@@ -266,6 +266,18 @@ func (r *Renderer) writeWithPrefix(prefix, text string) {
 		r.writeLine(prefix + text)
 		return
 	}
+
+	if currentStableLayout() {
+		tail := "..."
+		if available < ansi.StringWidth(tail) {
+			tail = ""
+		}
+		single := strings.ReplaceAll(text, "\n", " ")
+		truncated := ansi.Truncate(single, available, tail)
+		r.writeLine(prefix + truncated)
+		return
+	}
+
 	wrapped := ansi.Wrap(text, available, "")
 	lines := strings.Split(wrapped, "\n")
 	if len(lines) == 0 {
