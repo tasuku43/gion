@@ -1,6 +1,6 @@
 ---
 title: "gion manifest rm"
-status: planned
+status: implemented
 aliases:
   - "gion man rm"
   - "gion m rm"
@@ -16,7 +16,7 @@ Remove workspace entries from the inventory (`gion.yaml`) using an interactive U
 - Targets one or more workspaces:
   - With args: treat as the selected workspace IDs.
   - Without args: interactive multi-select.
-- Workspace IDs are treated as workspace directory identifiers (they do not have to be valid git branch names).
+- Workspace IDs are treated as workspace directory identifiers and must satisfy git branch ref format rules (`git check-ref-format --branch`).
 - Updates `<root>/gion.yaml` by removing the selected workspace entries.
 - By default, runs `gion apply` to reconcile the filesystem with the updated manifest.
   - Destructive behavior is enforced by `gion apply` (and `--no-prompt` must error if removals exist).

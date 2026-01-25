@@ -1,13 +1,12 @@
 ---
 title: "gion manifest gc"
-status: planned
+status: implemented
 aliases:
   - "gion man gc"
   - "gion m gc"
 pending:
-  - rules-implementation
-  - reason-format
-  - confirmation-ux
+  - info-counts
+  - candidate-target-context
 ---
 
 ## Synopsis
@@ -69,8 +68,8 @@ A workspace is a candidate only if:
 - `--no-prompt`: forwarded to `gion apply` when apply is run (behavior follows `gion apply` spec).
 
 ## Output
-- `Inputs`/`Info`: scanned / candidates / skipped counts.
-- Candidate list: workspace id + short reasons (e.g., `[merged]`) and target context.
+- `Info`: warnings (if any) and candidate list.
+- Candidate list: workspace id + short reasons (e.g., `[merged]`).
 - `Plan`/`Apply`/`Result`: delegated to `gion apply` when apply is run.
 
 ## Failure Modes

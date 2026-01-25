@@ -1,6 +1,6 @@
 ---
 title: "workspace metadata.json"
-status: planned
+status: implemented
 ---
 
 # workspace metadata.json
