@@ -25,8 +25,13 @@ jobs:
           check-latest: true
           cache: true
 
-      - name: Run Go tests
-        run: go test ./...
+      - name: Install task
+        run: |
+          go install github.com/go-task/task/v3/cmd/task@latest
+          echo "$(go env GOPATH)/bin" >>"$GITHUB_PATH"
+
+      - name: Run release preflight checks
+        run: task release:preflight
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6

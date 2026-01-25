@@ -2,14 +2,58 @@ version: "3"
 
 tasks:
   fmt:
-    desc: Run gofmt on all files
+    desc: Run gofmt on all files (mutates)
     cmds:
       - gofmt -w .
+  fmt:check:
+    desc: Check gofmt (non-mutating)
+    cmds:
+      - |
+        unformatted="$(gofmt -l .)"
+        if [ -n "${unformatted}" ]; then
+          echo "gofmt is required for the following files:"
+          echo "${unformatted}"
+          exit 1
+        fi
   build:dev:
     desc: Build dev binary to ./giondev
     cmds:
       - go build -o ./giondev ./cmd/gion
+  build:
+    desc: Build all packages
+    cmds:
+      - go build ./...
   test:
     desc: Run tests
     cmds:
       - go test ./...
+  test:race:
+    desc: Run tests with race detector
+    cmds:
+      - go test -race ./...
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+  vuln:
+    desc: Run govulncheck
+    cmds:
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+  ci:
+    desc: CI (fast)
+    cmds:
+      - task: fmt:check
+      - task: test
+      - task: vet
+      - task: build
+  ci:full:
+    desc: CI (includes race/vulncheck)
+    cmds:
+      - task: ci
+      - task: test:race
+      - task: vuln
+  release:preflight:
+    desc: Release preflight checks
+    cmds:
+      - task: test
+      - task: vet
