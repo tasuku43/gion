@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>gion — Git worktree workspace tool for AI agents</title>
+    <title>gion — Git workspaces as code, with guardrails</title>
     <meta
       name="description"
-      content="gion is a git workspace tool and worktree manager for AI agents and parallel development. Create task workspaces from issues, reviews, or presets."
+      content="gion is a Git workspace tool built on worktrees. Declare an inventory in YAML, then plan/apply to reconcile safely."
     />
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-GGSMHHLEKE"></script>
@@ -162,6 +162,8 @@
         margin: 0;
         color: var(--muted);
         line-height: 1.5;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .steps {
@@ -235,48 +237,64 @@
       <header>
         <div>
           <div class="kicker">gion</div>
-          <h1>Git worktrees, organized as workspaces.</h1>
+          <h1>Git workspaces, as code.</h1>
           <p class="tagline">
-            A git workspace tool and worktree manager for AI agents and parallel development.
-            Create task workspaces from issues, reviews, or presets without stepping on each other.
+            Built on Git worktrees: declare inventory in YAML, then plan/apply to reconcile safely.
+            Reproducible by default, safe for bulk operations.
           </p>
           <div class="cta-row">
-            <a class="btn primary" href="https://github.com/tasuku43/gion">View on GitHub</a>
-            <a class="btn" href="https://github.com/tasuku43/gion#quickstart-5-minutes"
-              >Quickstart</a
+            <a class="btn primary" href="https://github.com/tasuku43/gion#quickstart-5-minutes"
+              >Quickstart (README)</a
             >
+            <a class="btn" href="https://github.com/tasuku43/gion">View on GitHub</a>
           </div>
         </div>
         <div class="demo">
-          <video controls playsinline preload="metadata">
-            <source src="demo.mp4" type="video/mp4" />
-            Your browser does not support the video tag.
-          </video>
+          <div class="card">
+            <h3>Demo (45s)</h3>
+            <p>Coming soon — new demo video in progress.</p>
+          </div>
         </div>
       </header>
 
       <section>
-        <h2>Why teams adopt gion</h2>
+        <h2>Why gion</h2>
         <div class="grid">
           <div class="card">
-            <h3>Issue-driven work</h3>
+            <h3>Reproducible by design</h3>
             <p>
-              Pick multiple GitHub issues in one pass and spin up dedicated workspaces per task.
+              Workspace inventory is code (<code>gion.yaml</code>), synced safely via diffs.
             </p>
           </div>
           <div class="card">
-            <h3>Review bursts</h3>
+            <h3>Bulk operations without fear</h3>
             <p>
-              When reviews pile up, create review workspaces in bulk and run AI agents safely.
+              Create and remove many workspaces at once, with guardrails before risky deletions.
             </p>
           </div>
           <div class="card">
-            <h3>Multi-repo changes</h3>
-            <p>Templates bundle repositories into a single task workspace (pseudo-monorepo).</p>
+            <h3>Multi-repo tasks</h3>
+            <p>Presets bundle multiple repos into a single task workspace.</p>
           </div>
           <div class="card">
-            <h3>Safe cleanup</h3>
-            <p>Guardrails prevent accidental deletion when worktrees are dirty or unpushed.</p>
+            <h3>One inventory, many entry points</h3>
+            <p>Start from repos, presets, or PRs/issues and reconcile in one apply.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Quickstart (via README)</h2>
+        <div class="card">
+          <p>
+            The README is the single source of truth for setup, demos, and the command flow.
+            Start there, then come back for the overview.
+          </p>
+          <div class="cta-row" style="margin-top: 12px">
+            <a class="btn primary" href="https://github.com/tasuku43/gion#quickstart-5-minutes"
+              >Open Quickstart</a
+            >
+            <a class="btn" href="https://github.com/tasuku43/gion">Read the README</a>
           </div>
         </div>
       </section>
@@ -301,12 +319,11 @@
       </section>
 
       <section>
-        <h2>Quickstart</h2>
+        <h2>Workflow</h2>
         <div class="steps">
-          <div>1) <code>gion init</code></div>
-          <div>2) <code>gion repo get &lt;repo&gt;</code></div>
-          <div>3) <code>gion manifest add --repo &lt;repo&gt;</code></div>
-          <div>4) <code>gion manifest rm</code></div>
+          <div>1) Declare inventory in <code>gion.yaml</code></div>
+          <div>2) <code>gion plan</code> (diff only)</div>
+          <div>3) <code>gion apply</code> (confirm destructive changes)</div>
         </div>
       </section>
 
@@ -318,15 +335,14 @@
             <p>Only for <code>--issue</code> and <code>--review</code> modes (GitHub).</p>
           </div>
           <div class="card">
-            <h3>What does gion delete?</h3>
-            <p>It removes worktrees and directories, and warns on dirty or unpushed work.</p>
+            <h3>Is deletion safe?</h3>
+            <p><code>plan</code> surfaces risky deletions before <code>apply</code>.</p>
           </div>
         </div>
       </section>
 
       <footer>
-        Built for fast context switching. Explore docs on
-        <a href="https://github.com/tasuku43/gion">GitHub</a>.
+        Explore the full docs on <a href="https://github.com/tasuku43/gion">GitHub</a>.
       </footer>
     </div>
   </body>
