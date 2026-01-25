@@ -3109,23 +3109,16 @@ func renderWorkspaceRepoChoiceList(b *strings.Builder, items []WorkspaceChoice, 
 		displayID := item.ID
 		warnValue := shortWarningTag(item.Warning)
 		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
-		warnStyle := theme.SoftWarn
+		warnStyle := theme.Warn
 		if item.WarningStrong {
-			warnStyle = theme.Warn
+			warnStyle = theme.Error
 		}
 		warnTag := ""
 		if hasWarn {
 			warnTag = "[" + warnValue + "]"
 		}
-		if useColor {
-			switch {
-			case hasWarn && selectedWorkspace:
-				displayID = warnStyle.Copy().Bold(true).Render(displayID)
-			case hasWarn:
-				displayID = warnStyle.Render(displayID)
-			case selectedWorkspace:
-				displayID = lipgloss.NewStyle().Bold(true).Render(displayID)
-			}
+		if useColor && selectedWorkspace {
+			displayID = lipgloss.NewStyle().Bold(true).Render(displayID)
 		}
 		display := displayID
 		if warnTag != "" {
@@ -3227,24 +3220,16 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 		displayID := item.ID
 		warnValue := shortWarningTag(item.Warning)
 		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
-		warnStyle := theme.SoftWarn
+		warnStyle := theme.Warn
 		if item.WarningStrong {
-			warnStyle = theme.Warn
+			warnStyle = theme.Error
 		}
 		warnTag := ""
 		if hasWarn {
 			warnTag = "[" + warnValue + "]"
 		}
-		if useColor {
-			if hasWarn {
-				if i == cursor {
-					displayID = theme.Warn.Copy().Bold(true).Render(displayID)
-				} else {
-					displayID = warnStyle.Render(displayID)
-				}
-			} else if i == cursor {
-				displayID = lipgloss.NewStyle().Bold(true).Render(displayID)
-			}
+		if useColor && i == cursor {
+			displayID = lipgloss.NewStyle().Bold(true).Render(displayID)
 		}
 		display := displayID
 		if warnTag != "" {
@@ -3331,16 +3316,13 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 		displayID := item.ID
 		warnValue := shortWarningTag(item.Warning)
 		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
-		warnStyle := theme.SoftWarn
+		warnStyle := theme.Warn
 		if item.WarningStrong {
-			warnStyle = theme.Warn
+			warnStyle = theme.Error
 		}
 		warnTag := ""
 		if hasWarn {
 			warnTag = "[" + warnValue + "]"
-		}
-		if useColor && hasWarn {
-			displayID = warnStyle.Render(displayID)
 		}
 		display := displayID
 		if warnTag != "" {
@@ -3400,13 +3382,13 @@ func renderWorkspaceChoiceConfirmList(b *strings.Builder, items []WorkspaceChoic
 func shortWarningTag(value string) string {
 	switch strings.TrimSpace(strings.ToLower(value)) {
 	case "dirty changes":
-		return "dirty changes"
+		return "dirty"
 	case "unpushed commits":
-		return "unpushed commits"
+		return "unpushed"
 	case "diverged or upstream missing":
-		return "diverged or upstream missing"
+		return "diverged"
 	case "status unknown":
-		return "status unknown"
+		return "unknown"
 	default:
 		return strings.TrimSpace(value)
 	}
