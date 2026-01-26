@@ -40,14 +40,11 @@ func TestRunCreatesAndSkips(t *testing.T) {
 	if !strings.Contains(content, "presets:") {
 		t.Fatalf("expected presets in %s", manifest.FileName)
 	}
-	if !strings.Contains(content, "example:") {
-		t.Fatalf("expected example preset in %s", manifest.FileName)
+	if strings.Contains(content, "example:") {
+		t.Fatalf("did not expect example preset in %s", manifest.FileName)
 	}
-	if !strings.Contains(content, "git@github.com:octocat/Hello-World.git") {
-		t.Fatalf("expected octocat/Hello-World repo in %s", manifest.FileName)
-	}
-	if !strings.Contains(content, "git@github.com:octocat/Spoon-Knife.git") {
-		t.Fatalf("expected octocat/Spoon-Knife repo in %s", manifest.FileName)
+	if strings.Contains(content, "octocat/Hello-World") || strings.Contains(content, "octocat/Spoon-Knife") {
+		t.Fatalf("did not expect octocat repos in %s", manifest.FileName)
 	}
 
 	second, err := Run(rootDir)

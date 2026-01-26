@@ -17,6 +17,8 @@ Create the file (and the default directory layout) with:
 gion init
 ```
 
+`gion init` creates an empty `presets` map; you add entries with `gion manifest preset add` or by editing YAML.
+
 ## Format
 
 Top-level key is `presets`. Each preset has a `repos` list.

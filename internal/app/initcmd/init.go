@@ -60,14 +60,7 @@ func writeManifest(path string) error {
 	file := manifest.File{
 		Version:    1,
 		Workspaces: map[string]manifest.Workspace{},
-		Presets: map[string]manifest.Preset{
-			"example": {
-				Repos: []string{
-					"git@github.com:octocat/Hello-World.git",
-					"git@github.com:octocat/Spoon-Knife.git",
-				},
-			},
-		},
+		Presets:    map[string]manifest.Preset{},
 	}
 	data, err := manifest.Marshal(file)
 	if err != nil {

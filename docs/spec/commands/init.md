@@ -12,9 +12,7 @@ Create the minimum directory and file layout under the resolved GION root so oth
 ## Behavior
 - Validates that a root directory was resolved; otherwise fails.
 - Creates (if absent) the directories `bare/` and `workspaces/` under the root with `0755` permissions.
-- Creates `gion.yaml` if it does not exist, seeding it with:
-  - `presets.example` that lists two GitHub repositories.
-  - an empty `workspaces` map.
+- Creates `gion.yaml` if it does not exist, seeding it with empty `presets` and `workspaces` maps.
 - Skips creation for items that already exist and reports them as skipped.
 
 ## Success Criteria
