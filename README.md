@@ -9,6 +9,8 @@ Worktree sprawl brings pain:
 gion makes it safe and repeatable: declare task workspaces in YAML, review diffs (including deletion risk), then create and clean them up in bulk.  
 You don’t have to edit YAML directly—`gion manifest ...` lets you add/remove workspaces interactively and updates the inventory behind the scenes.
 
+https://github.com/user-attachments/assets/70da3e63-2bfe-4cca-b5a4-ffc8c153eb4a
+
 ## Who it’s for
 
 - Developers working on tasks that span multiple repositories.
