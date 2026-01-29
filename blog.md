@@ -5,14 +5,23 @@ AIエージェントで並行開発を回すようになって、Git worktreeに
 さらに増えると「今どこで何してるんだっけ？」の認知負荷が上がり、「これ消していいんだっけ？」が怖くなって片付けが止まる。  
 だから、複数のworktreeをタスク（workspace）単位で束ねて管理できるように、gionというツールを作ってみました。
 
-<-- XのPostはる -->
+## 概要
 
-## 0. 仕組み（gion.yaml と manifestサブコマンドの関係）
+gion は、Git worktree を「タスク（workspace）単位」で扱うための小さなCLIです。
 
-この章では、細かいサブコマンドの話に入る前に、gionの全体像だけ押さえます。  
-中心にあるのは `gion.yaml` で、ここに「こうなっていてほしい」（望ましい状態）を置きます。  
-その状態は、YAMLを直接編集してもいいし、人間向けの入口として `manifest` サブコマンドで更新してもいい——どちらも最終的に同じ `gion.yaml` を書き換えるだけです。  
-そして `plan` で差分を確認してから `apply` で実体（作業場所）を揃える、という関係になっています。
+- 作る：`gion manifest add` → `gion plan` → `gion apply`
+- 移動：`giongo` で検索して移動
+- 片付け：`gion manifest gc` / `gion manifest rm`
+
+GitHub: https://github.com/tasuku43/gion
+
+<!-- XのPostはる -->
+
+## 仕組み（gion.yaml と manifestサブコマンドの関係）
+
+gion の中心は `gion.yaml` です。ここに「こうなっていてほしい（望ましい状態）」を書きます。  
+`gion manifest` は、その `gion.yaml` を更新するための入口です。  
+そして `gion plan` で差分を確認して、`gion apply` で実体（作業場所）を揃える、という流れになっています。
 
 用語だけ補足すると、**Git worktree** はブランチ（や特定コミット）をチェックアウトした作業用ディレクトリです。  
 一方、ここで言う **workspace** は「タスク単位の箱」で、その中に1つ以上のworktree（必要なら複数リポジトリのworktree）を束ねて扱います。
@@ -33,77 +42,82 @@ GION_ROOT/
 ```
 
 <!-- Plan が出て、その後に確認プロンプトが出る画面（「いきなり実行しない」を一枚で）-->
+*Planの確認プロンプト（いきなり実行しない）*
 
+---
 
-———
-
-## 1. 作る（Planで差分を見て、Applyでまとめて作る）
+## 作る（Planで差分を見て、Applyでまとめて作る）
 
 workspaceを「作る」操作は、`gion manifest add` コマンド（入口 / mode）か、`gion.yaml` の直接編集で行います。  
 どちらの場合も、まず “望ましい状態” を宣言して `gion plan` で差分（何が作られるか）を確認し、納得できたら `gion apply` でまとめて作る——という流れです。
 
-### 1-1. 入口（mode）は4つある
+### 入口（mode）は4つある
 
 入口は `repo` / `issue` / `review` / `preset` の4つです。  
 始め方に合わせて入口を選べるだけで、行き着く先は同じで、最終的には `gion.yaml` に「こうしたい」を積んでいきます。
 
 まず入口をインタラクティブに選ぶなら、これだけでOKです。
 <!-- 画像を挟む -->
+*入口の選択（repo/issue/review/preset）*
 
-### 1-2. issue / review（まとめて積んで、一括で作る）
+### issue / review（まとめて積んで、一括で作る）
 
-個人的に一番推したいのがここです。Issue（やPR）を複数選んで `gion.yaml` に積み、`plan` で差分を見てから、`apply` は1回だけ。並行開発の「机をまとめて出す」がかなりラクになります。
+Issue（やPR）を複数選んで `gion.yaml` に積み、`gion plan` で差分を見てから、`gion apply` は1回だけ。並行開発の「机をまとめて出す」がかなりラクになります。
 
 <!-- GIFを挟む -->
+*issue/reviewをまとめて選んで、一括で作る*
 
-### 1-3. repo（workspaceを一つ作る）
+※ `--issue` / `--review` を使う場合は `gh` CLI が必要です（GitHub前提）。
 
-とにかく最短で1つ作るなら `repo` が一番シンプルです。リポジトリとworkspace IDを指定して追加し、`plan` で作成内容を確認してから `apply` します。
+### repo（workspaceを一つ作る）
+
+とにかく最短で1つ作るなら `repo` が一番シンプルです。リポジトリとworkspace IDを指定して追加し、`gion plan` で作成内容を確認してから `gion apply` します。
 
 <!-- 画像を挟む -->
+*repoを1つ追加して、Planで確認する*
 
-### 1-4. preset（複数repoをworkspaceに束ねる）
+### preset（複数repoをworkspaceに束ねる）
 
 workspaceは「タスク単位の箱」なので、backend + frontend + docs みたいに複数repoを束ねたくなります。presetを作っておけば、次からは `--preset` でまとめて積めます。
 
 <!-- 画像を挟む -->
+*presetで複数repoをまとめて宣言する*
 
-### 1-5. YAML直編集 vs manifest
+### YAML直編集 vs manifest
 
 `gion.yaml` は直接編集してもOKです。特に、すでにあるinventoryを「まとめて整える」用途に向いています。  
 たとえば ブランチ名を直したいとき、複数workspaceを同時に削除・作成したいとき、既存の定義を更新しつつ整理したいとき、などです。
 
-直編集のあとに `gion plan` を叩くと、削除・作成・更新がまとめて一覧できるので「何が起きるか」を落ち着いて確認できます。確認できたら `gion apply` で反映、という流れはmanifestと同じです。
+直編集のあとに `gion plan` を叩くと、削除・作成・更新がまとめて一覧できるので「何が起きるか」を落ち着いて確認できます。確認できたら `gion apply` で反映、という流れ自体は `gion manifest add` と同じです。
 
 <!-- 画像: Planで「削除・作成・更新」が同時に表示されるスクショ -->
+*削除・作成・更新が同時に出るPlanの例*
 
-———
+---
 
-## 2. 移動する（workspace/worktreeを検索して移動する）
+## 移動する（workspace/worktreeを検索して移動する）
 
 worktreeが増えてくると、「あの作業どこでやってたっけ？」を思い出す時間が地味に効いてきます。  
-gionの基本フロー（Plan/Apply）とは別に、移動だけを速くするための相棒が `giongo` です（brew/miseで入れると `gion` と一緒に入ってきます）。  
+移動は `giongo` を使います（brew/miseで入れると `gion` と一緒に入ってきます）。  
 これは状態を一切変えず、目的地を選ぶところまでを担当します。
 
-### 2-1. 検索して選んで移動する
+※ `giongo` 自体はそのまま使えますが、選んだ場所に `cd` までしたい場合は bash/zsh 側で関数でラップします（README参照）。
 
-`giongo` は workspace と worktree をまとめて一覧し、検索で絞って選べます。  
+### 検索して選んで移動する
+
+`giongo` は workspace と worktree をまとめて一覧し、検索で絞って選べます。
 
 <!-- GIF: workspace/worktreeを検索して移動する -->
 *workspace/worktreeを検索して移動する（giongo）*
 
-### 2-2. シェル統合（軽く）
+---
 
-`giongo --print` は選んだパスを出力するだけなので、`cd` まで繋ぐには bash/zsh の関数が必要です（`eval "$(giongo init)"` を一度入れるだけ）。
-
-———
-
-## 3. 削除する（gcで安全に回収して、rmは止まりながら消す）
+## 削除する（gcで安全に回収して、rmは止まりながら消す）
 
 worktreeが増えてくると、「これってもう消していいんだっけ？」と立ち止まることがあると思います。  
 gionはこの片付けを、`gion manifest gc` と `gion manifest rm` の2つに分けて扱います。
 
-### 3-1. gion manifest gc（自動・保守的に回収）
+### gion manifest gc（自動・保守的に回収）
 
 `gion manifest gc` は「高い確度で安全に消せるものだけ」をまとめて候補にします。  
 たとえば、デフォルトブランチにマージ済みのものは回収できる一方で、判断が難しい（未コミット/未push/状態が読めない等）ものは基本的に対象外です。作っただけでコミットが無いworkspaceも、うっかり消さないように外します。
@@ -111,33 +125,17 @@ gionはこの片付けを、`gion manifest gc` と `gion manifest rm` の2つに
 <!-- 画像: gion manifest gc の結果（回収候補と除外が分かる） -->
 *gcの結果（回収される/されないが一目で分かる）*
 
-### 3-2. gion manifest rm（手動・ガードレール付きで消す）
+### gion manifest rm（手動・ガードレール付きで消す）
 
 一方 `gion manifest rm` は「人間が消したいもの」を選ぶための入口です。選択自体はインタラクティブにできて、実行前に `Plan` で削除が出るので、そこで落ち着いて確認してから進めます。  
 
 <!-- 画像: gion manifest rm → Plan（risk/sync）→ 確認プロンプト -->
 *rmのPlan（risk/sync）と確認プロンプトの例*
 
-———
+---
 
-## 4. まとめ（体験の要約＋次の一歩）（200〜400字）
+## おわりに
 
-- 3体験を一文ずつで畳む
-  - 作る：入口が複数、まとめて展開できる（Issue起点が中心）
-  - 移動：思い出さずに開ける
-  - 削除：マージ済みは回収、危険なら止まる
-- 次の一歩（リンク/導線）
-  - READMEへの導線、インストール、まずはrepoモードから、など
+インストール手順と使い方はGitHubのREADMEにまとめています。よければ覗いて、手元で一度触ってみてください！
 
-———
-
-## 画像/GIF設計（Zenn向け・最小構成案）
-
-- 静止画4枚
-  - 導入：Plan→確認
-  - 作る：presetのツリー（backend + frontend + docs が見える）
-  - 削除：gcの結果
-  - 削除：rmのPlan（risk/sync）
-- GIF 1〜2本（入れるならここだけ）
-  - 作る：issueの複数選択（最優先、URLは実在のものを表示）
-  - 移動：giongo絞り込み（余裕があれば）
+https://github.com/tasuku43/gion
