@@ -395,9 +395,9 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.theme,
 					m.useColor,
 				)
-				if m.mode == "repo" {
-					m.branchModel.separateInputLine = true
-				}
+				// Prefer a 2-line layout so the user-entered branch stays visible even when labels are long.
+				// (See docs/spec/ui/UI.md)
+				m.branchModel.separateInputLine = true
 				m.stage = createStagePresetBranch
 				return m, nil
 			}
