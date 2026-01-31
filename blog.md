@@ -3,8 +3,8 @@ AIエージェントで並行開発を回すようになって、Git worktree �
 そこで、作る・移動・片付けをいい感じにまとめたくて gion を作りました。
 
 gion は Git worktree を「タスク（workspace）単位」で扱う小さな CLI です。  
-`gion.yaml` に望ましい状態を書き、`gion plan` で差分を見て、`gion apply` で作業場所を揃えます。  
-このGIFは、YAML直編集で入った作成・削除・更新を plan→apply で反映する例です。
+`gion.yaml` に望ましい状態を書き、`gion apply` で差分（Plan）を確認しつつ作業場所を揃えます。  
+このGIFは、YAML直編集で入った作成・削除・更新を `gion apply`（内部で Plan 表示→確認→Apply）で反映する例です。
 
 ![作成・削除・更新](https://storage.googleapis.com/zenn-user-upload/64d7ae3ea0a3-20260131.gif)
 
@@ -12,7 +12,7 @@ gion は Git worktree を「タスク（workspace）単位」で扱う小さな 
 
 コア機能は“作る/移動/片付け”の3つです。
 
-- 作る：`gion manifest add` → `gion plan` → `gion apply`
+- 作る：`gion manifest add` → `gion apply`（Planを確認して実行）
 - 移動：`giongo` で検索して移動
 - 片付け：`gion manifest gc` / `gion manifest rm`
 
@@ -46,10 +46,10 @@ GION_ROOT/
 
 ---
 
-## 作る（Planで差分を見て、Applyでまとめて作る）
+## 作る（ApplyでPlanを確認して、まとめて作る）
 
 workspaceを「作る」操作は、`gion manifest add` コマンドか、`gion.yaml` の直接編集で行います。  
-どちらの場合も、まず “望ましい状態” を宣言して `gion plan` で差分（何が作られるか・削除されるか）を確認し、納得できたら `gion apply` でまとめて作る——という流れです。
+どちらの場合も、まず “望ましい状態” を宣言して `gion apply` を実行します。内部で plan を計算して `Plan` を表示し、納得できたらそのまま `Apply` でまとめて反映する——という流れです。
 
 ### 4つの作成`mode`
 
@@ -60,7 +60,7 @@ workspaceを「作る」操作は、`gion manifest add` コマンドか、`gion.
 
 ### issue / review（まとめて積んで、一括で作る）
 
-Issue（やPR）を複数選んで `gion.yaml` に積み、`gion plan` で差分を見てから、`gion apply` を実行します。
+Issue（やPR）を複数選んで `gion.yaml` に積み、`gion apply` を実行して `Plan` で差分を確認してから反映します。
 
 ![issue/reviewをまとめて選んで、一括で作る](https://storage.googleapis.com/zenn-user-upload/027b8d9c6ecf-20260131.gif)
 
@@ -68,7 +68,7 @@ Issue（やPR）を複数選んで `gion.yaml` に積み、`gion plan` で差分
 
 ### repo（workspaceを一つ作る）
 
-とにかく最短で1つ作るなら `repo` が一番シンプルです。リポジトリとworkspace IDを指定して追加し、`gion plan` で作成内容を確認してから `gion apply` します。
+とにかく最短で1つ作るなら `repo` が一番シンプルです。リポジトリとworkspace IDを指定して追加し、`gion apply` の `Plan` で作成内容を確認してから反映します。
 
 ![repoを1つ追加して、Planで確認する](https://storage.googleapis.com/zenn-user-upload/36fcce70fba4-20260131.png)
 
@@ -84,7 +84,7 @@ workspaceは「タスク単位の箱」なので、backend + frontend + docs み
 `gion.yaml` は直接編集も可能です。
 たとえば ブランチ名を直したいとき、複数workspaceを同時に削除・作成したいとき、既存の定義を更新しつつ整理したいとき、などです。
 
-直編集のあとに `gion plan` を叩くと、削除・作成・更新がまとめて一覧できるので「何が起きるか」を落ち着いて確認できます。確認できたら `gion apply` で反映、という流れ自体は `gion manifest add` と同じです。
+直編集のあとに `gion apply` を実行すると、まず削除・作成・更新がまとめて `Plan` に出るので「何が起きるか」を落ち着いて確認できます。納得できたらそのまま `Apply` で反映できます。
 
 ![削除・作成・更新](https://storage.googleapis.com/zenn-user-upload/271e0d40813c-20260131.png)
 
