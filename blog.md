@@ -2,9 +2,14 @@ AIエージェントで並行開発を回すようになって、Git worktreeに
 ただ、並行開発が増えるほど worktree も増えて、「どこに作ろう？」「移動がめんどい...」「これ削除していいんだっけ？」みたいなことが増えてきました。  
 そこで、いい感じに作れて、いい感じに移動できて、いい感じに片付くやつが欲しくて gion を作りました。
 
+gion は Git worktree を「タスク（workspace）単位」で扱うための小さな CLI です。  
+gion.yaml に望ましい状態を書き、`gion plan` で差分を確認し、`gion apply` で実体（作業場所）を揃えます。
+
+![](vhs/demo-apply.gif)
+
 ## 概要
 
-gion は、Git worktree を「タスク（workspace）単位」で扱うための小さなCLIです。
+コア機能は“作る/移動/片付け”の3つです。
 
 - 作る：`gion manifest add` → `gion plan` → `gion apply`
 - 移動：`giongo` で検索して移動
