@@ -29,6 +29,7 @@ go.work.sum
 
 # Go build cache (set via GOCACHE for sandboxed runs)
 .gocache/
+.gomodcache/
 
 # env file
 .env

@@ -1,0 +1,18 @@
+version: 1
+workspaces:
+  PROJ-123:
+    description: "demo: apply from pre-defined gion.yaml"
+    mode: "repo"
+    repos:
+      - alias: gion
+        repo_key: github.com/tasuku43/gion.git
+        branch: PROJ-123
+        base_ref: origin/main
+  PROJ-456:
+    description: "demo: another workspace"
+    mode: "repo"
+    repos:
+      - alias: gion
+        repo_key: github.com/tasuku43/gion.git
+        branch: PROJ-456
+        base_ref: origin/main

@@ -1,0 +1,203 @@
+{
+  "main": {
+    "id": "47b1f37188fb9599",
+    "type": "split",
+    "children": [
+      {
+        "id": "621c35180caf67e6",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ae9c08304789e177",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "blog.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "blog"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "440ab65f14b70163",
+    "type": "split",
+    "children": [
+      {
+        "id": "2dff25aca453c183",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9d480e4ebc8112a3",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "ファイルエクスプローラ"
+            }
+          },
+          {
+            "id": "eade65fababa52ee",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "検索"
+            }
+          },
+          {
+            "id": "dde897fbfe231183",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "ブックマーク"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "8e0ad264cf5a949e",
+    "type": "split",
+    "children": [
+      {
+        "id": "a999f1800b27712e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "340880aab8dae1ab",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "blog.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "blogへのバックリンク"
+            }
+          },
+          {
+            "id": "935e3a6935d44bd3",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "blog.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "blogからのアウトゴーイングリンク"
+            }
+          },
+          {
+            "id": "9f2b4baecf4b41cc",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "タグ"
+            }
+          },
+          {
+            "id": "1a15fe9ff27dd521",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "すべてのプロパティ"
+            }
+          },
+          {
+            "id": "4be3dddb1fcd2d7e",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "blog.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "blogのアウトライン"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:クイックスイッチャーを開く": false,
+      "graph:グラフビューを開く": false,
+      "canvas:新規キャンバスを作成": false,
+      "daily-notes:今日のデイリーノートを開く": false,
+      "templates:テンプレートを挿入": false,
+      "command-palette:コマンドパレットを開く": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "ae9c08304789e177",
+  "lastOpenFiles": [
+    "vhs/fixtures/demo-apply-gion.yaml",
+    "vhs/fixtures",
+    "vhs/demo-apply.tape",
+    "vhs/demo-preset.tape",
+    "vhs/demo-issue.mp4",
+    "vhs/demo-issue.tape",
+    "vhs/demo-repo.mp4",
+    "vhs/demo.tape",
+    "vhs/demo.mp4",
+    "vhs/demo-repo.tape",
+    "vhs/README.md",
+    "vhs",
+    "demo_3s-9.5s_smooth.gif",
+    "demo_6s-10s.gif"
+  ]
+}
