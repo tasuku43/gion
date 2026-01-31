@@ -79,7 +79,7 @@ workspaceは「タスク単位の箱」なので、backend + frontend + docs み
 ![presetを作成](https://storage.googleapis.com/zenn-user-upload/e715690715a9-20260131.png)
 ![presetで複数repoをまとめて宣言する](https://storage.googleapis.com/zenn-user-upload/c86453de43b2-20260131.png)
 
-### YAML直編集 vs manifest
+### YAML直編集
 
 `gion.yaml` は直接編集も可能です。
 たとえば ブランチ名を直したいとき、複数workspaceを同時に削除・作成したいとき、既存の定義を更新しつつ整理したいとき、などです。
@@ -96,12 +96,14 @@ worktreeが増えてくると、「あの作業どこでやってたっけ？」
 移動は `giongo` を使います（brew/miseで入れると `gion` と一緒に入ってきます）。  
 これは状態を一切変えず、目的地を選ぶところまでを担当します。
 
-※ `giongo` 自体はそのまま使えますが、選んだ場所に `cd` までしたい場合は bash/zsh 側で関数でラップします（README参照）。
-
 `giongo` は workspace と worktree をまとめて一覧し、検索で絞って選べます。
+workspace を選べばその workspace ディレクトリへ、worktree を選べばそのリポジトリの作業ディレクトリへ移動できます。
 
-<!-- GIF: workspace/worktreeを検索して移動する -->
-*workspace/worktreeを検索して移動する（giongo）*
+![workspace/worktreeを検索して移動する（giongo）](https://storage.googleapis.com/zenn-user-upload/55a6eb8dd780-20260131.gif)
+
+:::message
+`giongo` 自体はそのまま使えますが、選んだ場所に `cd` までしたい場合は bash/zsh 側で初期設定が必要です（README参照）。
+:::
 
 ---
 

@@ -13,5 +13,6 @@ vhs vhs/demo-repo.tape
 ## tapes
 
 - `vhs/demo-apply.tape`: 事前に用意した `gion.yaml` を `gion apply` で反映（概要/仕組み向け）
+- `vhs/demo-giongo.tape`: workspace/worktree を検索して移動（ブログ/README の「移動する」向け）
 - `vhs/demo.tape`: `manifest add (issue)` → apply → giongo → rm（長尺の通しデモ）
 - `vhs/demo-repo.tape`: `manifest add (repo)` の入力例（短尺）
