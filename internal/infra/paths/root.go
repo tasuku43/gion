@@ -18,7 +18,7 @@ func ResolveRoot(flagRoot string) (string, error) {
 		return normalizeRoot(envRoot)
 	}
 
-	home, err := os.UserHomeDir()
+	home, err := resolveHomeDir()
 	if err != nil {
 		return "", err
 	}
@@ -33,9 +33,21 @@ func normalizeRoot(path string) (string, error) {
 	return filepath.Clean(expanded), nil
 }
 
+func resolveHomeDir() (string, error) {
+	// Prefer env vars so tests (and callers) can override HOME without being
+	// affected by Go's internal user home caching.
+	if home := strings.TrimSpace(os.Getenv("HOME")); home != "" {
+		return home, nil
+	}
+	if home := strings.TrimSpace(os.Getenv("USERPROFILE")); home != "" {
+		return home, nil
+	}
+	return os.UserHomeDir()
+}
+
 func expandHome(path string) (string, error) {
 	if path == "~" || strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
+		home, err := resolveHomeDir()
 		if err != nil {
 			return "", err
 		}

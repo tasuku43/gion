@@ -102,7 +102,9 @@ func (f *Frame) WriteTo(w io.Writer) (int64, error) {
 		for _, line := range f.Inputs {
 			renderLine(r, line)
 		}
-		r.Blank()
+		if len(f.Info) > 0 || len(f.Steps) > 0 || len(f.Result) > 0 || len(f.Suggestion) > 0 {
+			r.Blank()
+		}
 	}
 
 	if len(f.Info) > 0 {
@@ -110,7 +112,7 @@ func (f *Frame) WriteTo(w io.Writer) (int64, error) {
 		for _, line := range f.Info {
 			renderLine(r, line)
 		}
-		if !f.NoBlankAfterInfo {
+		if !f.NoBlankAfterInfo && (len(f.Steps) > 0 || len(f.Result) > 0 || len(f.Suggestion) > 0) {
 			r.Blank()
 		}
 	}
@@ -120,7 +122,9 @@ func (f *Frame) WriteTo(w io.Writer) (int64, error) {
 		for _, line := range f.Steps {
 			renderLine(r, line)
 		}
-		r.Blank()
+		if len(f.Result) > 0 || len(f.Suggestion) > 0 {
+			r.Blank()
+		}
 	}
 
 	if len(f.Result) > 0 {
@@ -128,7 +132,9 @@ func (f *Frame) WriteTo(w io.Writer) (int64, error) {
 		for _, line := range f.Result {
 			renderLine(r, line)
 		}
-		r.Blank()
+		if len(f.Suggestion) > 0 && f.useColor {
+			r.Blank()
+		}
 	}
 
 	if len(f.Suggestion) > 0 && f.useColor {

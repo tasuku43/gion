@@ -29,6 +29,8 @@ func TestResolveRootEnvOverridesConfig(t *testing.T) {
 
 func TestResolveRootDefault(t *testing.T) {
 	temp := t.TempDir()
+	// Ensure the default path is used even if the outer environment sets GION_ROOT.
+	t.Setenv("GION_ROOT", "")
 	t.Setenv("HOME", temp)
 	root, err := ResolveRoot("")
 	if err != nil {

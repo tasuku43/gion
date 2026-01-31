@@ -1602,11 +1602,19 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	lines = append(lines, fmt.Sprintf("%s: %s", label, model.input.View()))
 	frame.SetInputsPrompt(lines...)
 
-	selectedLines := collectLines(func(b *strings.Builder) {
-		renderSelectedChoiceTree(b, model.selected, model.useColor, model.theme)
-	})
-	infoLines := 1 + len(selectedLines) + 1
-	if model.errorLine != "" {
+	hasSelected := len(model.selected) > 0
+	hasError := model.errorLine != ""
+
+	var selectedLines []string
+	infoLines := 0
+	if hasSelected {
+		selectedLines = collectLines(func(b *strings.Builder) {
+			renderSelectedChoiceTree(b, model.selected, model.useColor, model.theme)
+		})
+		// "selected" header + selected lines
+		infoLines += 1 + len(selectedLines)
+	}
+	if hasError {
 		infoLines++
 	}
 	// +1 for the inline "finish" help line appended under Inputs.
@@ -1616,14 +1624,18 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	})
 	frame.AppendInputsRaw(rawLines...)
 
-	if model.useColor {
-		frame.SetInfo(model.theme.Accent.Render("selected"))
-	} else {
-		frame.SetInfo("selected")
+	if hasSelected || hasError {
+		if hasSelected {
+			if model.useColor {
+				frame.SetInfo(model.theme.Accent.Render("selected"))
+			} else {
+				frame.SetInfo("selected")
+			}
+			frame.AppendInfoRaw(selectedLines...)
+		}
 	}
-	frame.AppendInfoRaw(selectedLines...)
 
-	if model.errorLine != "" {
+	if hasError {
 		msg := model.errorLine
 		if model.useColor {
 			msg = model.theme.Error.Render(msg)
@@ -2274,8 +2286,8 @@ func listMaxLines(height int, inputLines int, infoLines int) int {
 		total += 1 + infoLines + 1
 	}
 	maxLines := height - total
-	if maxLines < 1 {
-		return 1
+	if maxLines < 0 {
+		return 0
 	}
 	return maxLines
 }
@@ -2942,6 +2954,9 @@ func listWindow(total int, cursor int, maxVisible int) (int, int) {
 }
 
 func renderChoiceList(b *strings.Builder, items []string, cursor int, maxVisible int, useColor bool, theme Theme) {
+	if maxVisible <= 0 {
+		return
+	}
 	if len(items) == 0 {
 		msg := "no matches"
 		if useColor {
@@ -2966,9 +2981,6 @@ func renderChoiceList(b *strings.Builder, items []string, cursor int, maxVisible
 	if cursor < 0 || cursor >= len(groups) {
 		cursor = 0
 	}
-	if maxVisible <= 0 {
-		maxVisible = 1
-	}
 	if len(groups[cursor].lines) > maxVisible {
 		start, end := listWindow(len(groups[cursor].lines), 0, maxVisible)
 		for i := start; i < end; i++ {
@@ -2987,12 +2999,15 @@ func renderChoiceList(b *strings.Builder, items []string, cursor int, maxVisible
 }
 
 func renderRepoChoiceList(b *strings.Builder, items []PromptChoice, cursor int, maxVisible int, useColor bool, theme Theme) {
+	if maxVisible <= 0 {
+		return
+	}
 	if len(items) == 0 {
 		msg := "no matches"
 		if useColor {
 			msg = theme.Muted.Render(msg)
 		}
-		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
+		b.WriteString(fmt.Sprintf("%s%s%s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.TreeBranchLast), msg))
 		return
 	}
 
@@ -3000,6 +3015,10 @@ func renderRepoChoiceList(b *strings.Builder, items []PromptChoice, cursor int, 
 	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
 	for i := range items {
 		item := items[i]
+		connector := output.TreeBranchMid
+		if i == len(items)-1 {
+			connector = output.TreeBranchLast
+		}
 		display := item.Label
 		if i == cursor && useColor {
 			display = lipgloss.NewStyle().Bold(true).Render(display)
@@ -3012,15 +3031,12 @@ func renderRepoChoiceList(b *strings.Builder, items []PromptChoice, cursor int, 
 				display += " - " + desc
 			}
 		}
-		line := fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), display)
+		line := fmt.Sprintf("%s%s%s", output.Indent+output.Indent, mutedToken(theme, useColor, connector), display)
 		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapRawLineToWidth(line, width)})
 	}
 
 	if cursor < 0 || cursor >= len(groups) {
 		cursor = 0
-	}
-	if maxVisible <= 0 {
-		maxVisible = 1
 	}
 	if len(groups[cursor].lines) > maxVisible {
 		start, end := listWindow(len(groups[cursor].lines), 0, maxVisible)
@@ -3368,6 +3384,9 @@ func groupWindowByLineBudget(groups []workspaceRepoChoiceGroup, cursorWorkspace 
 
 func renderWorkspaceRepoChoiceList(b *strings.Builder, items []WorkspaceChoice, cursor int, maxVisible int, useColor bool, theme Theme) {
 	groups, cursorWorkspace, cursorLine := buildWorkspaceRepoChoiceGroups(items, cursor, useColor, theme)
+	if maxVisible <= 0 {
+		return
+	}
 	if len(groups) == 0 {
 		msg := "no matches"
 		if useColor {
@@ -3375,10 +3394,6 @@ func renderWorkspaceRepoChoiceList(b *strings.Builder, items []WorkspaceChoice, 
 		}
 		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
 		return
-	}
-
-	if maxVisible <= 0 {
-		maxVisible = 1
 	}
 
 	if cursorWorkspace < 0 || cursorWorkspace >= len(groups) {
@@ -3410,6 +3425,9 @@ func renderWorkspaceRepoChoiceList(b *strings.Builder, items []WorkspaceChoice, 
 }
 
 func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, cursor int, maxVisible int, useColor bool, theme Theme) {
+	if maxVisible <= 0 {
+		return
+	}
 	if len(items) == 0 {
 		msg := "no matches"
 		if useColor {
@@ -3464,9 +3482,6 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 
 	if cursor < 0 || cursor >= len(groups) {
 		cursor = 0
-	}
-	if maxVisible <= 0 {
-		maxVisible = 1
 	}
 	if len(groups[cursor].lines) > maxVisible {
 		start, end := listWindow(len(groups[cursor].lines), 0, maxVisible)
