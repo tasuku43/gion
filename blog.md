@@ -1,11 +1,12 @@
-AIエージェントで並行開発を回すようになって、Git worktreeに辿り着きました。  
-ただ、並行開発が増えるほど worktree も増えて、「どこに作ろう？」「移動がめんどい...」「これ削除していいんだっけ？」みたいなことが増えてきました。  
-そこで、いい感じに作れて、いい感じに移動できて、いい感じに片付くやつが欲しくて gion を作りました。
+AIエージェントで並行開発を回すようになって、Git worktree に辿り着きました。  
+ただ、並行が増えるほど worktree も増えて、「どこに作ろう？」「移動がめんどい...」「これ削除していいんだっけ？」が増えてきました。  
+そこで、作る・移動・片付けをいい感じにまとめたくて gion を作りました。
 
-gion は Git worktree を「タスク（workspace）単位」で扱うための小さな CLI です。  
-gion.yaml に望ましい状態を書き、`gion plan` で差分を確認し、`gion apply` で実体（作業場所）を揃えます。
+gion は Git worktree を「タスク（workspace）単位」で扱う小さな CLI です。  
+`gion.yaml` に望ましい状態を書き、`gion plan` で差分を見て、`gion apply` で作業場所を揃えます。  
+このGIFは、YAML直編集で入った作成・削除・更新を plan→apply で反映する例です。
 
-![](vhs/demo-apply.gif)
+![作成・削除・更新](https://storage.googleapis.com/zenn-user-upload/b29fa0bb2fd5-20260131.gif)
 
 ## 概要
 
@@ -24,8 +25,7 @@ https://github.com/tasuku43/gion
 ## 仕組み（gion.yaml と manifestサブコマンドの関係）
 
 gion の中心は `gion.yaml` です。ここに「こうなっていてほしい（望ましい状態）」を書きます。  
-`gion manifest` は、その `gion.yaml` を更新するための入口です。  
-そして `gion plan` で差分を確認して、`gion apply` で実体（作業場所）を揃える、という流れになっています。
+`gion manifest` は、その `gion.yaml` を更新するための入口です（直接編集してもOKです）。
 
 用語だけ補足すると、**Git worktree** はブランチ（や特定コミット）をチェックアウトした作業用ディレクトリです。一方、ここで言う **workspace** は「タスク単位の箱」で、その中に1つ以上のworktree（必要なら複数リポジトリのworktree）を束ねて扱います。
 
@@ -60,7 +60,7 @@ workspaceを「作る」操作は、`gion manifest add` コマンドか、`gion.
 
 ### issue / review（まとめて積んで、一括で作る）
 
-Issue（やPR）を複数選んで `gion.yaml` に積み、`plan` で差分を見てから、`apply` を実行します。
+Issue（やPR）を複数選んで `gion.yaml` に積み、`gion plan` で差分を見てから、`gion apply` を実行します。
 
 ![issue/reviewをまとめて選んで、一括で作る](https://storage.googleapis.com/zenn-user-upload/027b8d9c6ecf-20260131.gif)
 
@@ -68,7 +68,7 @@ Issue（やPR）を複数選んで `gion.yaml` に積み、`plan` で差分を�
 
 ### repo（workspaceを一つ作る）
 
-とにかく最短で1つ作るなら `repo` が一番シンプルです。リポジトリとworkspace IDを指定して追加し、`plan` で作成内容を確認してから `apply` します。
+とにかく最短で1つ作るなら `repo` が一番シンプルです。リポジトリとworkspace IDを指定して追加し、`gion plan` で作成内容を確認してから `gion apply` します。
 
 ![repoを1つ追加して、Planで確認する](https://storage.googleapis.com/zenn-user-upload/36fcce70fba4-20260131.png)
 
