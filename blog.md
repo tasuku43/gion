@@ -117,15 +117,18 @@ gionはこの片付けを、`gion manifest gc` と `gion manifest rm` の2つに
 `gion manifest gc` は「高い確度で安全に消せるものだけ」をまとめて候補にします。  
 たとえば、デフォルトブランチにマージ済みのものは回収できる一方で、判断が難しい（未コミット/未push/状態が読めない等）ものは基本的に対象外です。作っただけでコミットが無いworkspaceも、うっかり消さないように外します。
 
-<!-- 画像: gion manifest gc の結果（回収候補と除外が分かる） -->
-*gcの結果（回収される/されないが一目で分かる）*
+![gcの結果（回収される/されないが一目で分かる）](https://storage.googleapis.com/zenn-user-upload/592d914cb8dd-20260131.png)
 
 ### gion manifest rm（手動・ガードレール付きで消す）
 
 一方 `gion manifest rm` は「人間が消したいもの」を選ぶための入口です。選択自体はインタラクティブにできて、実行前に `Plan` で削除が出るので、そこで落ち着いて確認してから進めます。
 
-<!-- 画像: gion manifest rm → Plan（risk/sync）→ 確認プロンプト -->
-*rmのPlan（risk/sync）と確認プロンプトの例*
+![rmのPlan（risk/sync）と確認プロンプトの例](https://storage.googleapis.com/zenn-user-upload/f542f7f94a3f-20260201.gif)
+
+### YAML直編集
+
+削除も `gion.yaml` を直接編集して行えます。  
+直編集の場合も `gion apply` の `Plan` で “消えるもの” が明示され、最後に確認プロンプトが出るので、うっかり消しすぎる事故を減らせます（不安ならそこで `n` で止めればOKです）。
 
 ---
 
