@@ -12,7 +12,11 @@ Enter
 Sleep 1s
 
 # Select repos (pick a couple of fetched repos)
+Type "backend"
+Sleep 0.5s
 Enter
+Sleep 0.5s
+Type "frontend"
 Sleep 0.5s
 Enter
 Sleep 0.5s
@@ -31,8 +35,47 @@ Sleep 0.5s
 Enter
 Sleep 4s
 
-# Apply preset: show Plan with multiple worktree creations, then cancel
-Type "gion manifest add --preset sample-app SAMPLE-123"
+Hide
+Type "clear"
+Enter
+Show
+
+# Create workspace from preset (interactive): show Plan then cancel
+Type "gion manifest add"
+Sleep 0.5s
+Enter
+Sleep 1s
+
+# Select mode: preset
+Type "preset"
+Sleep 0.5s
+Enter
+Sleep 1s
+
+# Select preset
+Type "sample-app"
+Sleep 0.5s
+Enter
+Sleep 1s
+
+# Enter workspace ID
+Type "SAMPLE-123"
+Sleep 0.5s
+Enter
+Sleep 1s
+
+# Enter description
+Type "demo: preset workspace (multi-repo)"
+Sleep 0.5s
+Enter
+Sleep 1s
+
+# Set branches per repo (the prompt is pre-filled with the workspace ID)
+Type "-backend"
+Sleep 0.5s
+Enter
+Sleep 0.5s
+Type "-frontend"
 Sleep 0.5s
 Enter
 Sleep 5s
