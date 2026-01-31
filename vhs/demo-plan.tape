@@ -1,4 +1,4 @@
-Output demo-apply.gif
+Output demo-plandemo-apply.tape.gif
 Set Width 1000
 Set Height 600
 Set FontSize 18
@@ -15,21 +15,7 @@ Type "clear"
 Enter
 Show
 
-Type "gion apply"
+Type "gion plan"
 Sleep 0.5s
-Enter
-Sleep 3s
-
-Type "y"
-Sleep 0.5s
-Enter
-Sleep 5s
-
-# できあがり確認（最低限）
-Type "gion manifest ls"
-Enter
-Sleep 1s
-
-Type "tree ~/gion/workspaces -L 2"
 Enter
 Sleep 3s

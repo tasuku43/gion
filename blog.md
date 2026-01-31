@@ -6,7 +6,7 @@ gion は Git worktree を「タスク（workspace）単位」で扱う小さな 
 `gion.yaml` に望ましい状態を書き、`gion plan` で差分を見て、`gion apply` で作業場所を揃えます。  
 このGIFは、YAML直編集で入った作成・削除・更新を plan→apply で反映する例です。
 
-![作成・削除・更新](https://storage.googleapis.com/zenn-user-upload/b29fa0bb2fd5-20260131.gif)
+![作成・削除・更新](https://storage.googleapis.com/zenn-user-upload/64d7ae3ea0a3-20260131.gif)
 
 ## 概要
 
@@ -77,8 +77,7 @@ Issue（やPR）を複数選んで `gion.yaml` に積み、`gion plan` で差分
 workspaceは「タスク単位の箱」なので、backend + frontend + docs みたいに複数repoを束ねたくなります。presetを作っておけば、次からはそれらをまとめて一つのworkspaceを作成できます。
 
 ![presetを作成](https://storage.googleapis.com/zenn-user-upload/e715690715a9-20260131.png)
-<!-- 画像を挟む -->
-*presetで複数repoをまとめて宣言する*
+![presetで複数repoをまとめて宣言する](https://storage.googleapis.com/zenn-user-upload/c86453de43b2-20260131.png)
 
 ### YAML直編集 vs manifest
 
@@ -87,8 +86,7 @@ workspaceは「タスク単位の箱」なので、backend + frontend + docs み
 
 直編集のあとに `gion plan` を叩くと、削除・作成・更新がまとめて一覧できるので「何が起きるか」を落ち着いて確認できます。確認できたら `gion apply` で反映、という流れ自体は `gion manifest add` と同じです。
 
-<!-- 画像: Planで「削除・作成・更新」が同時に表示されるスクショ -->
-*削除・作成・更新が同時に出るPlanの例*
+![削除・作成・更新](https://storage.googleapis.com/zenn-user-upload/271e0d40813c-20260131.png)
 
 ---
 
