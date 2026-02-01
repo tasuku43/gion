@@ -121,7 +121,16 @@ gionはこの片付けを、`gion manifest gc` と `gion manifest rm` の2つに
 
 ### gion manifest rm（手動・ガードレール付きで消す）
 
-一方 `gion manifest rm` は「人間が消したいもの」を選ぶための入口です。選択自体はインタラクティブにできて、実行前に `Plan` で削除が出るので、そこで落ち着いて確認してから進めます。
+一方 `gion manifest rm` は「人間が消したいもの」を選ぶための入口です。選択はインタラクティブにできて、最後に確認してから進めます。
+
+選択画面では workspace に軽いタグが付きます（`[dirty]` / `[unpushed]` / `[diverged]` / `[unknown]`）。
+
+- `dirty`：未コミット変更がある（未追跡ファイルやコンフリクト含む）
+- `unpushed`：upstream より手元が ahead（未pushのコミットがある）
+- `diverged`：ahead かつ behind（手元と upstream が分岐している）
+- `unknown`：upstream が無い / detached HEAD などで判定できない
+
+たとえば `dirty` の場合、`Plan` 側で `risk: dirty (...)` や変更ファイルが見えるので、削除前にサッと確認できます（具体的な見え方はGIF参照）。
 
 ![rmのPlan（risk/sync）と確認プロンプトの例](https://storage.googleapis.com/zenn-user-upload/f542f7f94a3f-20260201.gif)
 
@@ -134,6 +143,6 @@ gionはこの片付けを、`gion manifest gc` と `gion manifest rm` の2つに
 
 ## おわりに
 
-インストール手順と使い方はGitHubのREADMEにまとめています。よければ覗いて、手元で一度触ってみてください！
+インストール手順（Homebrew / mise 対応）と使い方はGitHubのREADMEにまとめています。よければ覗いて、手元で一度触ってみてください！
 
 https://github.com/tasuku43/gion

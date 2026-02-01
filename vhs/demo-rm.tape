@@ -19,4 +19,4 @@ Sleep 1s
 Type "done"
 Sleep 0.5s
 Enter
-Sleep 3s
+Sleep 5s
