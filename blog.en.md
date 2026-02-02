@@ -1,43 +1,74 @@
-AIエージェントで並行開発を回すようになって、Git worktree に辿り着きました。  
-ただ、並行が増えるほど worktree も増えて、「どこに作ろう？」「移動がめんどい...」「これ削除していいんだっけ？」が増えてきました。  
-そこで、作る・移動・片付けをいい感じにまとめたくて gion を作りました。
+# Manage Git worktrees declaratively with YAML (plan/apply + guardrails) — gion
 
-gion は Git worktree を「タスク（workspace）単位」で扱う小さな CLI です。  
-`gion.yaml` に望ましい状態を書き、`gion apply` で差分（Plan）を確認しつつ作業場所を揃えます。  
-このGIFは、YAML直編集で入った作成・削除・更新を `gion apply`（内部で Plan 表示→確認→Apply）で反映する例です。
+**TL;DR:** I built **gion**, a CLI to manage **Git worktrees** declaratively.  
+Write your desired state in `gion.yaml`, then **plan/apply** to create/update/cleanup in bulk **with guardrails**.  
+It also supports **task-scoped workspaces** (grouping multiple repos for a **monorepo-like workflow**) and fast navigation via **giongo**.
 
-![作成・削除・更新](https://storage.googleapis.com/zenn-user-upload/64d7ae3ea0a3-20260131.gif)
+Repo / docs:
+- https://github.com/tasuku43/gion
 
-## 概要
+---
 
-コア機能は“作る/移動/片付け”の3つです。
+## Why I built this
 
-- 作る：`gion manifest add` → `gion apply`（Planを確認して実行）
-- 移動：`giongo` で検索して移動
-- 片付け：`gion manifest gc` / `gion manifest rm`
+After I started using AI coding agents more often, I ended up doing more parallel work. That naturally led me to `git worktree`.
 
-:::message
-※ `gion manifest` は `gion m` / `gion man` と短縮できます！
-:::
+But the more parallel tasks I had, the more I kept asking myself:
 
-https://github.com/tasuku43/gion
+- Where should I create the next worktree?
+- Navigating across many worktrees is annoying.
+- Can I delete this safely? (Or will I accidentally lose local changes?)
 
-## 仕組み（gion.yaml と manifestサブコマンドの関係）
+There are already tools around worktrees, but I wanted two things in particular:
 
-gion の中心は `gion.yaml` です。ここに「こうなっていてほしい（望ましい状態）」を書きます。  
-`gion manifest` は、その `gion.yaml` を更新するための入口です（直接編集してもOKです）。
+1) **Guardrails during cleanup**  
+   I wanted to prevent “I didn’t mean to delete it, but it was deletable anyway.”
 
-用語だけ補足すると、**Git worktree** はブランチ（や特定コミット）をチェックアウトした作業用ディレクトリです。一方、ここで言う **workspace** は「タスク単位の箱」で、その中に1つ以上のworktree（必要なら複数リポジトリのworktree）を束ねて扱います。
+2) **Task-scoped workspaces**  
+   I wanted a “box per task” that can contain **one or more worktrees**, possibly across **multiple repositories**, so I can run my coding agent from the workspace root — and then delete the whole box when done.
 
-イメージとしては、だいたい次のようなディレクトリ構造になります。
+That’s what **gion** is.
+
+![Demo: gion reconciles workspaces via plan/apply (create/update/delete)](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/gdqcs7okhzr8ui9o7ln8.gif)
+
+---
+
+## Overview
+
+The core workflow is **Create / Move / Cleanup**:
+
+- **Create**: `gion manifest add` → `gion apply` (review the plan, then apply)
+- **Move**: use `giongo` to search and jump
+- **Cleanup**: `gion manifest gc` / `gion manifest rm`
+
+
+Tip: `gion manifest` can be shortened to `gion m` or `gion man`.
+
+---
+
+## How it works: `gion.yaml` and the `manifest` subcommands
+
+The center of gion is **`gion.yaml`**.
+
+- `gion.yaml` is the **source of truth** (“desired state” / inventory).
+- `gion manifest ...` is an **entry point** to update that YAML (you can also edit it directly).
+- After any update (via command or direct editing), you run **`gion apply`** to reconcile the filesystem with the desired state.
+- `gion apply` computes a **plan**, shows the diff, and then applies it when you confirm.
+
+### Terminology: worktree vs workspace
+
+- A **Git worktree** is a working directory that checks out a branch (or a specific commit).
+- A **workspace** (in gion’s terms) is a **task-scoped directory** that can contain **one or more worktrees** — potentially from multiple repos.
+
+A typical layout looks like this:
 
 ```text
 GION_ROOT/
-├─ gion.yaml           # 望ましい状態（inventory）
-├─ bare/               # 共有のbare repoストア
-└─ workspaces/         # タスク単位のworkspace
-   ├─ PROJ-123/        # workspace_id（タスク）
-   │  ├─ backend/      # worktree（repo: backend）
+├─ gion.yaml           # desired state (inventory)
+├─ bare/               # shared bare repo store
+└─ workspaces/         # task-scoped workspaces
+   ├─ PROJ-123/        # workspace_id (task)
+   │  ├─ backend/      # worktree (repo: backend)
    │  ├─ frontend/
    │  └─ docs/
    └─ PROJ-456/
@@ -46,103 +77,176 @@ GION_ROOT/
 
 ---
 
-## 作る（ApplyでPlanを確認して、まとめて作る）
+## Create: review a plan, then create in bulk
 
-workspaceを「作る」操作は、`gion manifest add` コマンドか、`gion.yaml` の直接編集で行います。  
-どちらの場合も、まず “望ましい状態” を宣言して `gion apply` を実行します。内部で plan を計算して `Plan` を表示し、納得できたらそのまま `Apply` でまとめて反映する——という流れです。
+There are two ways to declare “create this workspace”:
 
-### 4つの作成`mode`
+- Use `gion manifest add`, or
+- Edit `gion.yaml` directly
 
-入口は `repo` / `issue` / `review` / `preset` の4つです。  
-始め方に合わせて入口を選べるだけで、行き着く先は同じで、最終的には `gion.yaml` に「こうしたい」を積んでいきます。
+In both cases, you’re declaring a desired state first, and then reconciling with **`gion apply`**:
+1) compute the plan
+2) show the diff
+3) apply when you confirm
 
-![入口の選択（repo/issue/review/preset）](https://storage.googleapis.com/zenn-user-upload/f59efe84c584-20260131.png)
+### Four creation modes
 
-### issue / review（まとめて積んで、一括で作る）
+`gion manifest add` supports four entry paths:
 
-Issue（やPR）を複数選んで `gion.yaml` に積み、`gion apply` を実行して `Plan` で差分を確認してから反映します。
+- `repo`
+- `issue`
+- `review`
+- `preset`
 
-![issue/reviewをまとめて選んで、一括で作る](https://storage.googleapis.com/zenn-user-upload/027b8d9c6ecf-20260131.gif)
+The entry point differs, but the destination is the same: everything ends up in `gion.yaml` as desired state.
 
-※ `--issue` / `--review` を使う場合は `gh` CLI が必要です（GitHub前提）。
+![Screenshot: gion manifest add modes (repo/issue/review/preset)](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/qeedcq6ufp7q11726t1c.png)
 
-### repo（workspaceを一つ作る）
+#### `issue` / `review`: queue up many, then apply once
 
-とにかく最短で1つ作るなら `repo` が一番シンプルです。リポジトリとworkspace IDを指定して追加し、`gion apply` の `Plan` で作成内容を確認してから反映します。
+If you use `issue` / `review`, you’ll need the `gh` CLI (GitHub-only).
 
-![repoを1つ追加して、Planで確認する](https://storage.googleapis.com/zenn-user-upload/36fcce70fba4-20260131.png)
+The intended flow is:
+- select multiple Issues / PRs
+- add them to `gion.yaml`
+- run `gion apply` once
+- review the plan, then apply
 
-### preset（複数repoをworkspaceに束ねる）
+This is great when you want to spin up many review/issue worktrees quickly.
 
-workspaceは「タスク単位の箱」なので、backend + frontend + docs みたいに複数repoを束ねたくなります。presetを作っておけば、次からはそれらをまとめて一つのworkspaceを作成できます。
+![Demo: select multiple Issues/PRs and create worktrees in one apply](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/tfe4u3a1iz9uppv1kw4u.gif)
 
-![presetを作成](https://storage.googleapis.com/zenn-user-upload/e715690715a9-20260131.png)
-![presetで複数repoをまとめて宣言する](https://storage.googleapis.com/zenn-user-upload/c86453de43b2-20260131.png)
+#### `repo`: create a single workspace quickly
 
-### YAML直編集
+If you just want the fastest “create one workspace”, `repo` is the simplest:
+- choose a repo
+- set a workspace id
+- confirm the plan
+- apply
 
-`gion.yaml` は直接編集も可能です。
-たとえば ブランチ名を直したいとき、複数workspaceを同時に削除・作成したいとき、既存の定義を更新しつつ整理したいとき、などです。
+![Screenshot: repo mode (create one workspace quickly)](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/mokwx7dosfgl3rtj7im7.png)
 
-直編集のあとに `gion apply` を実行すると、まず削除・作成・更新がまとめて `Plan` に出るので「何が起きるか」を落ち着いて確認できます。納得できたらそのまま `Apply` で反映できます。
+#### `preset`: group multiple repos under one task workspace (monorepo-like workflow)
 
-![削除・作成・更新](https://storage.googleapis.com/zenn-user-upload/271e0d40813c-20260131.png)
+A workspace is a “task box”, so it’s common to want something like:
 
----
+- backend + frontend + docs
+- backend + infra
+- or any other multi-repo set
 
-## 移動する（workspace/worktreeを検索して移動する）
+With **presets**, you define the set once, and then reuse it to create workspaces repeatedly.
 
-worktreeが増えてくると、「あの作業どこでやってたっけ？」を思い出す時間が増えてきます。
-移動は `giongo` を使います（brew/miseで入れると `gion` と一緒に入ってきます）。  
-これは状態を一切変えず、目的地を選ぶところまでを担当します。
+![Screenshot: create a preset (define a reusable repo set)](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/57acy19xsjfgt4do8179.png)
 
-`giongo` は workspace と worktree をまとめて一覧し、検索で絞って選べます。
-workspace を選べばその workspace ディレクトリへ、worktree を選べばそのリポジトリの作業ディレクトリへ移動できます。
+![Screenshot: create a workspace from a preset (multi-repo)](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/7aqcmz5e0etprx10d46m.png)
 
-![workspace/worktreeを検索して移動する（giongo）](https://storage.googleapis.com/zenn-user-upload/55a6eb8dd780-20260131.gif)
+#### Direct YAML editing
 
-:::message
-`giongo` 自体はそのまま使えますが、選んだ場所に `cd` までしたい場合は bash/zsh 側で初期設定が必要です（README参照）。
-:::
+Direct editing is useful when you want to:
+- adjust branch names in bulk
+- create/remove multiple workspaces at once
+- refactor/reorganize existing definitions
 
----
+After editing, run:
 
-## 削除する（gcで安全に回収して、rmは止まりながら消す）
+```bash
+gion apply
+```
 
-worktreeが増えてくると、「これってもう消していいんだっけ？」と立ち止まることがあると思います。  
-gionはこの片付けを、`gion manifest gc` と `gion manifest rm` の2つに分けて扱います。
+You’ll get a plan showing **creates / deletes / updates** together, so you can calmly review what will happen before applying.
 
-### gion manifest gc（自動・保守的に回収）
-
-`gion manifest gc` は「高い確度で安全に消せるものだけ」をまとめて候補にします。  
-たとえば、デフォルトブランチにマージ済みのものは回収できる一方で、判断が難しい（未コミット/未push/状態が読めない等）ものは基本的に対象外です。作っただけでコミットが無いworkspaceも、うっかり消さないように外します。
-
-![gcの結果（回収される/されないが一目で分かる）](https://storage.googleapis.com/zenn-user-upload/592d914cb8dd-20260131.png)
-
-### gion manifest rm（手動・ガードレール付きで消す）
-
-一方 `gion manifest rm` は「人間が消したいもの」を選ぶための入口です。選択はインタラクティブにできて、最後に確認してから進めます。
-
-選択画面では workspace に軽いタグが付きます（`[dirty]` / `[unpushed]` / `[diverged]` / `[unknown]`）。
-
-- `dirty`：未コミット変更がある（未追跡ファイルやコンフリクト含む）
-- `unpushed`：upstream より手元が ahead（未pushのコミットがある）
-- `diverged`：ahead かつ behind（手元と upstream が分岐している）
-- `unknown`：upstream が無い / detached HEAD などで判定できない
-
-たとえば `dirty` の場合、`Plan` 側で `risk: dirty (...)` や変更ファイルが見えるので、削除前にサッと確認できます（具体的な見え方はGIF参照）。
-
-![rmのPlan（risk/sync）と確認プロンプトの例](https://storage.googleapis.com/zenn-user-upload/f542f7f94a3f-20260201.gif)
-
-### YAML直編集
-
-削除も `gion.yaml` を直接編集して行えます。  
-直編集の場合も `gion apply` の `Plan` で “消えるもの” が明示され、最後に確認プロンプトが出るので、うっかり消しすぎる事故を減らせます（不安ならそこで `n` で止めればOKです）。
+![Screenshot: plan shows create/delete/update changes together](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/psperyjrfddicopxrbba.png)
 
 ---
 
-## おわりに
+## Move: search and jump to a workspace/worktree
 
-インストール手順（Homebrew / mise 対応）と使い方はGitHubのREADMEにまとめています。よければ覗いて、手元で一度触ってみてください！
+Once worktrees start to accumulate, you waste time thinking:
 
-https://github.com/tasuku43/gion
+> “Where was I working on that?”
+
+For navigation, use **`giongo`** (installed alongside `gion` via Homebrew/mise).
+
+- `giongo` does **not** change any state.
+- It lists both **workspaces** and **worktrees**, and lets you filter and select.
+- Select a **workspace** → jump to the workspace directory
+- Select a **worktree** → jump to that repo’s working directory
+
+![Demo: giongo lists and jumps to workspaces/worktrees](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/fi7w0edfr2ktvxpkvono.gif)
+
+### Shell integration: make `giongo` change directories
+
+If you want selection → `cd`, you need a small shell integration. The README includes options, but the simplest is:
+
+```bash
+eval "$(giongo init)"
+```
+
+(That prints a function you can paste into `~/.zshrc` or `~/.bashrc` for permanent setup.)
+
+---
+
+## Cleanup: conservative `gc`, and guarded `rm`
+
+As worktrees pile up, you eventually pause and ask:
+
+> “Is it safe to delete this?”
+
+gion splits cleanup into two commands:
+
+- `gion manifest gc`: **automatic, conservative cleanup**
+- `gion manifest rm`: **manual selection with guardrails**
+
+### `gion manifest gc`: conservative auto-cleanup
+
+`gion manifest gc` proposes candidates that are **highly likely safe** to delete.
+
+For example:
+- workspaces whose checked-out branches are already merged into the default branch can be reclaimed
+- anything ambiguous (uncommitted / unpushed / unreadable state, etc.) is excluded by default
+- even “created but no commits” workspaces are excluded so you don’t delete something by accident
+
+In short: `gc` aims to keep false-positives very low.
+
+![Screenshot: gc classifies safe-to-delete candidates conservatively](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/90lzkd6aubtu9p87o4z5.png)
+
+### `gion manifest rm`: manual removal, with guardrails
+
+`gion manifest rm` is for cases where **a human decides** what to delete.
+
+It supports interactive selection and then a final confirmation. During selection, each workspace gets lightweight tags like:
+
+- `[dirty]`
+- `[unpushed]`
+- `[diverged]`
+- `[unknown]`
+
+What those mean:
+
+- **dirty**: working tree has uncommitted changes (including untracked files or conflicts)
+- **unpushed**: your local branch is ahead of upstream (has commits not pushed)
+- **diverged**: local and upstream have both advanced (ahead and behind)
+- **unknown**: cannot be determined (no upstream, detached HEAD, git error, etc.)
+
+When you delete something risky (e.g., `dirty`), the **plan** will show a risk summary and (for dirty cases) the changed files, so you can sanity-check quickly before you confirm.
+
+![Demo: rm shows risk and changed files in the plan before deletion](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/2jdlxkz8lggmv0l5kk8n.gif)
+
+### Cleanup via direct YAML editing
+
+You can also remove workspaces by editing `gion.yaml` directly.
+
+Even then, `gion apply` will:
+- clearly show what will be removed in the plan
+- ask for a confirmation before destructive changes
+
+So if you get nervous, you can just answer `n` and stop.
+
+---
+
+## Closing
+
+Installation (Homebrew / mise) and full usage examples are in the GitHub README. If you’ve ever felt the pain of worktree sprawl — especially in multi-repo tasks — I’d love for you to try **gion** and share feedback.
+
+- https://github.com/tasuku43/gion
+- https://tasuku43.github.io/gion/
