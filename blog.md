@@ -3,7 +3,7 @@ AIエージェントで並行開発を回すようになって、Git worktree �
 そこで、作る・移動・片付けをいい感じにまとめたくて gion を作りました。
 
 gion は Git worktree を「タスク（workspace）単位」で扱う小さな CLI です。  
-`gion.yaml` に望ましい状態を書き、`gion apply` で差分（Plan）を確認しつつ作業場所を揃えます。  
+`gion.yaml` をエディタまたはコマンドラインで理想状態に修正し、`gion apply` で差分（Plan）を確認しつつ作業場所を揃えます。  
 このGIFは、YAML直編集で入った作成・削除・更新を `gion apply`（内部で Plan 表示→確認→Apply）で反映する例です。
 
 ![作成・削除・更新](https://storage.googleapis.com/zenn-user-upload/64d7ae3ea0a3-20260131.gif)
