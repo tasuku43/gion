@@ -12,9 +12,9 @@ gion は Git worktree を「タスク（workspace）単位」で扱う小さな 
 
 コア機能は“作る/移動/片付け”の3つです。
 
-- 作る：`gion.yaml` を手動（直）編集、または `gion manifest add`（対話式）で更新 → `gion apply`（Plan→確認→Apply）
+- 作る：`gion.yaml` を手動編集、または `gion manifest add` で更新 → `gion apply`（Plan→確認→Apply）
 - 移動：`giongo` で検索して移動（状態は変えない）
-- 片付け：`gion.yaml` を手動（直）編集、または `gion manifest gc`（自動）/ `gion manifest rm`（対話式）で更新 → `gion apply`（Plan→確認→Apply）
+- 片付け：`gion.yaml` を手動編集、または `gion manifest gc` / `gion manifest rm` で更新 → `gion apply`（Plan→確認→Apply）
 
 :::message
 ※ `gion manifest` は `gion m` / `gion man` と短縮できます！
@@ -27,8 +27,8 @@ https://github.com/tasuku43/gion
 gion の中心は `gion.yaml` です。ここに「こうなっていてほしい（望ましい状態）」を書きます。  
 `gion manifest` は、その `gion.yaml` を更新するための入口です（直接編集してもOKです）。
 
-ポイントは一貫していて、**やることは常に `gion.yaml` の更新 → `gion apply`（Plan→確認→Apply）** です。  
-`gion manifest add` / `gc` / `rm` はデフォルトで `apply` まで実行します（`--no-apply` を付けると `gion.yaml` の更新だけにできます）。
+流れはシンプルで、`gion.yaml` を更新したら `gion apply` で反映します（Plan→確認→Apply）。  
+`gion manifest ...` は `gion.yaml` を更新するための入口で、デフォルトではそのまま `apply` まで進みます（更新だけにしたい場合は `--no-apply`）。
 
 用語だけ補足すると、**Git worktree** はブランチ（や特定コミット）をチェックアウトした作業用ディレクトリです。一方、ここで言う **workspace** は「タスク単位の箱」で、その中に1つ以上のworktree（必要なら複数リポジトリのworktree）を束ねて扱います。
 
@@ -52,8 +52,7 @@ GION_ROOT/
 ## 作る（ApplyでPlanを確認して、まとめて作る）
 
 workspaceを「作る」操作は、`gion manifest add` コマンドか、`gion.yaml` の直接編集で行います。  
-どちらもやることは同じで、**`gion.yaml` を更新してから `gion apply`（Plan→確認→Apply）** します。  
-`gion manifest add` はこの流れを1コマンドでやってくれる入口（デフォルトで `apply` まで）で、`gion.yaml` を直接編集した場合は編集後に `gion apply` を実行します。
+作成は `gion.yaml` を更新して `gion apply` するだけで、更新方法が `gion manifest add`（対話式）か直編集かの違いです。
 
 ### 4つの作成`mode`
 
