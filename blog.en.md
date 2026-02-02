@@ -37,9 +37,9 @@ That’s what **gion** is.
 
 The core workflow is **Create / Move / Cleanup**:
 
-- **Create**: `gion manifest add` → `gion apply` (review the plan, then apply)
-- **Move**: use `giongo` to search and jump
-- **Cleanup**: `gion manifest gc` / `gion manifest rm`
+- **Create**: edit `gion.yaml` manually, or use `gion manifest add` (interactive) → `gion apply` (Plan → confirm → Apply)
+- **Move**: use `giongo` to search and jump (no state changes)
+- **Cleanup**: edit `gion.yaml` manually, or use `gion manifest gc` (automatic) / `gion manifest rm` (interactive) → `gion apply` (Plan → confirm → Apply)
 
 
 Tip: `gion manifest` can be shortened to `gion m` or `gion man`.
