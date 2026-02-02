@@ -54,6 +54,7 @@ The center of gion is **`gion.yaml`**.
 - `gion manifest ...` is an **entry point** to update that YAML (you can also edit it directly).
 - After any update (via command or direct editing), you run **`gion apply`** to reconcile the filesystem with the desired state.
 - `gion apply` computes a **plan**, shows the diff, and then applies it when you confirm.
+- By default, `gion manifest ...` will run `gion apply` after rewriting `gion.yaml`. Use `--no-apply` if you want to update `gion.yaml` only and apply later.
 
 ### Terminology: worktree vs workspace
 
@@ -105,6 +106,7 @@ The entry point differs, but the destination is the same: everything ends up in 
 #### `issue` / `review`: queue up many, then apply once
 
 If you use `issue` / `review`, you’ll need the `gh` CLI (GitHub-only).
+These correspond to `--issue` / `--review`.
 
 The intended flow is:
 - select multiple Issues / PRs
@@ -228,7 +230,7 @@ What those mean:
 - **diverged**: local and upstream have both advanced (ahead and behind)
 - **unknown**: cannot be determined (no upstream, detached HEAD, git error, etc.)
 
-When you delete something risky (e.g., `dirty`), the **plan** will show a risk summary and (for dirty cases) the changed files, so you can sanity-check quickly before you confirm.
+When you delete something risky (e.g., `dirty`), the **plan** will show a risk summary (e.g., `risk: dirty (unstaged=2)`) and (for dirty cases) the changed files, so you can sanity-check quickly before you confirm.
 
 ![Demo: rm shows risk and changed files in the plan before deletion](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/2jdlxkz8lggmv0l5kk8n.gif)
 
