@@ -27,7 +27,9 @@ type Options struct {
 }
 
 func Apply(ctx context.Context, rootDir string, plan manifestplan.Result, opts Options) error {
-	for _, change := range plan.Changes {
+	execPlan := coreapplyplan.BuildExecution(plan.Changes)
+
+	for _, change := range execPlan.WorkspaceRemovals {
 		if change.Kind != manifestplan.WorkspaceRemove {
 			continue
 		}
@@ -37,28 +39,39 @@ func Apply(ctx context.Context, rootDir string, plan manifestplan.Result, opts O
 		}
 	}
 
-	for _, change := range plan.Changes {
+	for _, change := range execPlan.WorkspaceUpdateRemovals {
 		if change.Kind != manifestplan.WorkspaceUpdate {
 			continue
 		}
 		if err := applyRepoRemovals(ctx, rootDir, change, opts); err != nil {
 			return err
 		}
+	}
+
+	for _, change := range execPlan.WorkspaceUpdateRenames {
+		if change.Kind != manifestplan.WorkspaceUpdate {
+			continue
+		}
 		if err := applyRepoBranchRenames(ctx, rootDir, change, opts.Step); err != nil {
 			return err
 		}
 	}
 
-	for _, change := range plan.Changes {
-		switch change.Kind {
-		case manifestplan.WorkspaceAdd:
-			if err := applyWorkspaceAdd(ctx, rootDir, plan.Desired, change, opts); err != nil {
-				return err
-			}
-		case manifestplan.WorkspaceUpdate:
-			if err := applyRepoAdds(ctx, rootDir, plan.Desired, change, opts); err != nil {
-				return err
-			}
+	for _, change := range execPlan.WorkspaceAdds {
+		if change.Kind != manifestplan.WorkspaceAdd {
+			continue
+		}
+		if err := applyWorkspaceAdd(ctx, rootDir, plan.Desired, change, opts); err != nil {
+			return err
+		}
+	}
+
+	for _, change := range execPlan.WorkspaceUpdateAdds {
+		if change.Kind != manifestplan.WorkspaceUpdate {
+			continue
+		}
+		if err := applyRepoAdds(ctx, rootDir, plan.Desired, change, opts); err != nil {
+			return err
 		}
 	}
 
