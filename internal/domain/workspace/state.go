@@ -2,7 +2,8 @@ package workspace
 
 import (
 	"context"
-	"strings"
+
+	coreworkspacerisk "github.com/tasuku43/gion-core/workspacerisk"
 )
 
 type WorkspaceStateKind string
@@ -80,35 +81,16 @@ func repoStateFromStatus(repo RepoStatus) RepoState {
 		UnmergedCount:  repo.UnmergedCount,
 		Error:          repo.Error,
 	}
-	if repo.Error != nil {
-		state.Kind = RepoStateUnknown
-		return state
-	}
-	if repo.Dirty {
-		state.Kind = RepoStateDirty
-		return state
-	}
-	if repo.Detached || repo.HeadMissing {
-		state.Kind = RepoStateUnknown
-		return state
-	}
-	if strings.TrimSpace(repo.Upstream) == "" {
-		state.Kind = RepoStateUnknown
-		return state
-	}
-	if repo.AheadCount > 0 && repo.BehindCount > 0 {
-		state.Kind = RepoStateDiverged
-		return state
-	}
-	if repo.AheadCount > 0 {
-		state.Kind = RepoStateUnpushed
-		return state
-	}
-	if repo.BehindCount > 0 {
-		state.Kind = RepoStateClean
-		return state
-	}
-	state.Kind = RepoStateClean
+	kind := coreworkspacerisk.ClassifyRepoStatus(coreworkspacerisk.RepoStatus{
+		Upstream:    repo.Upstream,
+		AheadCount:  repo.AheadCount,
+		BehindCount: repo.BehindCount,
+		Dirty:       repo.Dirty,
+		Detached:    repo.Detached,
+		HeadMissing: repo.HeadMissing,
+		Error:       repo.Error,
+	})
+	state.Kind = RepoStateKind(kind)
 	return state
 }
 
