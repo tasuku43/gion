@@ -11,6 +11,7 @@ import (
 
 	"github.com/mattn/go-isatty"
 	coregitparse "github.com/tasuku43/gion-core/gitparse"
+	coregitref "github.com/tasuku43/gion-core/gitref"
 	"github.com/tasuku43/gion/internal/app/manifestplan"
 	"github.com/tasuku43/gion/internal/domain/manifest"
 	"github.com/tasuku43/gion/internal/domain/repo"
@@ -350,23 +351,11 @@ func fetchManifestGcRepo(ctx context.Context, rootDir, repoKey string, entries [
 }
 
 func parseBaseRefTarget(baseRef string) (manifestGcFetchTarget, bool) {
-	trimmed := strings.TrimSpace(baseRef)
-	if trimmed == "" {
+	target, ok := coregitref.ParseRemoteBranch(baseRef)
+	if !ok {
 		return manifestGcFetchTarget{}, false
 	}
-	if strings.HasPrefix(trimmed, "refs/remotes/") {
-		trimmed = strings.TrimPrefix(trimmed, "refs/remotes/")
-	}
-	parts := strings.SplitN(trimmed, "/", 2)
-	if len(parts) != 2 {
-		return manifestGcFetchTarget{}, false
-	}
-	remote := strings.TrimSpace(parts[0])
-	branch := strings.TrimSpace(parts[1])
-	if remote == "" || branch == "" {
-		return manifestGcFetchTarget{}, false
-	}
-	return manifestGcFetchTarget{Remote: remote, Branch: branch}, true
+	return manifestGcFetchTarget{Remote: target.Remote, Branch: target.Branch}, true
 }
 
 func resolveMergeTarget(ctx context.Context, rootDir string, entry manifest.Repo, defaultTargets map[string]string) (string, bool, error) {
