@@ -112,7 +112,7 @@ func applyWorkspaceAdd(ctx context.Context, rootDir string, desired manifest.Fil
 			return err
 		}
 		if createdBranch {
-			baseBranchToRecord, baseBranchMixed = updateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
+			baseBranchToRecord, baseBranchMixed = coreapplyplan.UpdateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 		}
 	}
 	if baseBranchMixed {
@@ -224,7 +224,7 @@ func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, c
 				return err
 			}
 			if createdBranch {
-				baseBranchToRecord, baseBranchMixed = updateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
+				baseBranchToRecord, baseBranchMixed = coreapplyplan.UpdateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 			}
 		case manifestplan.RepoUpdate:
 			if coreapplyplan.IsInPlaceBranchRename(repoChange) {
@@ -237,7 +237,7 @@ func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, c
 				return err
 			}
 			if createdBranch {
-				baseBranchToRecord, baseBranchMixed = updateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
+				baseBranchToRecord, baseBranchMixed = coreapplyplan.UpdateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 			}
 		}
 	}
@@ -248,23 +248,6 @@ func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, c
 		return err
 	}
 	return nil
-}
-
-func updateBaseBranchCandidate(candidate string, mixed bool, baseBranch string) (string, bool) {
-	if mixed {
-		return candidate, mixed
-	}
-	baseBranch = strings.TrimSpace(baseBranch)
-	if baseBranch == "" {
-		return candidate, mixed
-	}
-	if candidate == "" {
-		return baseBranch, mixed
-	}
-	if candidate != baseBranch {
-		return candidate, true
-	}
-	return candidate, mixed
 }
 
 func logStep(step func(text string), text string) {
