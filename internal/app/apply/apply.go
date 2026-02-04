@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	coreapplyplan "github.com/tasuku43/gion-core/applyplan"
 	"github.com/tasuku43/gion/internal/app/add"
 	"github.com/tasuku43/gion/internal/app/create"
 	"github.com/tasuku43/gion/internal/app/manifestplan"
@@ -155,7 +156,7 @@ func applyRepoRemovals(ctx context.Context, rootDir string, change manifestplan.
 	for _, repoChange := range change.Repos {
 		switch repoChange.Kind {
 		case manifestplan.RepoRemove, manifestplan.RepoUpdate:
-			if canRenameRepoBranchInPlace(repoChange) {
+			if coreapplyplan.IsInPlaceBranchRename(repoChange) {
 				continue
 			}
 			logStep(opts.Step, fmt.Sprintf("worktree remove %s", repoChange.Alias))
@@ -172,7 +173,7 @@ func applyRepoRemovals(ctx context.Context, rootDir string, change manifestplan.
 
 func applyRepoBranchRenames(ctx context.Context, rootDir string, change manifestplan.WorkspaceChange, step func(text string)) error {
 	for _, repoChange := range change.Repos {
-		if !canRenameRepoBranchInPlace(repoChange) {
+		if !coreapplyplan.IsInPlaceBranchRename(repoChange) {
 			continue
 		}
 		worktreePath := workspace.WorktreePath(rootDir, change.WorkspaceID, repoChange.Alias)
@@ -213,7 +214,7 @@ func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, c
 				baseBranchToRecord, baseBranchMixed = updateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 			}
 		case manifestplan.RepoUpdate:
-			if canRenameRepoBranchInPlace(repoChange) {
+			if coreapplyplan.IsInPlaceBranchRename(repoChange) {
 				continue
 			}
 			logStep(opts.Step, fmt.Sprintf("worktree add %s", repoChange.Alias))
@@ -251,26 +252,6 @@ func updateBaseBranchCandidate(candidate string, mixed bool, baseBranch string) 
 		return candidate, true
 	}
 	return candidate, mixed
-}
-
-func canRenameRepoBranchInPlace(change manifestplan.RepoChange) bool {
-	if change.Kind != manifestplan.RepoUpdate {
-		return false
-	}
-	fromRepo := strings.TrimSpace(change.FromRepo)
-	toRepo := strings.TrimSpace(change.ToRepo)
-	fromBranch := strings.TrimSpace(change.FromBranch)
-	toBranch := strings.TrimSpace(change.ToBranch)
-	if fromRepo == "" || toRepo == "" || fromBranch == "" || toBranch == "" {
-		return false
-	}
-	if fromRepo != toRepo {
-		return false
-	}
-	if fromBranch == toBranch {
-		return false
-	}
-	return true
 }
 
 func logStep(step func(text string), text string) {
