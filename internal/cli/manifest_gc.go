@@ -410,15 +410,6 @@ func fetchRemoteBranch(ctx context.Context, storePath string, target manifestGcF
 }
 
 func strictMergedIntoTarget(ctx context.Context, rootDir string, entry manifest.Repo, target string) (bool, error) {
-	branch := strings.TrimSpace(entry.Branch)
-	if branch == "" {
-		return false, fmt.Errorf("branch is required")
-	}
-	target = strings.TrimSpace(target)
-	if target == "" {
-		return false, fmt.Errorf("target is required")
-	}
-
 	storePath, exists, err := repo.Exists(rootDir, repo.SpecFromKey(entry.RepoKey))
 	if err != nil {
 		return false, err
@@ -426,31 +417,19 @@ func strictMergedIntoTarget(ctx context.Context, rootDir string, entry manifest.
 	if !exists {
 		return false, fmt.Errorf("repo store not found (run: gion repo get %s)", repo.SpecFromKey(entry.RepoKey))
 	}
+	return coregcplan.StrictMergedIntoTarget(ctx, manifestGcMergeChecker{}, coregcplan.StrictMergeRequest{
+		StorePath: storePath,
+		Branch:    entry.Branch,
+		Target:    target,
+	})
+}
 
-	headRef, targetRef := coregcplan.MergeCheckRefs(branch, target)
+type manifestGcMergeChecker struct{}
 
-	headHash, headOK, err := gitcmd.ShowRef(ctx, storePath, headRef)
-	if err != nil {
-		return false, err
-	}
-	if !headOK {
-		return false, fmt.Errorf("ref not found: %s", headRef)
-	}
-	targetHash, targetOK, err := gitcmd.ShowRef(ctx, storePath, targetRef)
-	if err != nil {
-		return false, err
-	}
-	if !targetOK {
-		return false, fmt.Errorf("ref not found: %s", targetRef)
-	}
+func (manifestGcMergeChecker) ShowRef(ctx context.Context, storePath, ref string) (string, bool, error) {
+	return gitcmd.ShowRef(ctx, storePath, ref)
+}
 
-	if headHash == targetHash {
-		return false, nil
-	}
-
-	ok, err := gitcmd.IsAncestor(ctx, storePath, headRef, targetRef)
-	if err != nil {
-		return false, err
-	}
-	return ok, nil
+func (manifestGcMergeChecker) IsAncestor(ctx context.Context, storePath, headRef, targetRef string) (bool, error) {
+	return gitcmd.IsAncestor(ctx, storePath, headRef, targetRef)
 }
