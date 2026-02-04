@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	coremanifestlsplan "github.com/tasuku43/gion-core/manifestlsplan"
+	coreworkspacerisk "github.com/tasuku43/gion-core/workspacerisk"
 	"github.com/tasuku43/gion/internal/app/manifestplan"
 	"github.com/tasuku43/gion/internal/domain/workspace"
 )
@@ -116,30 +117,29 @@ func bestEffortWorkspaceRisk(ctx context.Context, rootDir, workspaceID string) (
 // We keep "unknown" as a special-case top priority (can't confidently assert safety).
 // When unknown is not present, we use a stable order: dirty > diverged > unpushed.
 func aggregateRiskKind(repos []workspace.RepoState) workspace.WorkspaceStateKind {
-	hasDirty := false
-	hasUnknown := false
-	hasDiverged := false
-	hasUnpushed := false
+	coreRepos := make([]coreworkspacerisk.RepoState, 0, len(repos))
 	for _, repo := range repos {
 		switch repo.Kind {
 		case workspace.RepoStateUnknown:
-			hasUnknown = true
+			coreRepos = append(coreRepos, coreworkspacerisk.RepoStateUnknown)
 		case workspace.RepoStateDirty:
-			hasDirty = true
+			coreRepos = append(coreRepos, coreworkspacerisk.RepoStateDirty)
 		case workspace.RepoStateDiverged:
-			hasDiverged = true
+			coreRepos = append(coreRepos, coreworkspacerisk.RepoStateDiverged)
 		case workspace.RepoStateUnpushed:
-			hasUnpushed = true
+			coreRepos = append(coreRepos, coreworkspacerisk.RepoStateUnpushed)
+		default:
+			coreRepos = append(coreRepos, coreworkspacerisk.RepoStateClean)
 		}
 	}
-	switch {
-	case hasUnknown:
+	switch coreworkspacerisk.Aggregate(coreRepos) {
+	case coreworkspacerisk.WorkspaceRiskUnknown:
 		return workspace.WorkspaceStateUnknown
-	case hasDirty:
+	case coreworkspacerisk.WorkspaceRiskDirty:
 		return workspace.WorkspaceStateDirty
-	case hasDiverged:
+	case coreworkspacerisk.WorkspaceRiskDiverged:
 		return workspace.WorkspaceStateDiverged
-	case hasUnpushed:
+	case coreworkspacerisk.WorkspaceRiskUnpushed:
 		return workspace.WorkspaceStateUnpushed
 	default:
 		return workspace.WorkspaceStateClean
