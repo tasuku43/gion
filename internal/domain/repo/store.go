@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	coregitparse "github.com/tasuku43/gion-core/gitparse"
@@ -200,30 +199,17 @@ func localHeadHash(ctx context.Context, storePath, branch string) (string, error
 
 func pruneLocalHeads(ctx context.Context, storePath, keepBranch string) error {
 	worktreeBranches, _ := worktreeBranchNames(ctx, storePath)
+	worktreeBranchList := make([]string, 0, len(worktreeBranches))
+	for name := range worktreeBranches {
+		worktreeBranchList = append(worktreeBranchList, name)
+	}
 	res, err := gitcmd.Run(ctx, []string{"show-ref", "--heads"}, gitcmd.Options{Dir: storePath})
 	if err != nil && res.ExitCode != 1 {
 		return err
 	}
-	lines := strings.Split(strings.TrimSpace(res.Stdout), "\n")
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		parts := strings.Fields(line)
-		if len(parts) != 2 {
-			continue
-		}
-		ref := parts[1]
-		if !strings.HasPrefix(ref, "refs/heads/") {
-			continue
-		}
-		name := strings.TrimPrefix(ref, "refs/heads/")
-		if name == keepBranch {
-			continue
-		}
-		if _, ok := worktreeBranches[name]; ok {
-			continue
-		}
+	headRefs := coregitparse.ParseHeadRefs(res.Stdout)
+	prunable := corerepostore.SelectPrunableHeadRefs(headRefs, keepBranch, worktreeBranchList)
+	for _, ref := range prunable {
 		_, _ = gitcmd.Run(ctx, []string{"update-ref", "-d", ref}, gitcmd.Options{Dir: storePath})
 	}
 	return nil
