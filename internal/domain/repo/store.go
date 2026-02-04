@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	coregitparse "github.com/tasuku43/gion-core/gitparse"
 	coregitref "github.com/tasuku43/gion-core/gitref"
+	corerepostore "github.com/tasuku43/gion-core/repostore"
 	"github.com/tasuku43/gion/internal/infra/gitcmd"
 	"github.com/tasuku43/gion/internal/infra/paths"
 )
@@ -242,47 +242,15 @@ func worktreeBranchNames(ctx context.Context, storePath string) (map[string]stru
 }
 
 func fetchGraceDuration() time.Duration {
-	val := strings.TrimSpace(os.Getenv("GION_FETCH_GRACE_SECONDS"))
-	if val == "" {
-		return 30 * time.Second
-	}
-	secs, err := strconv.Atoi(val)
-	if err != nil || secs < 0 {
-		return 30 * time.Second
-	}
-	return time.Duration(secs) * time.Second
+	return corerepostore.FetchGraceDuration(os.Getenv("GION_FETCH_GRACE_SECONDS"))
 }
 
 func recentlyFetched(storePath string, grace time.Duration) bool {
-	if grace <= 0 {
-		return false
-	}
-	info, err := os.Stat(filepath.Join(storePath, "FETCH_HEAD"))
-	if err != nil {
-		return false
-	}
-	return time.Since(info.ModTime()) <= grace
+	return corerepostore.RecentlyFetched(storePath, grace)
 }
 
 func touchFetchHead(storePath string) error {
-	if strings.TrimSpace(storePath) == "" {
-		return fmt.Errorf("store path is required")
-	}
-	path := filepath.Join(storePath, "FETCH_HEAD")
-	now := time.Now()
-	if _, err := os.Stat(path); err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
-		if err != nil {
-			return err
-		}
-		if err := file.Close(); err != nil {
-			return err
-		}
-	}
-	return os.Chtimes(path, now, now)
+	return corerepostore.TouchFetchHead(storePath)
 }
 
 func localDefaultBranch(ctx context.Context, storePath string) (string, error) {
