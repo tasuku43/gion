@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/mattn/go-isatty"
+	coregcplan "github.com/tasuku43/gion-core/gcplan"
 	coregitparse "github.com/tasuku43/gion-core/gitparse"
-	coregitref "github.com/tasuku43/gion-core/gitref"
 	"github.com/tasuku43/gion/internal/app/manifestplan"
 	"github.com/tasuku43/gion/internal/domain/manifest"
 	"github.com/tasuku43/gion/internal/domain/repo"
@@ -316,22 +316,20 @@ func fetchManifestGcRepo(ctx context.Context, rootDir, repoKey string, entries [
 			Err:     fmt.Errorf("repo store not found (run: gion repo get %s)", spec),
 		}
 	}
-	targets := make(map[manifestGcFetchTarget]struct{})
-	needsDefault := false
+	planEntries := make([]coregcplan.RepoEntry, 0, len(entries))
 	for _, entry := range entries {
-		base := strings.TrimSpace(entry.BaseRef)
-		if base == "" {
-			needsDefault = true
-			continue
-		}
-		target, ok := parseBaseRefTarget(base)
-		if !ok {
-			continue
-		}
-		targets[target] = struct{}{}
+		planEntries = append(planEntries, coregcplan.RepoEntry{
+			RepoKey: entry.RepoKey,
+			BaseRef: strings.TrimSpace(entry.BaseRef),
+		})
+	}
+	fetchPlan := coregcplan.BuildFetchPlan(planEntries)
+	targets := make(map[manifestGcFetchTarget]struct{})
+	for _, target := range fetchPlan.Targets {
+		targets[manifestGcFetchTarget{Remote: target.Remote, Branch: target.Branch}] = struct{}{}
 	}
 	var defaultTarget string
-	if needsDefault {
+	if fetchPlan.NeedsDefault {
 		branch, err := defaultBranchFromRemote(ctx, storePath)
 		if err != nil {
 			return manifestGcFetchResult{RepoKey: repoKey, Err: err}
@@ -348,14 +346,6 @@ func fetchManifestGcRepo(ctx context.Context, rootDir, repoKey string, entries [
 		}
 	}
 	return manifestGcFetchResult{RepoKey: repoKey, DefaultTarget: defaultTarget}
-}
-
-func parseBaseRefTarget(baseRef string) (manifestGcFetchTarget, bool) {
-	target, ok := coregitref.ParseRemoteBranch(baseRef)
-	if !ok {
-		return manifestGcFetchTarget{}, false
-	}
-	return manifestGcFetchTarget{Remote: target.Remote, Branch: target.Branch}, true
 }
 
 func resolveMergeTarget(ctx context.Context, rootDir string, entry manifest.Repo, defaultTargets map[string]string) (string, bool, error) {
