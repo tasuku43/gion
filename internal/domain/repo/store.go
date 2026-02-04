@@ -210,30 +210,6 @@ func defaultBranchFromRemote(ctx context.Context, storePath string) (string, str
 	return branch, hash, nil
 }
 
-func localRemoteHash(ctx context.Context, storePath, branch string) (string, error) {
-	ref := fmt.Sprintf("refs/remotes/origin/%s", branch)
-	hash, exists, err := gitcmd.ShowRef(ctx, storePath, ref)
-	if err != nil {
-		return "", err
-	}
-	if !exists {
-		return "", nil
-	}
-	return hash, nil
-}
-
-func localHeadHash(ctx context.Context, storePath, branch string) (string, error) {
-	ref := fmt.Sprintf("refs/heads/%s", branch)
-	hash, exists, err := gitcmd.ShowRef(ctx, storePath, ref)
-	if err != nil {
-		return "", err
-	}
-	if !exists {
-		return "", nil
-	}
-	return hash, nil
-}
-
 func localDefaultBranch(ctx context.Context, storePath string) (string, error) {
 	ref, ok, err := gitcmd.SymbolicRef(ctx, storePath, "refs/remotes/origin/HEAD")
 	if err != nil {
