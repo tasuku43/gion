@@ -427,8 +427,7 @@ func strictMergedIntoTarget(ctx context.Context, rootDir string, entry manifest.
 		return false, fmt.Errorf("repo store not found (run: gion repo get %s)", repo.SpecFromKey(entry.RepoKey))
 	}
 
-	headRef := fmt.Sprintf("refs/heads/%s", branch)
-	targetRef := fmt.Sprintf("refs/remotes/%s", target)
+	headRef, targetRef := coregcplan.MergeCheckRefs(branch, target)
 
 	headHash, headOK, err := gitcmd.ShowRef(ctx, storePath, headRef)
 	if err != nil {
