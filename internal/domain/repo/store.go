@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	coregitparse "github.com/tasuku43/gion-core/gitparse"
 	coregitref "github.com/tasuku43/gion-core/gitref"
@@ -26,31 +25,20 @@ func Get(ctx context.Context, rootDir string, repo string) (Store, error) {
 	}
 
 	storePath := storePathForSpec(rootDir, spec)
-
-	exists, err := paths.DirExists(storePath)
+	result, err := corerepostore.EnsureStore(ctx, storeAccessAdapter{}, corerepostore.EnsureStoreRequest{
+		RepoKey:       spec.RepoKey,
+		RemoteURL:     remoteURL,
+		StorePath:     storePath,
+		RepoSpec:      repo,
+		MustExist:     false,
+		Fetch:         false,
+		FetchGraceEnv: os.Getenv("GION_FETCH_GRACE_SECONDS"),
+		Log:           true,
+	})
 	if err != nil {
 		return Store{}, err
 	}
-
-	if !exists {
-		if err := os.MkdirAll(filepath.Dir(storePath), 0o750); err != nil {
-			return Store{}, fmt.Errorf("create repo store dir: %w", err)
-		}
-		gitcmd.Logf("git clone --bare %s %s", remoteURL, storePath)
-		if _, err := gitcmd.Run(ctx, []string{"clone", "--bare", remoteURL, storePath}, gitcmd.Options{}); err != nil {
-			return Store{}, err
-		}
-	}
-
-	if err := normalizeStore(ctx, storePath, spec.RepoKey, false); err != nil {
-		return Store{}, err
-	}
-
-	return Store{
-		RepoKey:   spec.RepoKey,
-		StorePath: storePath,
-		RemoteURL: remoteURL,
-	}, nil
+	return fromCoreStore(result.Store), nil
 }
 
 func Open(ctx context.Context, rootDir string, repo string, fetch bool) (Store, error) {
@@ -60,24 +48,20 @@ func Open(ctx context.Context, rootDir string, repo string, fetch bool) (Store, 
 	}
 
 	storePath := storePathForSpec(rootDir, spec)
-
-	exists, err := paths.DirExists(storePath)
+	result, err := corerepostore.EnsureStore(ctx, storeAccessAdapter{}, corerepostore.EnsureStoreRequest{
+		RepoKey:       spec.RepoKey,
+		RemoteURL:     remoteURL,
+		StorePath:     storePath,
+		RepoSpec:      repo,
+		MustExist:     true,
+		Fetch:         fetch,
+		FetchGraceEnv: os.Getenv("GION_FETCH_GRACE_SECONDS"),
+		Log:           true,
+	})
 	if err != nil {
 		return Store{}, err
 	}
-	if !exists {
-		return Store{}, fmt.Errorf("repo store not found, run: gion repo get %s", repo)
-	}
-
-	if err := normalizeStore(ctx, storePath, spec.RepoKey, fetch); err != nil {
-		return Store{}, err
-	}
-
-	return Store{
-		RepoKey:   spec.RepoKey,
-		StorePath: storePath,
-		RemoteURL: remoteURL,
-	}, nil
+	return fromCoreStore(result.Store), nil
 }
 
 func Prefetch(ctx context.Context, rootDir string, repo string) error {
@@ -122,6 +106,35 @@ func storePathForSpec(rootDir string, spec Spec) string {
 func normalizeStore(ctx context.Context, storePath, display string, fetch bool) error {
 	_, err := corerepostore.NormalizeStore(ctx, normalizerGitAdapter{}, storePath, fetch, os.Getenv("GION_FETCH_GRACE_SECONDS"), true)
 	return err
+}
+
+type storeAccessAdapter struct{}
+
+func (storeAccessAdapter) DirExists(path string) (bool, error) {
+	return paths.DirExists(path)
+}
+
+func (storeAccessAdapter) MkdirAll(path string, perm os.FileMode) error {
+	return os.MkdirAll(path, perm)
+}
+
+func (storeAccessAdapter) CloneBare(ctx context.Context, remoteURL, storePath string) error {
+	gitcmd.Logf("git clone --bare %s %s", remoteURL, storePath)
+	_, err := gitcmd.Run(ctx, []string{"clone", "--bare", remoteURL, storePath}, gitcmd.Options{})
+	return err
+}
+
+func (storeAccessAdapter) NormalizeStore(ctx context.Context, storePath string, fetch bool, fetchGraceEnv string, log bool) error {
+	_, err := corerepostore.NormalizeStore(ctx, normalizerGitAdapter{}, storePath, fetch, fetchGraceEnv, log)
+	return err
+}
+
+func fromCoreStore(store corerepostore.Store) Store {
+	return Store{
+		RepoKey:   store.RepoKey,
+		StorePath: store.StorePath,
+		RemoteURL: store.RemoteURL,
+	}
 }
 
 func ensureDefaultBranch(ctx context.Context, storePath string, fetch bool, log bool) (string, error) {
