@@ -12,6 +12,7 @@ import (
 	"github.com/mattn/go-isatty"
 	coregcplan "github.com/tasuku43/gion-core/gcplan"
 	coregitparse "github.com/tasuku43/gion-core/gitparse"
+	coregitref "github.com/tasuku43/gion-core/gitref"
 	"github.com/tasuku43/gion/internal/app/manifestplan"
 	"github.com/tasuku43/gion/internal/domain/manifest"
 	"github.com/tasuku43/gion/internal/domain/repo"
@@ -381,11 +382,9 @@ func resolveLocalMergeTarget(ctx context.Context, rootDir string, entry manifest
 		return "", false, nil
 	}
 	ref = strings.TrimSpace(ref)
-	if strings.HasPrefix(ref, "refs/remotes/origin/") {
-		branch := strings.TrimPrefix(ref, "refs/remotes/origin/")
-		if branch != "" {
-			return fmt.Sprintf("origin/%s", branch), true, nil
-		}
+	if branch, ok := coregitref.ParseOriginHeadRef(ref); ok {
+		target, _ := coregitref.FormatOriginTarget(branch)
+		return target, true, nil
 	}
 	return "", false, nil
 }

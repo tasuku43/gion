@@ -10,6 +10,7 @@ import (
 	"time"
 
 	coregitparse "github.com/tasuku43/gion-core/gitparse"
+	coregitref "github.com/tasuku43/gion-core/gitref"
 	"github.com/tasuku43/gion/internal/infra/gitcmd"
 	"github.com/tasuku43/gion/internal/infra/paths"
 )
@@ -292,8 +293,8 @@ func localDefaultBranch(ctx context.Context, storePath string) (string, error) {
 	if !ok {
 		return "", nil
 	}
-	if strings.HasPrefix(ref, "refs/remotes/origin/") {
-		return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
+	if branch, ok := coregitref.ParseOriginHeadRef(ref); ok {
+		return branch, nil
 	}
 	return "", nil
 }
