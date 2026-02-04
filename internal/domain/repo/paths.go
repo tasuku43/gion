@@ -1,9 +1,9 @@
 package repo
 
 import (
-	"path/filepath"
 	"strings"
 
+	corerepostore "github.com/tasuku43/gion-core/repostore"
 	"github.com/tasuku43/gion/internal/domain/repospec"
 	"github.com/tasuku43/gion/internal/infra/paths"
 )
@@ -13,7 +13,7 @@ type Spec = repospec.Spec
 
 // StorePath returns the path to the bare repo store for the spec.
 func StorePath(rootDir string, spec repospec.Spec) string {
-	return filepath.Join(paths.BareRoot(rootDir), spec.Host, spec.Owner, spec.Repo+".git")
+	return corerepostore.StorePath(paths.BareRoot(rootDir), spec)
 }
 
 // Normalize trims and validates a repo spec, returning the spec and trimmed input.
