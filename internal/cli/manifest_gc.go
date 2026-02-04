@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mattn/go-isatty"
+	coregitparse "github.com/tasuku43/gion-core/gitparse"
 	"github.com/tasuku43/gion/internal/app/manifestplan"
 	"github.com/tasuku43/gion/internal/domain/manifest"
 	"github.com/tasuku43/gion/internal/domain/repo"
@@ -415,23 +416,8 @@ func defaultBranchFromRemote(ctx context.Context, storePath string) (string, err
 	if err != nil {
 		return "", err
 	}
-	lines := strings.Split(strings.TrimSpace(res.Stdout), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "ref: ") && strings.HasSuffix(line, "\tHEAD") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				ref := strings.TrimPrefix(parts[1], "refs/heads/")
-				if ref != "" {
-					return ref, nil
-				}
-			}
-		}
-	}
-	return "", nil
+	branch, _ := coregitparse.ParseRemoteHeadSymref(res.Stdout)
+	return branch, nil
 }
 
 func fetchRemoteBranch(ctx context.Context, storePath string, target manifestGcFetchTarget) error {

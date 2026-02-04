@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	coregitparse "github.com/tasuku43/gion-core/gitparse"
 	"github.com/tasuku43/gion/internal/infra/gitcmd"
 	"github.com/tasuku43/gion/internal/infra/paths"
 )
@@ -168,32 +169,7 @@ func defaultBranchFromRemote(ctx context.Context, storePath string) (string, str
 	if err != nil {
 		return "", "", err
 	}
-	lines := strings.Split(strings.TrimSpace(res.Stdout), "\n")
-	var branch string
-	var hash string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "ref: ") && strings.HasSuffix(line, "\tHEAD") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				ref := parts[1]
-				ref = strings.TrimPrefix(ref, "refs/heads/")
-				if ref != "" {
-					branch = ref
-				}
-			}
-			continue
-		}
-		if strings.HasSuffix(line, "\tHEAD") {
-			fields := strings.Fields(line)
-			if len(fields) >= 1 {
-				hash = fields[0]
-			}
-		}
-	}
+	branch, hash := coregitparse.ParseRemoteHeadSymref(res.Stdout)
 	return branch, hash, nil
 }
 
