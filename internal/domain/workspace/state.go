@@ -95,30 +95,18 @@ func repoStateFromStatus(repo RepoStatus) RepoState {
 }
 
 func aggregateWorkspaceState(repos []RepoState) WorkspaceStateKind {
-	hasDirty := false
-	hasUnknown := false
-	hasDiverged := false
-	hasUnpushed := false
+	coreRepos := make([]coreworkspacerisk.RepoState, 0, len(repos))
 	for _, repo := range repos {
-		switch repo.Kind {
-		case RepoStateDirty:
-			hasDirty = true
-		case RepoStateUnknown:
-			hasUnknown = true
-		case RepoStateDiverged:
-			hasDiverged = true
-		case RepoStateUnpushed:
-			hasUnpushed = true
-		}
+		coreRepos = append(coreRepos, coreworkspacerisk.RepoState(repo.Kind))
 	}
-	switch {
-	case hasDirty:
+	switch coreworkspacerisk.AggregateForState(coreRepos) {
+	case coreworkspacerisk.WorkspaceRiskDirty:
 		return WorkspaceStateDirty
-	case hasUnknown:
+	case coreworkspacerisk.WorkspaceRiskUnknown:
 		return WorkspaceStateUnknown
-	case hasDiverged:
+	case coreworkspacerisk.WorkspaceRiskDiverged:
 		return WorkspaceStateDiverged
-	case hasUnpushed:
+	case coreworkspacerisk.WorkspaceRiskUnpushed:
 		return WorkspaceStateUnpushed
 	default:
 		return WorkspaceStateClean
