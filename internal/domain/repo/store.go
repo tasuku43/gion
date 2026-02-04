@@ -234,19 +234,8 @@ func worktreeBranchNames(ctx context.Context, storePath string) (map[string]stru
 		return nil, err
 	}
 	branches := make(map[string]struct{})
-	lines := strings.Split(strings.TrimSpace(out), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "branch ") {
-			continue
-		}
-		ref := strings.TrimSpace(strings.TrimPrefix(line, "branch "))
-		if strings.HasPrefix(ref, "refs/heads/") {
-			name := strings.TrimPrefix(ref, "refs/heads/")
-			if name != "" {
-				branches[name] = struct{}{}
-			}
-		}
+	for _, name := range coregitparse.ParseWorktreeBranchNames(out) {
+		branches[name] = struct{}{}
 	}
 	return branches, nil
 }
