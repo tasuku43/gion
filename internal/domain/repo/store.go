@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	coregitparse "github.com/tasuku43/gion-core/gitparse"
 	coregitref "github.com/tasuku43/gion-core/gitref"
@@ -121,47 +120,72 @@ func storePathForSpec(rootDir string, spec Spec) string {
 // (moved to paths.go)
 
 func normalizeStore(ctx context.Context, storePath, display string, fetch bool) error {
-	defaultBranch, err := ensureDefaultBranch(ctx, storePath, fetch, true)
-	if err != nil {
-		return err
-	}
-	return pruneLocalHeads(ctx, storePath, defaultBranch)
+	_, err := corerepostore.NormalizeStore(ctx, normalizerGitAdapter{}, storePath, fetch, os.Getenv("GION_FETCH_GRACE_SECONDS"), true)
+	return err
 }
 
 func ensureDefaultBranch(ctx context.Context, storePath string, fetch bool, log bool) (string, error) {
+	return corerepostore.EnsureDefaultBranch(ctx, normalizerGitAdapter{}, storePath, fetch, os.Getenv("GION_FETCH_GRACE_SECONDS"), log)
+}
+
+type normalizerGitAdapter struct{}
+
+func (normalizerGitAdapter) ConfigureRemoteFetch(ctx context.Context, storePath string) error {
 	if _, err := gitcmd.Run(ctx, []string{"config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"}, gitcmd.Options{Dir: storePath}); err != nil {
-		return "", err
+		return err
 	}
-	defaultBranch, _ := localDefaultBranch(ctx, storePath)
+	return nil
+}
 
-	remoteChecked := false
-	grace := fetchGraceDuration()
-	if !recentlyFetched(storePath, grace) || defaultBranch == "" {
-		var err error
-		defaultBranch, _, err = defaultBranchFromRemote(ctx, storePath)
-		if err != nil {
-			return "", err
-		}
-		remoteChecked = true
-	}
-	if defaultBranch != "" {
-		_, _ = gitcmd.Run(ctx, []string{"symbolic-ref", "refs/remotes/origin/HEAD", fmt.Sprintf("refs/remotes/origin/%s", defaultBranch)}, gitcmd.Options{Dir: storePath})
-	}
+func (normalizerGitAdapter) LocalDefaultBranch(ctx context.Context, storePath string) (string, error) {
+	return localDefaultBranch(ctx, storePath)
+}
 
-	if fetch {
-		if log {
-			gitcmd.Logf("git fetch --prune")
-		}
-		if _, err := gitcmd.Run(ctx, []string{"fetch", "--prune"}, gitcmd.Options{Dir: storePath}); err != nil {
-			return "", err
-		}
-	} else if remoteChecked {
-		if err := touchFetchHead(storePath); err != nil {
-			return "", err
-		}
-	}
+func (normalizerGitAdapter) DefaultBranchFromRemote(ctx context.Context, storePath string) (string, error) {
+	branch, _, err := defaultBranchFromRemote(ctx, storePath)
+	return branch, err
+}
 
-	return defaultBranch, nil
+func (normalizerGitAdapter) SetRemoteHead(ctx context.Context, storePath, branch string) error {
+	if _, err := gitcmd.Run(ctx, []string{"symbolic-ref", "refs/remotes/origin/HEAD", fmt.Sprintf("refs/remotes/origin/%s", branch)}, gitcmd.Options{Dir: storePath}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (normalizerGitAdapter) FetchPrune(ctx context.Context, storePath string, log bool) error {
+	if log {
+		gitcmd.Logf("git fetch --prune")
+	}
+	if _, err := gitcmd.Run(ctx, []string{"fetch", "--prune"}, gitcmd.Options{Dir: storePath}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (normalizerGitAdapter) WorktreeBranches(ctx context.Context, storePath string) ([]string, error) {
+	out, err := gitcmd.WorktreeListPorcelain(ctx, storePath)
+	if err != nil {
+		return nil, err
+	}
+	return coregitparse.ParseWorktreeBranchNames(out), nil
+}
+
+func (normalizerGitAdapter) HeadRefs(ctx context.Context, storePath string) ([]string, error) {
+	res, err := gitcmd.Run(ctx, []string{"show-ref", "--heads"}, gitcmd.Options{Dir: storePath})
+	if err != nil && res.ExitCode != 1 {
+		return nil, err
+	}
+	return coregitparse.ParseHeadRefs(res.Stdout), nil
+}
+
+func (normalizerGitAdapter) DeleteRef(ctx context.Context, storePath, ref string) error {
+	_, err := gitcmd.Run(ctx, []string{"update-ref", "-d", ref}, gitcmd.Options{Dir: storePath})
+	return err
+}
+
+func (normalizerGitAdapter) TouchFetchHead(storePath string) error {
+	return corerepostore.TouchFetchHead(storePath)
 }
 
 func defaultBranchFromRemote(ctx context.Context, storePath string) (string, string, error) {
@@ -195,48 +219,6 @@ func localHeadHash(ctx context.Context, storePath, branch string) (string, error
 		return "", nil
 	}
 	return hash, nil
-}
-
-func pruneLocalHeads(ctx context.Context, storePath, keepBranch string) error {
-	worktreeBranches, _ := worktreeBranchNames(ctx, storePath)
-	worktreeBranchList := make([]string, 0, len(worktreeBranches))
-	for name := range worktreeBranches {
-		worktreeBranchList = append(worktreeBranchList, name)
-	}
-	res, err := gitcmd.Run(ctx, []string{"show-ref", "--heads"}, gitcmd.Options{Dir: storePath})
-	if err != nil && res.ExitCode != 1 {
-		return err
-	}
-	headRefs := coregitparse.ParseHeadRefs(res.Stdout)
-	prunable := corerepostore.SelectPrunableHeadRefs(headRefs, keepBranch, worktreeBranchList)
-	for _, ref := range prunable {
-		_, _ = gitcmd.Run(ctx, []string{"update-ref", "-d", ref}, gitcmd.Options{Dir: storePath})
-	}
-	return nil
-}
-
-func worktreeBranchNames(ctx context.Context, storePath string) (map[string]struct{}, error) {
-	out, err := gitcmd.WorktreeListPorcelain(ctx, storePath)
-	if err != nil {
-		return nil, err
-	}
-	branches := make(map[string]struct{})
-	for _, name := range coregitparse.ParseWorktreeBranchNames(out) {
-		branches[name] = struct{}{}
-	}
-	return branches, nil
-}
-
-func fetchGraceDuration() time.Duration {
-	return corerepostore.FetchGraceDuration(os.Getenv("GION_FETCH_GRACE_SECONDS"))
-}
-
-func recentlyFetched(storePath string, grace time.Duration) bool {
-	return corerepostore.RecentlyFetched(storePath, grace)
-}
-
-func touchFetchHead(storePath string) error {
-	return corerepostore.TouchFetchHead(storePath)
 }
 
 func localDefaultBranch(ctx context.Context, storePath string) (string, error) {
