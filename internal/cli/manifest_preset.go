@@ -102,15 +102,17 @@ func runManifestPresetList(ctx context.Context, rootDir string, args []string) e
 func runManifestPresetAdd(ctx context.Context, rootDir string, args []string, noPrompt bool) error {
 	addFlags := flag.NewFlagSet("manifest preset add", flag.ContinueOnError)
 	var helpFlag bool
+	var noPromptFlag bool
 	var repos stringSliceFlag
 	addFlags.Var(&repos, "repo", "repo spec (repeatable)")
+	addFlags.BoolVar(&noPromptFlag, "no-prompt", false, "disable interactive prompt")
 	addFlags.BoolVar(&helpFlag, "help", false, "show help")
 	addFlags.BoolVar(&helpFlag, "h", false, "show help")
 	addFlags.SetOutput(os.Stdout)
 	addFlags.Usage = func() {
 		printManifestPresetAddHelp(os.Stdout)
 	}
-	if err := addFlags.Parse(args); err != nil {
+	if err := addFlags.Parse(normalizeManifestPresetAddArgs(args)); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -123,6 +125,8 @@ func runManifestPresetAdd(ctx context.Context, rootDir string, args []string, no
 	if addFlags.NArg() > 1 {
 		return fmt.Errorf("usage: gion manifest preset add [<name>] [--repo <repo> ...] [--no-prompt]")
 	}
+
+	noPrompt = noPrompt || noPromptFlag
 
 	name := ""
 	if addFlags.NArg() == 1 {
@@ -239,13 +243,15 @@ func runManifestPresetAdd(ctx context.Context, rootDir string, args []string, no
 func runManifestPresetRemove(ctx context.Context, rootDir string, args []string, noPrompt bool) error {
 	rmFlags := flag.NewFlagSet("manifest preset rm", flag.ContinueOnError)
 	var helpFlag bool
+	var noPromptFlag bool
+	rmFlags.BoolVar(&noPromptFlag, "no-prompt", false, "disable interactive prompt")
 	rmFlags.BoolVar(&helpFlag, "help", false, "show help")
 	rmFlags.BoolVar(&helpFlag, "h", false, "show help")
 	rmFlags.SetOutput(os.Stdout)
 	rmFlags.Usage = func() {
 		printManifestPresetRmHelp(os.Stdout)
 	}
-	if err := rmFlags.Parse(args); err != nil {
+	if err := rmFlags.Parse(normalizeArgsFlagsFirst(args, nil)); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -255,6 +261,8 @@ func runManifestPresetRemove(ctx context.Context, rootDir string, args []string,
 		printManifestPresetRmHelp(os.Stdout)
 		return nil
 	}
+
+	noPrompt = noPrompt || noPromptFlag
 
 	file, err := preset.Load(rootDir)
 	if err != nil {
