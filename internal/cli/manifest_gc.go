@@ -10,6 +10,9 @@ import (
 	"strings"
 
 	"github.com/mattn/go-isatty"
+	coregcplan "github.com/tasuku43/gion-core/gcplan"
+	coregitparse "github.com/tasuku43/gion-core/gitparse"
+	coregitref "github.com/tasuku43/gion-core/gitref"
 	"github.com/tasuku43/gion/internal/app/manifestplan"
 	"github.com/tasuku43/gion/internal/domain/manifest"
 	"github.com/tasuku43/gion/internal/domain/repo"
@@ -22,11 +25,6 @@ type manifestGcCandidate struct {
 	WorkspaceID string
 	Targets     []string
 	Reason      string
-}
-
-type manifestGcFetchTarget struct {
-	Remote string
-	Branch string
 }
 
 type manifestGcFetchResult struct {
@@ -314,58 +312,18 @@ func fetchManifestGcRepo(ctx context.Context, rootDir, repoKey string, entries [
 			Err:     fmt.Errorf("repo store not found (run: gion repo get %s)", spec),
 		}
 	}
-	targets := make(map[manifestGcFetchTarget]struct{})
-	needsDefault := false
+	planEntries := make([]coregcplan.RepoEntry, 0, len(entries))
 	for _, entry := range entries {
-		base := strings.TrimSpace(entry.BaseRef)
-		if base == "" {
-			needsDefault = true
-			continue
-		}
-		target, ok := parseBaseRefTarget(base)
-		if !ok {
-			continue
-		}
-		targets[target] = struct{}{}
+		planEntries = append(planEntries, coregcplan.RepoEntry{
+			RepoKey: entry.RepoKey,
+			BaseRef: strings.TrimSpace(entry.BaseRef),
+		})
 	}
-	var defaultTarget string
-	if needsDefault {
-		branch, err := defaultBranchFromRemote(ctx, storePath)
-		if err != nil {
-			return manifestGcFetchResult{RepoKey: repoKey, Err: err}
-		}
-		if strings.TrimSpace(branch) == "" {
-			return manifestGcFetchResult{RepoKey: repoKey, Err: fmt.Errorf("default branch unavailable")}
-		}
-		defaultTarget = fmt.Sprintf("origin/%s", branch)
-		targets[manifestGcFetchTarget{Remote: "origin", Branch: branch}] = struct{}{}
+	fetchResult, err := coregcplan.FetchRepo(ctx, manifestGcRepoFetcher{}, storePath, planEntries)
+	if err != nil {
+		return manifestGcFetchResult{RepoKey: repoKey, Err: err}
 	}
-	for target := range targets {
-		if err := fetchRemoteBranch(ctx, storePath, target); err != nil {
-			return manifestGcFetchResult{RepoKey: repoKey, Err: err}
-		}
-	}
-	return manifestGcFetchResult{RepoKey: repoKey, DefaultTarget: defaultTarget}
-}
-
-func parseBaseRefTarget(baseRef string) (manifestGcFetchTarget, bool) {
-	trimmed := strings.TrimSpace(baseRef)
-	if trimmed == "" {
-		return manifestGcFetchTarget{}, false
-	}
-	if strings.HasPrefix(trimmed, "refs/remotes/") {
-		trimmed = strings.TrimPrefix(trimmed, "refs/remotes/")
-	}
-	parts := strings.SplitN(trimmed, "/", 2)
-	if len(parts) != 2 {
-		return manifestGcFetchTarget{}, false
-	}
-	remote := strings.TrimSpace(parts[0])
-	branch := strings.TrimSpace(parts[1])
-	if remote == "" || branch == "" {
-		return manifestGcFetchTarget{}, false
-	}
-	return manifestGcFetchTarget{Remote: remote, Branch: branch}, true
+	return manifestGcFetchResult{RepoKey: repoKey, DefaultTarget: fetchResult.DefaultTarget}
 }
 
 func resolveMergeTarget(ctx context.Context, rootDir string, entry manifest.Repo, defaultTargets map[string]string) (string, bool, error) {
@@ -401,11 +359,9 @@ func resolveLocalMergeTarget(ctx context.Context, rootDir string, entry manifest
 		return "", false, nil
 	}
 	ref = strings.TrimSpace(ref)
-	if strings.HasPrefix(ref, "refs/remotes/origin/") {
-		branch := strings.TrimPrefix(ref, "refs/remotes/origin/")
-		if branch != "" {
-			return fmt.Sprintf("origin/%s", branch), true, nil
-		}
+	if branch, ok := coregitref.ParseOriginHeadRef(ref); ok {
+		target, _ := coregitref.FormatOriginTarget(branch)
+		return target, true, nil
 	}
 	return "", false, nil
 }
@@ -415,28 +371,13 @@ func defaultBranchFromRemote(ctx context.Context, storePath string) (string, err
 	if err != nil {
 		return "", err
 	}
-	lines := strings.Split(strings.TrimSpace(res.Stdout), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "ref: ") && strings.HasSuffix(line, "\tHEAD") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				ref := strings.TrimPrefix(parts[1], "refs/heads/")
-				if ref != "" {
-					return ref, nil
-				}
-			}
-		}
-	}
-	return "", nil
+	branch, _ := coregitparse.ParseRemoteHeadSymref(res.Stdout)
+	return branch, nil
 }
 
-func fetchRemoteBranch(ctx context.Context, storePath string, target manifestGcFetchTarget) error {
-	remote := strings.TrimSpace(target.Remote)
-	branch := strings.TrimSpace(target.Branch)
+func fetchRemoteBranch(ctx context.Context, storePath, remote, branch string) error {
+	remote = strings.TrimSpace(remote)
+	branch = strings.TrimSpace(branch)
 	if remote == "" || branch == "" {
 		return fmt.Errorf("fetch target invalid")
 	}
@@ -445,16 +386,17 @@ func fetchRemoteBranch(ctx context.Context, storePath string, target manifestGcF
 	return err
 }
 
-func strictMergedIntoTarget(ctx context.Context, rootDir string, entry manifest.Repo, target string) (bool, error) {
-	branch := strings.TrimSpace(entry.Branch)
-	if branch == "" {
-		return false, fmt.Errorf("branch is required")
-	}
-	target = strings.TrimSpace(target)
-	if target == "" {
-		return false, fmt.Errorf("target is required")
-	}
+type manifestGcRepoFetcher struct{}
 
+func (manifestGcRepoFetcher) DefaultBranchFromRemote(ctx context.Context, storePath string) (string, error) {
+	return defaultBranchFromRemote(ctx, storePath)
+}
+
+func (manifestGcRepoFetcher) FetchRemoteBranch(ctx context.Context, storePath, remote, branch string) error {
+	return fetchRemoteBranch(ctx, storePath, remote, branch)
+}
+
+func strictMergedIntoTarget(ctx context.Context, rootDir string, entry manifest.Repo, target string) (bool, error) {
 	storePath, exists, err := repo.Exists(rootDir, repo.SpecFromKey(entry.RepoKey))
 	if err != nil {
 		return false, err
@@ -462,32 +404,19 @@ func strictMergedIntoTarget(ctx context.Context, rootDir string, entry manifest.
 	if !exists {
 		return false, fmt.Errorf("repo store not found (run: gion repo get %s)", repo.SpecFromKey(entry.RepoKey))
 	}
+	return coregcplan.StrictMergedIntoTarget(ctx, manifestGcMergeChecker{}, coregcplan.StrictMergeRequest{
+		StorePath: storePath,
+		Branch:    entry.Branch,
+		Target:    target,
+	})
+}
 
-	headRef := fmt.Sprintf("refs/heads/%s", branch)
-	targetRef := fmt.Sprintf("refs/remotes/%s", target)
+type manifestGcMergeChecker struct{}
 
-	headHash, headOK, err := gitcmd.ShowRef(ctx, storePath, headRef)
-	if err != nil {
-		return false, err
-	}
-	if !headOK {
-		return false, fmt.Errorf("ref not found: %s", headRef)
-	}
-	targetHash, targetOK, err := gitcmd.ShowRef(ctx, storePath, targetRef)
-	if err != nil {
-		return false, err
-	}
-	if !targetOK {
-		return false, fmt.Errorf("ref not found: %s", targetRef)
-	}
+func (manifestGcMergeChecker) ShowRef(ctx context.Context, storePath, ref string) (string, bool, error) {
+	return gitcmd.ShowRef(ctx, storePath, ref)
+}
 
-	if headHash == targetHash {
-		return false, nil
-	}
-
-	ok, err := gitcmd.IsAncestor(ctx, storePath, headRef, targetRef)
-	if err != nil {
-		return false, err
-	}
-	return ok, nil
+func (manifestGcMergeChecker) IsAncestor(ctx context.Context, storePath, headRef, targetRef string) (bool, error) {
+	return gitcmd.IsAncestor(ctx, storePath, headRef, targetRef)
 }

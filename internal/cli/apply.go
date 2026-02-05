@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/mattn/go-isatty"
+	coreapplyplan "github.com/tasuku43/gion-core/applyplan"
+	coreplanner "github.com/tasuku43/gion-core/planner"
 	"github.com/tasuku43/gion/internal/app/apply"
 	"github.com/tasuku43/gion/internal/app/manifestplan"
 	"github.com/tasuku43/gion/internal/domain/manifest"
@@ -41,70 +43,15 @@ func runApply(ctx context.Context, rootDir string, args []string, noPrompt bool)
 	return err
 }
 
-func countWorkspaceChangeKinds(plan manifestplan.Result) (adds, updates, removes int) {
-	for _, change := range plan.Changes {
-		switch change.Kind {
-		case manifestplan.WorkspaceAdd:
-			adds++
-		case manifestplan.WorkspaceUpdate:
-			updates++
-		case manifestplan.WorkspaceRemove:
-			removes++
-		}
-	}
-	return adds, updates, removes
-}
-
-func planHasDestructiveChanges(plan manifestplan.Result) bool {
-	for _, change := range plan.Changes {
-		switch change.Kind {
-		case manifestplan.WorkspaceRemove:
-			return true
-		case manifestplan.WorkspaceUpdate:
-			if hasDestructiveRepoChange(change.Repos) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func hasDestructiveRepoChange(changes []manifestplan.RepoChange) bool {
-	for _, change := range changes {
-		switch change.Kind {
-		case manifestplan.RepoRemove:
-			return true
-		case manifestplan.RepoUpdate:
-			if isInPlaceBranchRename(change) {
-				continue
-			}
-			return true
-		}
-	}
-	return false
-}
-
-func isInPlaceBranchRename(change manifestplan.RepoChange) bool {
-	if change.Kind != manifestplan.RepoUpdate {
-		return false
-	}
-	if strings.TrimSpace(change.FromRepo) == "" || strings.TrimSpace(change.ToRepo) == "" {
-		return false
-	}
-	if strings.TrimSpace(change.FromBranch) == "" || strings.TrimSpace(change.ToBranch) == "" {
-		return false
-	}
-	if strings.TrimSpace(change.FromRepo) != strings.TrimSpace(change.ToRepo) {
-		return false
-	}
-	return strings.TrimSpace(change.FromBranch) != strings.TrimSpace(change.ToBranch)
-}
-
 type applyInternalResult struct {
 	HadChanges bool
 	Confirmed  bool
 	Applied    bool
 	Canceled   bool
+}
+
+func planHasDestructiveChanges(plan manifestplan.Result) bool {
+	return coreapplyplan.HasDestructiveChanges(plan.Changes)
 }
 
 func runApplyInternalWithPlan(ctx context.Context, rootDir string, renderer *ui.Renderer, noPrompt bool, plan manifestplan.Result) (applyInternalResult, error) {
@@ -142,7 +89,7 @@ func runApplyInternalWithPlan(ctx context.Context, rootDir string, renderer *ui.
 		return applyInternalResult{HadChanges: true}, err
 	}
 
-	destructive := planHasDestructiveChanges(plan)
+	destructive := coreapplyplan.HasDestructiveChanges(plan.Changes)
 	if destructive && noPrompt {
 		return applyInternalResult{HadChanges: true}, fmt.Errorf("destructive changes require confirmation")
 	}
@@ -190,44 +137,40 @@ func runApplyInternalWithPlan(ctx context.Context, rootDir string, renderer *ui.
 
 	renderer.Blank()
 	renderer.Section("Result")
-	adds, updates, removes := countWorkspaceChangeKinds(plan)
+	adds, updates, removes := coreapplyplan.CountWorkspaceChanges(plan.Changes)
 	renderer.BulletSuccess(fmt.Sprintf("applied: add=%d update=%d remove=%d", adds, updates, removes))
 	renderer.Bullet(fmt.Sprintf("%s rewritten", manifest.FileName))
 	return applyInternalResult{HadChanges: true, Confirmed: confirmed, Applied: true}, nil
 }
 
 func repoSpecsForApplyPlan(plan manifestplan.Result) []string {
-	unique := map[string]struct{}{}
-	for _, change := range plan.Changes {
-		switch change.Kind {
-		case manifestplan.WorkspaceAdd:
-			ws, ok := plan.Desired.Workspaces[change.WorkspaceID]
-			if !ok {
-				continue
-			}
-			for _, repoEntry := range ws.Repos {
-				spec := repo.SpecFromKey(repoEntry.RepoKey)
-				if strings.TrimSpace(spec) == "" {
-					continue
-				}
-				unique[spec] = struct{}{}
-			}
-		case manifestplan.WorkspaceUpdate:
-			for _, repoChange := range change.Repos {
-				switch repoChange.Kind {
-				case manifestplan.RepoAdd, manifestplan.RepoUpdate:
-					spec := repo.SpecFromKey(repoChange.ToRepo)
-					if strings.TrimSpace(spec) == "" {
-						continue
-					}
-					unique[spec] = struct{}{}
-				}
-			}
+	repoKeys := coreapplyplan.CollectPrefetchRepoKeys(plan.Changes, toPlannerInventory(plan.Desired))
+	specs := make([]string, 0, len(repoKeys))
+	for _, repoKey := range repoKeys {
+		spec := strings.TrimSpace(repo.SpecFromKey(repoKey))
+		if spec == "" {
+			continue
 		}
-	}
-	var specs []string
-	for spec := range unique {
 		specs = append(specs, spec)
 	}
 	return specs
+}
+
+func toPlannerInventory(file manifest.File) coreplanner.Inventory {
+	workspaces := make(map[string]coreplanner.Workspace, len(file.Workspaces))
+	for id, ws := range file.Workspaces {
+		repos := make([]coreplanner.Repo, 0, len(ws.Repos))
+		for _, repoEntry := range ws.Repos {
+			repos = append(repos, coreplanner.Repo{
+				Alias:   repoEntry.Alias,
+				RepoKey: repoEntry.RepoKey,
+				Branch:  repoEntry.Branch,
+			})
+		}
+		workspaces[id] = coreplanner.Workspace{
+			ID:    id,
+			Repos: repos,
+		}
+	}
+	return coreplanner.Inventory{Workspaces: workspaces}
 }

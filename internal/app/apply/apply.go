@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	coreapplyplan "github.com/tasuku43/gion-core/applyplan"
 	"github.com/tasuku43/gion/internal/app/add"
 	"github.com/tasuku43/gion/internal/app/create"
 	"github.com/tasuku43/gion/internal/app/manifestplan"
@@ -26,7 +27,9 @@ type Options struct {
 }
 
 func Apply(ctx context.Context, rootDir string, plan manifestplan.Result, opts Options) error {
-	for _, change := range plan.Changes {
+	execPlan := coreapplyplan.BuildExecution(plan.Changes)
+
+	for _, change := range execPlan.WorkspaceRemovals {
 		if change.Kind != manifestplan.WorkspaceRemove {
 			continue
 		}
@@ -36,28 +39,39 @@ func Apply(ctx context.Context, rootDir string, plan manifestplan.Result, opts O
 		}
 	}
 
-	for _, change := range plan.Changes {
+	for _, change := range execPlan.WorkspaceUpdateRemovals {
 		if change.Kind != manifestplan.WorkspaceUpdate {
 			continue
 		}
 		if err := applyRepoRemovals(ctx, rootDir, change, opts); err != nil {
 			return err
 		}
+	}
+
+	for _, change := range execPlan.WorkspaceUpdateRenames {
+		if change.Kind != manifestplan.WorkspaceUpdate {
+			continue
+		}
 		if err := applyRepoBranchRenames(ctx, rootDir, change, opts.Step); err != nil {
 			return err
 		}
 	}
 
-	for _, change := range plan.Changes {
-		switch change.Kind {
-		case manifestplan.WorkspaceAdd:
-			if err := applyWorkspaceAdd(ctx, rootDir, plan.Desired, change, opts); err != nil {
-				return err
-			}
-		case manifestplan.WorkspaceUpdate:
-			if err := applyRepoAdds(ctx, rootDir, plan.Desired, change, opts); err != nil {
-				return err
-			}
+	for _, change := range execPlan.WorkspaceAdds {
+		if change.Kind != manifestplan.WorkspaceAdd {
+			continue
+		}
+		if err := applyWorkspaceAdd(ctx, rootDir, plan.Desired, change, opts); err != nil {
+			return err
+		}
+	}
+
+	for _, change := range execPlan.WorkspaceUpdateAdds {
+		if change.Kind != manifestplan.WorkspaceUpdate {
+			continue
+		}
+		if err := applyRepoAdds(ctx, rootDir, plan.Desired, change, opts); err != nil {
+			return err
 		}
 	}
 
@@ -98,7 +112,7 @@ func applyWorkspaceAdd(ctx context.Context, rootDir string, desired manifest.Fil
 			return err
 		}
 		if createdBranch {
-			baseBranchToRecord, baseBranchMixed = updateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
+			baseBranchToRecord, baseBranchMixed = coreapplyplan.UpdateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 		}
 	}
 	if baseBranchMixed {
@@ -155,7 +169,7 @@ func applyRepoRemovals(ctx context.Context, rootDir string, change manifestplan.
 	for _, repoChange := range change.Repos {
 		switch repoChange.Kind {
 		case manifestplan.RepoRemove, manifestplan.RepoUpdate:
-			if canRenameRepoBranchInPlace(repoChange) {
+			if coreapplyplan.IsInPlaceBranchRename(repoChange) {
 				continue
 			}
 			logStep(opts.Step, fmt.Sprintf("worktree remove %s", repoChange.Alias))
@@ -172,7 +186,7 @@ func applyRepoRemovals(ctx context.Context, rootDir string, change manifestplan.
 
 func applyRepoBranchRenames(ctx context.Context, rootDir string, change manifestplan.WorkspaceChange, step func(text string)) error {
 	for _, repoChange := range change.Repos {
-		if !canRenameRepoBranchInPlace(repoChange) {
+		if !coreapplyplan.IsInPlaceBranchRename(repoChange) {
 			continue
 		}
 		worktreePath := workspace.WorktreePath(rootDir, change.WorkspaceID, repoChange.Alias)
@@ -210,10 +224,10 @@ func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, c
 				return err
 			}
 			if createdBranch {
-				baseBranchToRecord, baseBranchMixed = updateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
+				baseBranchToRecord, baseBranchMixed = coreapplyplan.UpdateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 			}
 		case manifestplan.RepoUpdate:
-			if canRenameRepoBranchInPlace(repoChange) {
+			if coreapplyplan.IsInPlaceBranchRename(repoChange) {
 				continue
 			}
 			logStep(opts.Step, fmt.Sprintf("worktree add %s", repoChange.Alias))
@@ -223,7 +237,7 @@ func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, c
 				return err
 			}
 			if createdBranch {
-				baseBranchToRecord, baseBranchMixed = updateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
+				baseBranchToRecord, baseBranchMixed = coreapplyplan.UpdateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 			}
 		}
 	}
@@ -234,43 +248,6 @@ func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, c
 		return err
 	}
 	return nil
-}
-
-func updateBaseBranchCandidate(candidate string, mixed bool, baseBranch string) (string, bool) {
-	if mixed {
-		return candidate, mixed
-	}
-	baseBranch = strings.TrimSpace(baseBranch)
-	if baseBranch == "" {
-		return candidate, mixed
-	}
-	if candidate == "" {
-		return baseBranch, mixed
-	}
-	if candidate != baseBranch {
-		return candidate, true
-	}
-	return candidate, mixed
-}
-
-func canRenameRepoBranchInPlace(change manifestplan.RepoChange) bool {
-	if change.Kind != manifestplan.RepoUpdate {
-		return false
-	}
-	fromRepo := strings.TrimSpace(change.FromRepo)
-	toRepo := strings.TrimSpace(change.ToRepo)
-	fromBranch := strings.TrimSpace(change.FromBranch)
-	toBranch := strings.TrimSpace(change.ToBranch)
-	if fromRepo == "" || toRepo == "" || fromBranch == "" || toBranch == "" {
-		return false
-	}
-	if fromRepo != toRepo {
-		return false
-	}
-	if fromBranch == toBranch {
-		return false
-	}
-	return true
 }
 
 func logStep(step func(text string), text string) {
