@@ -29,7 +29,7 @@ func runManifestRm(ctx context.Context, rootDir string, args []string, globalNoP
 	rmFlags.Usage = func() {
 		printManifestRmHelp(os.Stdout)
 	}
-	if err := rmFlags.Parse(args); err != nil {
+	if err := rmFlags.Parse(normalizeArgsFlagsFirst(args, nil)); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

@@ -29,7 +29,13 @@ func Run() error {
 	fs.Usage = func() {
 		printGlobalHelp(os.Stdout)
 	}
-	if err := fs.Parse(os.Args[1:]); err != nil {
+
+	normalizedArgs, err := normalizeGlobalArgs(os.Args[1:])
+	if err != nil {
+		return err
+	}
+
+	if err := fs.Parse(normalizedArgs); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
