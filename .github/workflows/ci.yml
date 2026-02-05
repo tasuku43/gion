@@ -29,6 +29,8 @@ jobs:
           echo "$HOME/.local/bin" >>"$GITHUB_PATH"
 
       - name: Checkout gion-core dependency
+        env:
+          GION_CORE_REF: gion-core
         run: ./.github/scripts/setup-gion-core-dependency.sh
 
       - name: task ci
