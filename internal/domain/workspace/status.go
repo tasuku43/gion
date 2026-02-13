@@ -3,8 +3,9 @@ package workspace
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
-	coregitparse "github.com/tasuku43/gion-core/gitparse"
 	"github.com/tasuku43/gion/internal/infra/gitcmd"
 	"github.com/tasuku43/gion/internal/infra/paths"
 )
@@ -90,10 +91,173 @@ func gitStatusPorcelain(ctx context.Context, worktreePath string) (string, error
 }
 
 func parseStatusPorcelainV2(output, fallbackBranch string) (string, string, string, bool, bool, bool, int, int, int, int, int, int) {
-	status := coregitparse.ParseStatusPorcelainV2(output, fallbackBranch)
-	return status.Branch, status.Upstream, status.Head, status.Detached, status.HeadMissing, status.Dirty, status.UntrackedCount, status.StagedCount, status.UnstagedCount, status.UnmergedCount, status.AheadCount, status.BehindCount
+	branch := fallbackBranch
+	var upstream string
+	var head string
+	var detached bool
+	var headMissing bool
+	var dirty bool
+	var untracked int
+	var staged int
+	var unstaged int
+	var unmerged int
+	var ahead int
+	var behind int
+
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "# ") {
+			fields := strings.Fields(line)
+			if len(fields) < 3 {
+				continue
+			}
+			switch fields[1] {
+			case "branch.oid":
+				if fields[2] == "(initial)" {
+					headMissing = true
+				} else {
+					head = shortSHA(fields[2])
+				}
+			case "branch.head":
+				switch fields[2] {
+				case "(detached)":
+					detached = true
+				case "(unknown)":
+					headMissing = true
+				default:
+					branch = fields[2]
+				}
+			case "branch.upstream":
+				if fields[2] != "(unknown)" {
+					upstream = fields[2]
+				}
+			case "branch.ab":
+				for _, field := range fields[2:] {
+					if strings.HasPrefix(field, "+") {
+						ahead = parseCount(field[1:])
+					}
+					if strings.HasPrefix(field, "-") {
+						behind = parseCount(field[1:])
+					}
+				}
+			}
+			continue
+		}
+
+		if strings.HasPrefix(line, "? ") {
+			untracked++
+			dirty = true
+			continue
+		}
+
+		if strings.HasPrefix(line, "u ") {
+			unmerged++
+			dirty = true
+			continue
+		}
+		if strings.HasPrefix(line, "1 ") || strings.HasPrefix(line, "2 ") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				xy := fields[1]
+				if len(xy) >= 2 {
+					if xy[0] != '.' {
+						staged++
+					}
+					if xy[1] != '.' {
+						unstaged++
+					}
+					if xy[0] != '.' || xy[1] != '.' {
+						dirty = true
+					}
+				}
+			}
+			continue
+		}
+		dirty = true
+	}
+
+	return branch, upstream, head, detached, headMissing, dirty, untracked, staged, unstaged, unmerged, ahead, behind
 }
 
 func parseChangedFilesPorcelainV2(output string) []string {
-	return coregitparse.ParseChangedFilesPorcelainV2(output)
+	var files []string
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "# ") {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, "? "):
+			path := strings.TrimSpace(strings.TrimPrefix(line, "? "))
+			if path != "" {
+				files = append(files, fmt.Sprintf("?? %s", path))
+			}
+		case strings.HasPrefix(line, "u "):
+			fields := strings.Fields(line)
+			if len(fields) < 3 {
+				continue
+			}
+			xy := shortXY(fields[1])
+			path := fields[len(fields)-1]
+			if strings.TrimSpace(path) != "" {
+				files = append(files, fmt.Sprintf("%s %s", xy, path))
+			}
+		case strings.HasPrefix(line, "1 "):
+			fields := strings.Fields(line)
+			if len(fields) < 3 {
+				continue
+			}
+			xy := shortXY(fields[1])
+			path := fields[len(fields)-1]
+			if strings.TrimSpace(path) != "" {
+				files = append(files, fmt.Sprintf("%s %s", xy, path))
+			}
+		case strings.HasPrefix(line, "2 "):
+			fields := strings.Fields(line)
+			if len(fields) < 4 {
+				continue
+			}
+			xy := shortXY(fields[1])
+			oldPath := fields[len(fields)-2]
+			newPath := fields[len(fields)-1]
+			if strings.TrimSpace(oldPath) == "" || strings.TrimSpace(newPath) == "" {
+				continue
+			}
+			files = append(files, fmt.Sprintf("%s %s -> %s", xy, oldPath, newPath))
+		}
+	}
+	return files
+}
+
+func shortXY(xy string) string {
+	value := strings.TrimSpace(xy)
+	if value == "" {
+		return "??"
+	}
+	value = strings.ReplaceAll(value, ".", " ")
+	return value
+}
+
+func shortSHA(oid string) string {
+	if len(oid) <= 7 {
+		return oid
+	}
+	return oid[:7]
+}
+
+func parseCount(value string) int {
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	if n < 0 {
+		return 0
+	}
+	return n
 }

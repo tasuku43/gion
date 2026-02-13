@@ -2,8 +2,7 @@ package workspace
 
 import (
 	"context"
-
-	coreworkspacerisk "github.com/tasuku43/gion-core/workspacerisk"
+	"strings"
 )
 
 type WorkspaceStateKind string
@@ -81,32 +80,63 @@ func repoStateFromStatus(repo RepoStatus) RepoState {
 		UnmergedCount:  repo.UnmergedCount,
 		Error:          repo.Error,
 	}
-	kind := coreworkspacerisk.ClassifyRepoStatus(coreworkspacerisk.RepoStatus{
-		Upstream:    repo.Upstream,
-		AheadCount:  repo.AheadCount,
-		BehindCount: repo.BehindCount,
-		Dirty:       repo.Dirty,
-		Detached:    repo.Detached,
-		HeadMissing: repo.HeadMissing,
-		Error:       repo.Error,
-	})
-	state.Kind = RepoStateKind(kind)
+	if repo.Error != nil {
+		state.Kind = RepoStateUnknown
+		return state
+	}
+	if repo.Dirty {
+		state.Kind = RepoStateDirty
+		return state
+	}
+	if repo.Detached || repo.HeadMissing {
+		state.Kind = RepoStateUnknown
+		return state
+	}
+	if strings.TrimSpace(repo.Upstream) == "" {
+		state.Kind = RepoStateUnknown
+		return state
+	}
+	if repo.AheadCount > 0 && repo.BehindCount > 0 {
+		state.Kind = RepoStateDiverged
+		return state
+	}
+	if repo.AheadCount > 0 {
+		state.Kind = RepoStateUnpushed
+		return state
+	}
+	if repo.BehindCount > 0 {
+		state.Kind = RepoStateClean
+		return state
+	}
+	state.Kind = RepoStateClean
 	return state
 }
 
 func aggregateWorkspaceState(repos []RepoState) WorkspaceStateKind {
-	coreRepos := make([]coreworkspacerisk.RepoState, 0, len(repos))
+	hasDirty := false
+	hasUnknown := false
+	hasDiverged := false
+	hasUnpushed := false
 	for _, repo := range repos {
-		coreRepos = append(coreRepos, coreworkspacerisk.RepoState(repo.Kind))
+		switch repo.Kind {
+		case RepoStateDirty:
+			hasDirty = true
+		case RepoStateUnknown:
+			hasUnknown = true
+		case RepoStateDiverged:
+			hasDiverged = true
+		case RepoStateUnpushed:
+			hasUnpushed = true
+		}
 	}
-	switch coreworkspacerisk.AggregateForState(coreRepos) {
-	case coreworkspacerisk.WorkspaceRiskDirty:
+	switch {
+	case hasDirty:
 		return WorkspaceStateDirty
-	case coreworkspacerisk.WorkspaceRiskUnknown:
+	case hasUnknown:
 		return WorkspaceStateUnknown
-	case coreworkspacerisk.WorkspaceRiskDiverged:
+	case hasDiverged:
 		return WorkspaceStateDiverged
-	case coreworkspacerisk.WorkspaceRiskUnpushed:
+	case hasUnpushed:
 		return WorkspaceStateUnpushed
 	default:
 		return WorkspaceStateClean

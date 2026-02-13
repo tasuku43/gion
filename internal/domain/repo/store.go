@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
-	coregitparse "github.com/tasuku43/gion-core/gitparse"
-	coregitref "github.com/tasuku43/gion-core/gitref"
-	corerepostore "github.com/tasuku43/gion-core/repostore"
 	"github.com/tasuku43/gion/internal/infra/gitcmd"
 	"github.com/tasuku43/gion/internal/infra/paths"
 )
@@ -25,20 +26,31 @@ func Get(ctx context.Context, rootDir string, repo string) (Store, error) {
 	}
 
 	storePath := storePathForSpec(rootDir, spec)
-	result, err := corerepostore.EnsureStore(ctx, storeAccessAdapter{}, corerepostore.EnsureStoreRequest{
-		RepoKey:       spec.RepoKey,
-		RemoteURL:     remoteURL,
-		StorePath:     storePath,
-		RepoSpec:      repo,
-		MustExist:     false,
-		Fetch:         false,
-		FetchGraceEnv: os.Getenv("GION_FETCH_GRACE_SECONDS"),
-		Log:           true,
-	})
+
+	exists, err := paths.DirExists(storePath)
 	if err != nil {
 		return Store{}, err
 	}
-	return fromCoreStore(result.Store), nil
+
+	if !exists {
+		if err := os.MkdirAll(filepath.Dir(storePath), 0o750); err != nil {
+			return Store{}, fmt.Errorf("create repo store dir: %w", err)
+		}
+		gitcmd.Logf("git clone --bare %s %s", remoteURL, storePath)
+		if _, err := gitcmd.Run(ctx, []string{"clone", "--bare", remoteURL, storePath}, gitcmd.Options{}); err != nil {
+			return Store{}, err
+		}
+	}
+
+	if err := normalizeStore(ctx, storePath, spec.RepoKey, false); err != nil {
+		return Store{}, err
+	}
+
+	return Store{
+		RepoKey:   spec.RepoKey,
+		StorePath: storePath,
+		RemoteURL: remoteURL,
+	}, nil
 }
 
 func Open(ctx context.Context, rootDir string, repo string, fetch bool) (Store, error) {
@@ -48,20 +60,24 @@ func Open(ctx context.Context, rootDir string, repo string, fetch bool) (Store, 
 	}
 
 	storePath := storePathForSpec(rootDir, spec)
-	result, err := corerepostore.EnsureStore(ctx, storeAccessAdapter{}, corerepostore.EnsureStoreRequest{
-		RepoKey:       spec.RepoKey,
-		RemoteURL:     remoteURL,
-		StorePath:     storePath,
-		RepoSpec:      repo,
-		MustExist:     true,
-		Fetch:         fetch,
-		FetchGraceEnv: os.Getenv("GION_FETCH_GRACE_SECONDS"),
-		Log:           true,
-	})
+
+	exists, err := paths.DirExists(storePath)
 	if err != nil {
 		return Store{}, err
 	}
-	return fromCoreStore(result.Store), nil
+	if !exists {
+		return Store{}, fmt.Errorf("repo store not found, run: gion repo get %s", repo)
+	}
+
+	if err := normalizeStore(ctx, storePath, spec.RepoKey, fetch); err != nil {
+		return Store{}, err
+	}
+
+	return Store{
+		RepoKey:   spec.RepoKey,
+		StorePath: storePath,
+		RemoteURL: remoteURL,
+	}, nil
 }
 
 func Prefetch(ctx context.Context, rootDir string, repo string) error {
@@ -104,101 +120,47 @@ func storePathForSpec(rootDir string, spec Spec) string {
 // (moved to paths.go)
 
 func normalizeStore(ctx context.Context, storePath, display string, fetch bool) error {
-	_, err := corerepostore.NormalizeStore(ctx, normalizerGitAdapter{}, storePath, fetch, os.Getenv("GION_FETCH_GRACE_SECONDS"), true)
-	return err
-}
-
-type storeAccessAdapter struct{}
-
-func (storeAccessAdapter) DirExists(path string) (bool, error) {
-	return paths.DirExists(path)
-}
-
-func (storeAccessAdapter) MkdirAll(path string, perm os.FileMode) error {
-	return os.MkdirAll(path, perm)
-}
-
-func (storeAccessAdapter) CloneBare(ctx context.Context, remoteURL, storePath string) error {
-	gitcmd.Logf("git clone --bare %s %s", remoteURL, storePath)
-	_, err := gitcmd.Run(ctx, []string{"clone", "--bare", remoteURL, storePath}, gitcmd.Options{})
-	return err
-}
-
-func (storeAccessAdapter) NormalizeStore(ctx context.Context, storePath string, fetch bool, fetchGraceEnv string, log bool) error {
-	_, err := corerepostore.NormalizeStore(ctx, normalizerGitAdapter{}, storePath, fetch, fetchGraceEnv, log)
-	return err
-}
-
-func fromCoreStore(store corerepostore.Store) Store {
-	return Store{
-		RepoKey:   store.RepoKey,
-		StorePath: store.StorePath,
-		RemoteURL: store.RemoteURL,
+	defaultBranch, err := ensureDefaultBranch(ctx, storePath, fetch, true)
+	if err != nil {
+		return err
 	}
+	return pruneLocalHeads(ctx, storePath, defaultBranch)
 }
 
 func ensureDefaultBranch(ctx context.Context, storePath string, fetch bool, log bool) (string, error) {
-	return corerepostore.EnsureDefaultBranch(ctx, normalizerGitAdapter{}, storePath, fetch, os.Getenv("GION_FETCH_GRACE_SECONDS"), log)
-}
-
-type normalizerGitAdapter struct{}
-
-func (normalizerGitAdapter) ConfigureRemoteFetch(ctx context.Context, storePath string) error {
 	if _, err := gitcmd.Run(ctx, []string{"config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"}, gitcmd.Options{Dir: storePath}); err != nil {
-		return err
+		return "", err
 	}
-	return nil
-}
+	defaultBranch, _ := localDefaultBranch(ctx, storePath)
 
-func (normalizerGitAdapter) LocalDefaultBranch(ctx context.Context, storePath string) (string, error) {
-	return localDefaultBranch(ctx, storePath)
-}
-
-func (normalizerGitAdapter) DefaultBranchFromRemote(ctx context.Context, storePath string) (string, error) {
-	branch, _, err := defaultBranchFromRemote(ctx, storePath)
-	return branch, err
-}
-
-func (normalizerGitAdapter) SetRemoteHead(ctx context.Context, storePath, branch string) error {
-	if _, err := gitcmd.Run(ctx, []string{"symbolic-ref", "refs/remotes/origin/HEAD", fmt.Sprintf("refs/remotes/origin/%s", branch)}, gitcmd.Options{Dir: storePath}); err != nil {
-		return err
+	remoteChecked := false
+	grace := fetchGraceDuration()
+	if !recentlyFetched(storePath, grace) || defaultBranch == "" {
+		var err error
+		defaultBranch, _, err = defaultBranchFromRemote(ctx, storePath)
+		if err != nil {
+			return "", err
+		}
+		remoteChecked = true
 	}
-	return nil
-}
-
-func (normalizerGitAdapter) FetchPrune(ctx context.Context, storePath string, log bool) error {
-	if log {
-		gitcmd.Logf("git fetch --prune")
+	if defaultBranch != "" {
+		_, _ = gitcmd.Run(ctx, []string{"symbolic-ref", "refs/remotes/origin/HEAD", fmt.Sprintf("refs/remotes/origin/%s", defaultBranch)}, gitcmd.Options{Dir: storePath})
 	}
-	if _, err := gitcmd.Run(ctx, []string{"fetch", "--prune"}, gitcmd.Options{Dir: storePath}); err != nil {
-		return err
+
+	if fetch {
+		if log {
+			gitcmd.Logf("git fetch --prune")
+		}
+		if _, err := gitcmd.Run(ctx, []string{"fetch", "--prune"}, gitcmd.Options{Dir: storePath}); err != nil {
+			return "", err
+		}
+	} else if remoteChecked {
+		if err := touchFetchHead(storePath); err != nil {
+			return "", err
+		}
 	}
-	return nil
-}
 
-func (normalizerGitAdapter) WorktreeBranches(ctx context.Context, storePath string) ([]string, error) {
-	out, err := gitcmd.WorktreeListPorcelain(ctx, storePath)
-	if err != nil {
-		return nil, err
-	}
-	return coregitparse.ParseWorktreeBranchNames(out), nil
-}
-
-func (normalizerGitAdapter) HeadRefs(ctx context.Context, storePath string) ([]string, error) {
-	res, err := gitcmd.Run(ctx, []string{"show-ref", "--heads"}, gitcmd.Options{Dir: storePath})
-	if err != nil && res.ExitCode != 1 {
-		return nil, err
-	}
-	return coregitparse.ParseHeadRefs(res.Stdout), nil
-}
-
-func (normalizerGitAdapter) DeleteRef(ctx context.Context, storePath, ref string) error {
-	_, err := gitcmd.Run(ctx, []string{"update-ref", "-d", ref}, gitcmd.Options{Dir: storePath})
-	return err
-}
-
-func (normalizerGitAdapter) TouchFetchHead(storePath string) error {
-	return corerepostore.TouchFetchHead(storePath)
+	return defaultBranch, nil
 }
 
 func defaultBranchFromRemote(ctx context.Context, storePath string) (string, string, error) {
@@ -206,8 +168,155 @@ func defaultBranchFromRemote(ctx context.Context, storePath string) (string, str
 	if err != nil {
 		return "", "", err
 	}
-	branch, hash := coregitparse.ParseRemoteHeadSymref(res.Stdout)
+	lines := strings.Split(strings.TrimSpace(res.Stdout), "\n")
+	var branch string
+	var hash string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "ref: ") && strings.HasSuffix(line, "\tHEAD") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				ref := parts[1]
+				ref = strings.TrimPrefix(ref, "refs/heads/")
+				if ref != "" {
+					branch = ref
+				}
+			}
+			continue
+		}
+		if strings.HasSuffix(line, "\tHEAD") {
+			fields := strings.Fields(line)
+			if len(fields) >= 1 {
+				hash = fields[0]
+			}
+		}
+	}
 	return branch, hash, nil
+}
+
+func localRemoteHash(ctx context.Context, storePath, branch string) (string, error) {
+	ref := fmt.Sprintf("refs/remotes/origin/%s", branch)
+	hash, exists, err := gitcmd.ShowRef(ctx, storePath, ref)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", nil
+	}
+	return hash, nil
+}
+
+func localHeadHash(ctx context.Context, storePath, branch string) (string, error) {
+	ref := fmt.Sprintf("refs/heads/%s", branch)
+	hash, exists, err := gitcmd.ShowRef(ctx, storePath, ref)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", nil
+	}
+	return hash, nil
+}
+
+func pruneLocalHeads(ctx context.Context, storePath, keepBranch string) error {
+	worktreeBranches, _ := worktreeBranchNames(ctx, storePath)
+	res, err := gitcmd.Run(ctx, []string{"show-ref", "--heads"}, gitcmd.Options{Dir: storePath})
+	if err != nil && res.ExitCode != 1 {
+		return err
+	}
+	lines := strings.Split(strings.TrimSpace(res.Stdout), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) != 2 {
+			continue
+		}
+		ref := parts[1]
+		if !strings.HasPrefix(ref, "refs/heads/") {
+			continue
+		}
+		name := strings.TrimPrefix(ref, "refs/heads/")
+		if name == keepBranch {
+			continue
+		}
+		if _, ok := worktreeBranches[name]; ok {
+			continue
+		}
+		_, _ = gitcmd.Run(ctx, []string{"update-ref", "-d", ref}, gitcmd.Options{Dir: storePath})
+	}
+	return nil
+}
+
+func worktreeBranchNames(ctx context.Context, storePath string) (map[string]struct{}, error) {
+	out, err := gitcmd.WorktreeListPorcelain(ctx, storePath)
+	if err != nil {
+		return nil, err
+	}
+	branches := make(map[string]struct{})
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "branch ") {
+			continue
+		}
+		ref := strings.TrimSpace(strings.TrimPrefix(line, "branch "))
+		if strings.HasPrefix(ref, "refs/heads/") {
+			name := strings.TrimPrefix(ref, "refs/heads/")
+			if name != "" {
+				branches[name] = struct{}{}
+			}
+		}
+	}
+	return branches, nil
+}
+
+func fetchGraceDuration() time.Duration {
+	val := strings.TrimSpace(os.Getenv("GION_FETCH_GRACE_SECONDS"))
+	if val == "" {
+		return 30 * time.Second
+	}
+	secs, err := strconv.Atoi(val)
+	if err != nil || secs < 0 {
+		return 30 * time.Second
+	}
+	return time.Duration(secs) * time.Second
+}
+
+func recentlyFetched(storePath string, grace time.Duration) bool {
+	if grace <= 0 {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(storePath, "FETCH_HEAD"))
+	if err != nil {
+		return false
+	}
+	return time.Since(info.ModTime()) <= grace
+}
+
+func touchFetchHead(storePath string) error {
+	if strings.TrimSpace(storePath) == "" {
+		return fmt.Errorf("store path is required")
+	}
+	path := filepath.Join(storePath, "FETCH_HEAD")
+	now := time.Now()
+	if _, err := os.Stat(path); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
+		if err != nil {
+			return err
+		}
+		if err := file.Close(); err != nil {
+			return err
+		}
+	}
+	return os.Chtimes(path, now, now)
 }
 
 func localDefaultBranch(ctx context.Context, storePath string) (string, error) {
@@ -218,8 +327,8 @@ func localDefaultBranch(ctx context.Context, storePath string) (string, error) {
 	if !ok {
 		return "", nil
 	}
-	if branch, ok := coregitref.ParseOriginHeadRef(ref); ok {
-		return branch, nil
+	if strings.HasPrefix(ref, "refs/remotes/origin/") {
+		return strings.TrimPrefix(ref, "refs/remotes/origin/"), nil
 	}
 	return "", nil
 }

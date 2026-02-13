@@ -1,10 +1,6 @@
 package apply
 
-import (
-	"testing"
-
-	coreapplyplan "github.com/tasuku43/gion-core/applyplan"
-)
+import "testing"
 
 func TestUpdateBaseBranchCandidate(t *testing.T) {
 	t.Parallel()
@@ -59,7 +55,7 @@ func TestUpdateBaseBranchCandidate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotCandidate, gotMixed := coreapplyplan.UpdateBaseBranchCandidate(tt.candidate, tt.mixed, tt.input)
+			gotCandidate, gotMixed := updateBaseBranchCandidate(tt.candidate, tt.mixed, tt.input)
 			if gotCandidate != tt.wantCandidate {
 				t.Fatalf("candidate: got %q, want %q", gotCandidate, tt.wantCandidate)
 			}

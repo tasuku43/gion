@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
-	coreimportplan "github.com/tasuku43/gion-core/importplan"
 	"github.com/tasuku43/gion/internal/domain/manifest"
 	"github.com/tasuku43/gion/internal/domain/workspace"
 	"github.com/tasuku43/gion/internal/infra/paths"
@@ -52,16 +52,14 @@ func Build(ctx context.Context, rootDir string) (manifest.File, []error, error) 
 	}
 	var warnings []error
 
-	var workspaceNames []string
+	var workspaceIDs []string
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		workspaceNames = append(workspaceNames, entry.Name())
+		workspaceIDs = append(workspaceIDs, entry.Name())
 	}
-	workspaceIDs := coreimportplan.CollectWorkspaceIDs(workspaceNames)
-
-	snapshots := make([]coreimportplan.WorkspaceSnapshot, 0, len(workspaceIDs))
+	sort.Strings(workspaceIDs)
 
 	for _, wsID := range workspaceIDs {
 		wsDir := workspace.WorkspaceDir(rootDir, wsID)
@@ -81,26 +79,28 @@ func Build(ctx context.Context, rootDir string) (manifest.File, []error, error) 
 			}
 		}
 
-		repoEntries := make([]coreimportplan.RepoSnapshot, 0, len(repos))
+		repoEntries := make([]manifest.Repo, 0, len(repos))
 		for _, repoEntry := range repos {
-			repoEntries = append(repoEntries, coreimportplan.RepoSnapshot{
+			repoEntries = append(repoEntries, manifest.Repo{
 				Alias:   strings.TrimSpace(repoEntry.Alias),
 				RepoKey: strings.TrimSpace(repoEntry.RepoKey),
 				Branch:  strings.TrimSpace(repoEntry.Branch),
+				BaseRef: strings.TrimSpace(meta.BaseBranch),
 			})
 		}
+		sort.Slice(repoEntries, func(i, j int) bool {
+			return repoEntries[i].Alias < repoEntries[j].Alias
+		})
 
-		snapshots = append(snapshots, coreimportplan.WorkspaceSnapshot{
-			ID:          wsID,
+		wsEntry := manifest.Workspace{
 			Description: strings.TrimSpace(meta.Description),
 			Mode:        strings.TrimSpace(meta.Mode),
 			PresetName:  strings.TrimSpace(meta.PresetName),
 			SourceURL:   strings.TrimSpace(meta.SourceURL),
-			BaseBranch:  strings.TrimSpace(meta.BaseBranch),
 			Repos:       repoEntries,
-		})
+		}
+		file.Workspaces[wsID] = wsEntry
 	}
-	file.Workspaces = toManifestWorkspaces(coreimportplan.BuildInventory(snapshots).Workspaces)
 
 	return file, warnings, nil
 }
@@ -118,27 +118,4 @@ func Write(rootDir string, file manifest.File, warnings []error) (Result, error)
 
 func Path(rootDir string) string {
 	return manifest.Path(rootDir)
-}
-
-func toManifestWorkspaces(workspaces map[string]coreimportplan.Workspace) map[string]manifest.Workspace {
-	converted := make(map[string]manifest.Workspace, len(workspaces))
-	for id, ws := range workspaces {
-		repos := make([]manifest.Repo, 0, len(ws.Repos))
-		for _, repoEntry := range ws.Repos {
-			repos = append(repos, manifest.Repo{
-				Alias:   repoEntry.Alias,
-				RepoKey: repoEntry.RepoKey,
-				Branch:  repoEntry.Branch,
-				BaseRef: repoEntry.BaseRef,
-			})
-		}
-		converted[id] = manifest.Workspace{
-			Description: ws.Description,
-			Mode:        ws.Mode,
-			PresetName:  ws.PresetName,
-			SourceURL:   ws.SourceURL,
-			Repos:       repos,
-		}
-	}
-	return converted
 }
