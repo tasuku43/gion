@@ -96,6 +96,8 @@ func Run() error {
 		return runImport(ctx, rootDir, args[1:], noPrompt)
 	case "apply":
 		return runApply(ctx, rootDir, args[1:], noPrompt)
+	case "completion":
+		return runCompletion(args[1:])
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}
