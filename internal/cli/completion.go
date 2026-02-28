@@ -238,5 +238,5 @@ _gion() {
   esac
 }
 
-_gion`)
+compdef _gion gion`)
 }
