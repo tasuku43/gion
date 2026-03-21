@@ -167,7 +167,7 @@ func TestRepoMultiSelectRows_ShowSelectionMarker(t *testing.T) {
 	renderRepoMultiSelectChoiceList(&b, []PromptChoice{
 		{Label: "example/repo-a", Value: "a"},
 		{Label: "example/repo-b", Value: "b"},
-	}, 0, 10, map[string]bool{"b": true}, false, DefaultTheme())
+	}, 0, 10, map[string]bool{"b": true}, false, false, DefaultTheme())
 
 	out := b.String()
 	if !strings.Contains(out, "○ example/repo-a") || !strings.Contains(out, "● example/repo-b") {
@@ -180,7 +180,7 @@ func TestWorkspaceMultiSelectRows_ShowSelectionMarker(t *testing.T) {
 	renderWorkspaceMultiSelectChoiceList(&b, []WorkspaceChoice{
 		{ID: "WS-1", Description: "first"},
 		{ID: "WS-2", Description: "second"},
-	}, 0, 10, map[string]bool{"WS-2": true}, false, DefaultTheme())
+	}, 0, 10, map[string]bool{"WS-2": true}, false, false, DefaultTheme())
 
 	out := b.String()
 	if !strings.Contains(out, "○ WS-1 - first") || !strings.Contains(out, "● WS-2 - second") {
@@ -206,6 +206,54 @@ func TestMultiSelectModel_SpaceTogglesSelection(t *testing.T) {
 	next = updated.(multiSelectModel)
 	if len(next.selectedValues) != 0 {
 		t.Fatalf("expected second toggle to clear selection, got: %+v", next.selectedValues)
+	}
+}
+
+func TestMultiSelectView_HidesAssistLinesWhileConfirming(t *testing.T) {
+	model := newMultiSelectModel("title", "pull request", []PromptChoice{
+		{Label: "#1", Value: "1"},
+		{Label: "#2", Value: "2"},
+	}, DefaultTheme(), false)
+	model.selectedValues = []string{"1"}
+	model.selected = []PromptChoice{{Label: "#1", Value: "1"}}
+	model.confirming = true
+	model.input.SetValue("s")
+
+	view := model.View()
+	if strings.Contains(view, "filter: s") {
+		t.Fatalf("expected filter assist line to be hidden while confirming, got: %q", view)
+	}
+	if strings.Contains(view, "selected: 1/2") {
+		t.Fatalf("expected footer assist line to be hidden while confirming, got: %q", view)
+	}
+	if !strings.Contains(view, "● #1") || !strings.Contains(view, "○ #2") {
+		t.Fatalf("expected selection markers to remain visible while confirming, got: %q", view)
+	}
+}
+
+func TestMultiSelectModel_EnterStartsConfirmTimer(t *testing.T) {
+	model := newMultiSelectModel("title", "pull request", []PromptChoice{
+		{Label: "#1", Value: "1"},
+	}, DefaultTheme(), false)
+	model.selectedValues = []string{"1"}
+	model.selected = []PromptChoice{{Label: "#1", Value: "1"}}
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next := updated.(multiSelectModel)
+	if !next.confirming {
+		t.Fatalf("expected multi-select to enter confirming state")
+	}
+	if cmd == nil {
+		t.Fatalf("expected confirm timer command")
+	}
+
+	updated, cmd = next.Update(singleSelectConfirmDoneMsg{})
+	next = updated.(multiSelectModel)
+	if !next.done {
+		t.Fatalf("expected confirm completion to finish multi-select")
+	}
+	if cmd == nil {
+		t.Fatalf("expected quit command after confirm completion")
 	}
 }
 
@@ -397,6 +445,46 @@ func TestCreateFlowReviewRepo_ConfirmAdvancesToPRSelection(t *testing.T) {
 	}
 	if cmd != nil {
 		t.Fatalf("expected no quit command after advancing to PR selection")
+	}
+}
+
+func TestCreateFlowReviewPRs_EnterStartsConfirmTimer(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"review",
+		"",
+	)
+	model.stage = createStageReviewPRs
+	model.reviewRepo = "chatwork/terraforms"
+	model.reviewPRModel = newMultiSelectModel("gion manifest add", "pull request", []PromptChoice{
+		{Label: "#1", Value: "1"},
+	}, DefaultTheme(), false)
+	model.reviewPRModel.selectedValues = []string{"1"}
+	model.reviewPRModel.selected = []PromptChoice{{Label: "#1", Value: "1"}}
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next := updated.(createFlowModel)
+	if !next.reviewPRModel.confirming {
+		t.Fatalf("expected review PR selector to enter confirming state")
+	}
+	if cmd == nil {
+		t.Fatalf("expected confirm timer command to propagate from review PR selector")
 	}
 }
 
