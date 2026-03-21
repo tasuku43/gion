@@ -23,6 +23,7 @@ Reconcile the filesystem to match `gion.yaml` by computing a diff, showing a pla
   - For destructive actions, the prompt does not repeat per-repo git status output; users should review the plan output above before confirming.
 - If confirmed, applies actions in a stable order: removes, then updates, then adds.
   - When a repo update is a branch rename only (same repo key, different branch), gion renames the branch in-place (no worktree remove/add) to match common local development workflows.
+- During destructive workspace removal, if the current process cwd is inside `workspaces/<id>/...`, gion must first shift process cwd to `<root>` before any worktree removal starts.
 - When applying `add` actions that require creating a new branch:
   - If the target `branch` already exists in the bare store, gion checks it out when adding the worktree.
   - If the branch does not exist, gion creates it from:

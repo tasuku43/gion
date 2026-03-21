@@ -81,6 +81,89 @@ func TestRepoGetWorkspaceAddRemove(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRemoveShiftsProcessCWDWhenInsideTargetWorkspace(t *testing.T) {
+	t.Setenv("GIT_AUTHOR_NAME", "gion")
+	t.Setenv("GIT_AUTHOR_EMAIL", "gion@example.com")
+	t.Setenv("GIT_COMMITTER_NAME", "gion")
+	t.Setenv("GIT_COMMITTER_EMAIL", "gion@example.com")
+
+	ctx := context.Background()
+	tmp := t.TempDir()
+	rootDir := filepath.Join(tmp, "gion")
+
+	remoteBase := filepath.Join(tmp, "remotes")
+	remotePath := filepath.Join(remoteBase, "org", "repo.git")
+	if err := os.MkdirAll(filepath.Dir(remotePath), 0o755); err != nil {
+		t.Fatalf("mkdir remote: %v", err)
+	}
+	runGit(t, "", "init", "--bare", remotePath)
+
+	seedDir := filepath.Join(tmp, "seed")
+	runGit(t, "", "init", seedDir)
+	runGit(t, seedDir, "checkout", "-b", "main")
+	if err := os.WriteFile(filepath.Join(seedDir, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("write seed file: %v", err)
+	}
+	runGit(t, seedDir, "add", ".")
+	runGit(t, seedDir, "commit", "-m", "init")
+	runGit(t, seedDir, "remote", "add", "origin", remotePath)
+	runGit(t, seedDir, "push", "origin", "main")
+	runGit(t, "", "--git-dir", remotePath, "symbolic-ref", "HEAD", "refs/heads/main")
+
+	configPath := filepath.Join(tmp, "gitconfig")
+	fileURL := "file://" + filepath.ToSlash(remoteBase) + "/"
+	configData := fmt.Sprintf("[url \"%s\"]\n\tinsteadOf = https://example.com/\n", fileURL)
+	if err := os.WriteFile(configPath, []byte(configData), 0o644); err != nil {
+		t.Fatalf("write gitconfig: %v", err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", configPath)
+	t.Setenv("GIT_CONFIG_SYSTEM", "/dev/null")
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_TERMINAL_PROMPT", "0")
+
+	repoSpec := "https://example.com/org/repo.git"
+	if _, err := repo.Get(ctx, rootDir, repoSpec); err != nil {
+		t.Fatalf("repo get: %v", err)
+	}
+	if _, err := workspace.New(ctx, rootDir, "WS-1"); err != nil {
+		t.Fatalf("workspace new: %v", err)
+	}
+	if _, err := workspace.Add(ctx, rootDir, "WS-1", repoSpec, "", true); err != nil {
+		t.Fatalf("workspace add: %v", err)
+	}
+
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origWD) })
+
+	worktreePath := workspace.WorktreePath(rootDir, "WS-1", "repo")
+	if err := os.Chdir(worktreePath); err != nil {
+		t.Fatalf("Chdir(%s) error: %v", worktreePath, err)
+	}
+
+	if err := workspace.Remove(ctx, rootDir, "WS-1"); err != nil {
+		t.Fatalf("workspace remove: %v", err)
+	}
+
+	afterWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() after remove error: %v", err)
+	}
+	afterResolved := afterWD
+	if resolved, err := filepath.EvalSymlinks(afterWD); err == nil {
+		afterResolved = resolved
+	}
+	rootResolved := rootDir
+	if resolved, err := filepath.EvalSymlinks(rootDir); err == nil {
+		rootResolved = resolved
+	}
+	if afterResolved != rootResolved {
+		t.Fatalf("process cwd = %q (resolved=%q), want %q (resolved=%q)", afterWD, afterResolved, rootDir, rootResolved)
+	}
+}
+
 func TestWorkspaceAddSkipsFetchWhenUpToDate(t *testing.T) {
 	t.Setenv("GIT_AUTHOR_NAME", "gion")
 	t.Setenv("GIT_AUTHOR_EMAIL", "gion@example.com")

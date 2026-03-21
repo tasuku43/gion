@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/tasuku43/gion/internal/infra/gitcmd"
 	"github.com/tasuku43/gion/internal/infra/paths"
@@ -34,6 +36,9 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 		return err
 	} else if !exists {
 		return fmt.Errorf("workspace does not exist: %s", wsDir)
+	}
+	if err := shiftCWDToRootIfInsideWorkspace(rootDir, wsDir); err != nil {
+		return err
 	}
 
 	repos, warnings, err := ScanRepos(ctx, wsDir)
@@ -84,4 +89,44 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 	}
 
 	return nil
+}
+
+func shiftCWDToRootIfInsideWorkspace(rootDir, workspaceDir string) error {
+	if strings.TrimSpace(rootDir) == "" || strings.TrimSpace(workspaceDir) == "" {
+		return nil
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working dir: %w", err)
+	}
+	if !pathInside(workspaceDir, cwd) {
+		return nil
+	}
+	if err := os.Chdir(rootDir); err != nil {
+		return fmt.Errorf("shift process cwd to root: %w", err)
+	}
+	return nil
+}
+
+func pathInside(base, target string) bool {
+	if strings.TrimSpace(base) == "" || strings.TrimSpace(target) == "" {
+		return false
+	}
+	basePath := filepath.Clean(base)
+	targetPath := filepath.Clean(target)
+	if resolved, err := filepath.EvalSymlinks(basePath); err == nil {
+		basePath = filepath.Clean(resolved)
+	}
+	if resolved, err := filepath.EvalSymlinks(targetPath); err == nil {
+		targetPath = filepath.Clean(resolved)
+	}
+	rel, err := filepath.Rel(basePath, targetPath)
+	if err != nil {
+		return false
+	}
+	rel = filepath.Clean(rel)
+	if rel == "." {
+		return true
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
