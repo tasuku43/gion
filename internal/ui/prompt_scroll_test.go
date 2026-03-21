@@ -275,6 +275,74 @@ func TestWorkspaceSelectModel_SpaceSelectsCurrent(t *testing.T) {
 	}
 }
 
+func TestCreateFlowModeView_ShowsSingleSelectAssistLines(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"",
+		"",
+	)
+	model.modeInput.SetValue("s")
+	model.filtered = model.filterModes()
+
+	view := model.View()
+	if !strings.Contains(view, "filter: s") {
+		t.Fatalf("expected filter assist line, got: %q", view)
+	}
+	if !strings.Contains(view, "space/enter select") {
+		t.Fatalf("expected single-select hint line, got: %q", view)
+	}
+	if !strings.Contains(view, "○ issue") {
+		t.Fatalf("expected single-select row markers, got: %q", view)
+	}
+}
+
+func TestCreateFlowMode_SpaceSelectsCurrentMode(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		[]PromptChoice{{Label: "repo-1", Value: "repo-1"}},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"",
+		"",
+	)
+	model.cursor = 2
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	next := updated.(createFlowModel)
+	if next.stage != createStageReviewRepo {
+		t.Fatalf("expected space to move to review repo stage, got %v", next.stage)
+	}
+}
+
 func TestStableLayout_TruncatesLinesWithDots(t *testing.T) {
 	setWrapWidth(20)
 	defer setWrapWidth(0)

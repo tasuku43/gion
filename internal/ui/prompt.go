@@ -341,6 +341,95 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
+		case tea.KeySpace:
+			if m.stage == createStageMode {
+				if len(m.filtered) == 0 {
+					return m, nil
+				}
+				m.mode = m.filtered[m.cursor].Value
+				switch m.mode {
+				case "preset":
+					if m.tmplErr != nil {
+						m.err = m.tmplErr
+						return m, tea.Quit
+					}
+					m.stage = createStagePreset
+					m.presetModel = newInputsModel(m.title, m.presets, "", "", m.theme, m.useColor)
+				case "review":
+					if len(m.reviewRepos) == 0 {
+						m.err = fmt.Errorf("no GitHub repos found")
+						return m, tea.Quit
+					}
+					m.stage = createStageReviewRepo
+					m.reviewRepoModel = newChoiceSelectModel(m.title, "repo", m.reviewRepos, m.theme, m.useColor)
+				case "issue":
+					if len(m.issueRepos) == 0 {
+						m.err = fmt.Errorf("no repos with supported hosts found")
+						return m, tea.Quit
+					}
+					m.stage = createStageIssueRepo
+					m.issueRepoModel = newChoiceSelectModel(m.title, "repo", m.issueRepos, m.theme, m.useColor)
+				case "repo":
+					if m.repoErr != nil {
+						m.err = m.repoErr
+						return m, tea.Quit
+					}
+					if len(m.repoChoices) == 0 {
+						m.err = fmt.Errorf("no repos found")
+						return m, tea.Quit
+					}
+					m.stage = createStageRepoSelect
+					m.repoSelectModel = newChoiceSelectModel(m.title, "repo", m.repoChoices, m.theme, m.useColor)
+				default:
+					m.err = fmt.Errorf("unknown mode: %s", m.mode)
+					return m, tea.Quit
+				}
+				return m, nil
+			}
+		}
+		if m.stage == createStageMode && msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			m.mode = m.filtered[m.cursor].Value
+			switch m.mode {
+			case "preset":
+				if m.tmplErr != nil {
+					m.err = m.tmplErr
+					return m, tea.Quit
+				}
+				m.stage = createStagePreset
+				m.presetModel = newInputsModel(m.title, m.presets, "", "", m.theme, m.useColor)
+			case "review":
+				if len(m.reviewRepos) == 0 {
+					m.err = fmt.Errorf("no GitHub repos found")
+					return m, tea.Quit
+				}
+				m.stage = createStageReviewRepo
+				m.reviewRepoModel = newChoiceSelectModel(m.title, "repo", m.reviewRepos, m.theme, m.useColor)
+			case "issue":
+				if len(m.issueRepos) == 0 {
+					m.err = fmt.Errorf("no repos with supported hosts found")
+					return m, tea.Quit
+				}
+				m.stage = createStageIssueRepo
+				m.issueRepoModel = newChoiceSelectModel(m.title, "repo", m.issueRepos, m.theme, m.useColor)
+			case "repo":
+				if m.repoErr != nil {
+					m.err = m.repoErr
+					return m, tea.Quit
+				}
+				if len(m.repoChoices) == 0 {
+					m.err = fmt.Errorf("no repos found")
+					return m, tea.Quit
+				}
+				m.stage = createStageRepoSelect
+				m.repoSelectModel = newChoiceSelectModel(m.title, "repo", m.repoChoices, m.theme, m.useColor)
+			default:
+				m.err = fmt.Errorf("unknown mode: %s", m.mode)
+				return m, tea.Quit
+			}
+			return m, nil
 		}
 	}
 
@@ -593,11 +682,13 @@ func (m createFlowModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "mode")
 	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.modeInput.View()))
-	maxLines := listMaxLines(m.height, 1, 0)
+	assistLines := singleSelectAssistLines("select", m.modeInput.Value(), m.theme, m.useColor)
+	maxLines := listMaxLines(m.height, 1+len(assistLines), 0)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderRepoChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
+		renderRepoMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, nil, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	frame.AppendInputsRaw(assistLines...)
 	return frame.Render()
 }
 
