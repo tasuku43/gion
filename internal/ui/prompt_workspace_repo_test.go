@@ -1,6 +1,11 @@
 package ui
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/charmbracelet/x/ansi"
+)
 
 func TestWorkspaceRepoFilter_RepoMatchKeepsParent(t *testing.T) {
 	workspaces := []WorkspaceChoice{
@@ -143,5 +148,29 @@ func TestWorkspaceRepoBestSelectionPrefersRepoMatch(t *testing.T) {
 	}
 	if model.selections[best].RepoIndex < 0 {
 		t.Fatalf("expected repo selection, got workspace selection")
+	}
+}
+
+func TestWorkspaceRepoView_ShowsFocusMarkerOnSelectedRepo(t *testing.T) {
+	var b strings.Builder
+	renderWorkspaceRepoChoiceList(&b, []WorkspaceChoice{
+		{
+			ID: "gion",
+			Repos: []PromptChoice{
+				{
+					Label:   "gion (branch: feature/test)",
+					Value:   "/ws/gion/gion",
+					Details: []string{"repo: github.com/tasuku43/gion"},
+				},
+			},
+		},
+	}, 1, 20, true, DefaultTheme())
+
+	out := ansi.Strip(b.String())
+	if !strings.Contains(out, ">") {
+		t.Fatalf("expected focused row marker in output, got: %q", out)
+	}
+	if !strings.Contains(out, ">     └─ gion (branch: feature/test)") {
+		t.Fatalf("expected focused repo row marker, got: %q", out)
 	}
 }

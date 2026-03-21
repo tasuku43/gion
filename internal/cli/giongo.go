@@ -230,9 +230,6 @@ func buildGiongoWorkspaceChoices(ctx context.Context, entries []workspace.Entry)
 			} else if strings.TrimSpace(repoEntry.RepoSpec) != "" {
 				details = append(details, fmt.Sprintf("repo: %s", strings.TrimSpace(repoEntry.RepoSpec)))
 			}
-			if strings.TrimSpace(repoEntry.Branch) != "" {
-				details = append(details, fmt.Sprintf("branch: %s", repoEntry.Branch))
-			}
 			repoChoices = append(repoChoices, ui.PromptChoice{
 				Label:       label,
 				Value:       repoEntry.WorktreePath,

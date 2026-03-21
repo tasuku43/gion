@@ -3627,7 +3627,7 @@ func buildWorkspaceRepoChoiceGroups(items []WorkspaceChoice, cursor int, useColo
 
 	baseIndent := output.Indent + output.Indent
 	selectIndent := func(selected bool) string {
-		if !selected || useColor {
+		if !selected {
 			return baseIndent
 		}
 		return ">" + baseIndent[1:]
