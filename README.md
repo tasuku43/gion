@@ -54,6 +54,9 @@ brew install gion
 - Version pinning with mise (optional): `mise use -g github:tasuku43/gion@<version>`
 - Manual install via GitHub Releases (download archive → put `gion` and `giongo` on your PATH)
 - Build from source requires Go 1.24+
+- Shell integration (recommended for safe workspace removal and faster setup):
+  - `eval "$(gion shell init zsh --with-completion)"`
+  - `eval "$(gion shell init bash --with-completion)"`
 
 ### Requirements
 
@@ -134,7 +137,10 @@ Resulting worktree:
 ### 4) Jump into a workspace (interactive)
 
 ```bash
-# Setup (once):
+# Setup (once; shell integration + completion):
+eval "$(gion shell init zsh --with-completion)"
+
+# Optional: keep giongo shortcut too
 eval "$(giongo init)"
 giongo
 ```
@@ -231,6 +237,16 @@ gion manifest add --preset app PROJ-123
 `giongo` is a small companion binary that jumps into a workspace or repo using a picker.  
 It does not change any state.
 
+For `gion` itself, prefer `gion shell init` as the primary shell integration entrypoint:
+
+```bash
+eval "$(gion shell init zsh --with-completion)"
+```
+
+This enables:
+- parent-shell `cd` after successful destructive workspace removal
+- shell completion in the same setup step
+
 Example (zsh function):
 
 ```bash
@@ -253,6 +269,7 @@ eval "$(giongo init)"
 
 Notes:
 - `giongo init` outputs a bash/zsh function definition.
+- `gion shell init` is the primary shell integration path for `gion` commands.
 - For a permanent setup, paste the output into `~/.zshrc` or `~/.bashrc`.
 
 ### Cleanup

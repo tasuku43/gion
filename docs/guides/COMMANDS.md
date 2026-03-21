@@ -36,6 +36,8 @@ gion manifest rm PROJ-123
 - `gion plan` - show the diff between `gion.yaml` and the filesystem (no changes).
 - `gion apply` - reconcile the filesystem to match `gion.yaml` (prompts before destructive changes).
 - `gion import` - rebuild `gion.yaml` from the filesystem (when the filesystem is the source of truth).
+- `gion shell init [shell] [--with-completion]` - print shell integration code for parent-shell side effects.
+- `gion shell completion [shell]` - print shell completion script.
 - `gion doctor [--fix | --self]` - check workspace/repo health.
 - `gion version` - print version.
 - `gion help [command]` - show help (examples: `gion help manifest`, `gion help repo`).

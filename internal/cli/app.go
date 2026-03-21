@@ -98,6 +98,8 @@ func Run() error {
 		return runApply(ctx, rootDir, args[1:], noPrompt)
 	case "completion":
 		return runCompletion(args[1:])
+	case "shell":
+		return runShell(args[1:])
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}

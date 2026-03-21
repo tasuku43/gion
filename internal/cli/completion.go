@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 const SupportedShells = "bash, zsh"
@@ -25,34 +26,32 @@ func runCompletion(args []string) error {
 	}
 }
 
+func renderShellCompletionScript(shell string) (string, error) {
+	var buf stringWriter
+	switch shell {
+	case "bash":
+		printBashCompletion(&buf)
+	case "zsh":
+		printZshCompletion(&buf)
+	default:
+		return "", fmt.Errorf("unsupported shell: %s (supported: %s)", shell, SupportedShells)
+	}
+	return buf.String(), nil
+}
+
 func printBashCompletion(w io.Writer) {
 	fmt.Fprintln(w, `# gion bash completion
-__gion_run() {
-  local action_file
-  action_file="$(mktemp "${TMPDIR:-/tmp}/gion-shell-action.XXXXXX")" || return $?
-  GION_SHELL_ACTION_FILE="$action_file" command gion "$@"
-  local status=$?
-  if [[ $status -eq 0 && -s "$action_file" ]]; then
-    source "$action_file"
-  fi
-  rm -f "$action_file"
-  return $status
-}
-
-gion() {
-  __gion_run "$@"
-}
-
 _gion_completion() {
   local cur prev words cword
   _init_completion || return
 
-  local commands="init doctor repo manifest plan import apply version help completion"
+  local commands="init doctor repo manifest plan import apply shell version help completion"
   local manifest_subcmds="ls add rm gc validate preset"
   local manifest_aliases="man m"
   local preset_subcmds="ls add rm validate"
   local preset_aliases="pre p"
   local repo_subcmds="get ls rm"
+  local shell_subcmds="init completion"
 
   if [[ ${cword} -eq 1 ]]; then
     COMPREPLY=($(compgen -W "${commands} ${manifest_aliases}" -- "${cur}"))
@@ -112,6 +111,22 @@ _gion_completion() {
       COMPREPLY=($(compgen -W "--fix --self" -- "${cur}"))
       return
     ;;
+    shell)
+      if [[ ${cword} -eq 2 ]]; then
+        COMPREPLY=($(compgen -W "${shell_subcmds}" -- "${cur}"))
+        return
+      fi
+      case ${words[2]} in
+        init)
+          COMPREPLY=($(compgen -W "--with-completion bash zsh" -- "${cur}"))
+          return
+        ;;
+        completion)
+          COMPREPLY=($(compgen -W "bash zsh" -- "${cur}"))
+          return
+        ;;
+      esac
+    ;;
     completion)
       if [[ ${cword} -eq 2 ]]; then
         COMPREPLY=($(compgen -W "bash zsh" -- "${cur}"))
@@ -131,18 +146,6 @@ complete -F _gion_completion gion`)
 func printZshCompletion(w io.Writer) {
 	fmt.Fprintln(w, `#compdef gion
 
-gion() {
-  local action_file
-  action_file="$(mktemp "${TMPDIR:-/tmp}/gion-shell-action.XXXXXX")" || return $?
-  GION_SHELL_ACTION_FILE="$action_file" command gion "$@"
-  local status=$?
-  if [[ $status -eq 0 && -s "$action_file" ]]; then
-    source "$action_file"
-  fi
-  rm -f "$action_file"
-  return $status
-}
-
 _gion() {
   local -a commands
   commands=(
@@ -153,6 +156,7 @@ _gion() {
     'plan:show manifest diff'
     'import:rebuild manifest from filesystem'
     'apply:apply manifest to filesystem'
+    'shell:shell integration commands'
     'version:print version'
     'help:show help'
     'completion:generate shell completion'
@@ -165,6 +169,12 @@ _gion() {
     'get:fetch or update bare repo store'
     'ls:list known bare repo stores'
     'rm:remove bare repo stores'
+  )
+
+  local -a shell_subcmds
+  shell_subcmds=(
+    'init:print shell integration script'
+    'completion:print shell completion script'
   )
 
   local -a manifest_subcmds
@@ -258,6 +268,19 @@ _gion() {
         doctor)
           _arguments '--fix[list issues and planned fixes]' '--self[run self-diagnostics]'
         ;;
+        shell)
+          case ${words[2]} in
+            init)
+              _arguments '--with-completion[append shell completion]' '1:shell:(bash zsh)'
+            ;;
+            completion)
+              _arguments '1:shell:(bash zsh)'
+            ;;
+            *)
+              _describe 'shell subcommand' shell_subcmds
+            ;;
+          esac
+        ;;
         completion)
           _values 'shell' bash zsh
         ;;
@@ -267,4 +290,16 @@ _gion() {
 }
 
 compdef _gion gion`)
+}
+
+type stringWriter struct {
+	b strings.Builder
+}
+
+func (w *stringWriter) Write(p []byte) (int, error) {
+	return w.b.Write(p)
+}
+
+func (w *stringWriter) String() string {
+	return w.b.String()
 }

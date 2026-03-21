@@ -24,7 +24,7 @@ Reconcile the filesystem to match `gion.yaml` by computing a diff, showing a pla
 - If confirmed, applies actions in a stable order: removes, then updates, then adds.
   - When a repo update is a branch rename only (same repo key, different branch), gion renames the branch in-place (no worktree remove/add) to match common local development workflows.
 - During destructive workspace removal, if the current process cwd is inside `workspaces/<id>/...`, gion must first shift process cwd to `<root>` before any worktree removal starts.
-  - When shell integration from `gion completion bash|zsh` is active, successful workspace removal must emit a shell action that changes the parent shell cwd to `<root>`.
+  - When shell integration from `gion shell init` is active, successful workspace removal must emit a shell action that changes the parent shell cwd to `<root>`.
   - On failure, gion must not emit a shell action.
 - When applying `add` actions that require creating a new branch:
   - If the target `branch` already exists in the bare store, gion checks it out when adding the worktree.

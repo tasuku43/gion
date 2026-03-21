@@ -31,6 +31,7 @@ func printGlobalHelp(w io.Writer) {
 	fmt.Fprintln(w, helpCommand(theme, useColor, "import", fmt.Sprintf("rebuild %s from filesystem", manifest.FileName)))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "apply", fmt.Sprintf("apply %s to filesystem", manifest.FileName)))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "repo <subcommand>", "repo commands (get/ls/rm)"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "shell <subcommand>", "shell integration commands"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "doctor [--fix | --self]", "check workspace/repo health"))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "completion [shell]", fmt.Sprintf("generate shell completion (%s)", SupportedShells)))
 	fmt.Fprintln(w, helpCommand(theme, useColor, "version", "print version"))
@@ -62,6 +63,8 @@ func printCommandHelp(cmd string, w io.Writer) bool {
 		printInitHelp(w)
 	case "completion":
 		printCompletionHelp(w)
+	case "shell":
+		printShellHelp(w)
 	case "version":
 		printVersion(w)
 	default:
@@ -216,11 +219,25 @@ func printCompletionHelp(w io.Writer) {
 	fmt.Fprintln(w, helpFlag(theme, useColor, "zsh", "generate zsh completion"))
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Usage:"))
-	fmt.Fprintln(w, "  # bash - add to ~/.bashrc")
-	fmt.Fprintln(w, "  eval \"$(gion completion bash)\"")
+	fmt.Fprintln(w, "  source <(gion completion bash)")
 	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, "  # zsh - add to ~/.zshrc")
-	fmt.Fprintln(w, "  eval \"$(gion completion zsh)\"")
+	fmt.Fprintln(w, "  source <(gion completion zsh)")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Shell integration is handled separately by `gion shell init`.")
+}
+
+func printShellHelp(w io.Writer) {
+	theme, useColor := helpTheme(w)
+	fmt.Fprintln(w, "Usage: gion shell <subcommand>")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Subcommands:"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "init [shell] [--with-completion]", "print shell integration script"))
+	fmt.Fprintln(w, helpCommand(theme, useColor, "completion [shell]", fmt.Sprintf("print shell completion script (%s)", SupportedShells)))
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, helpSectionTitle(theme, useColor, "Usage:"))
+	fmt.Fprintln(w, "  eval \"$(gion shell init zsh)\"")
+	fmt.Fprintln(w, "  eval \"$(gion shell init zsh --with-completion)\"")
+	fmt.Fprintln(w, "  source <(gion shell completion zsh)")
 }
 
 func printImportHelp(w io.Writer) {
