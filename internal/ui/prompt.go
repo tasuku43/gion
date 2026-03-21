@@ -575,8 +575,10 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m createFlowModel) View() string {
+	modeLabel := promptLabel(m.theme, m.useColor, "mode")
+	modeLine := renderPromptValueLine(modeLabel, m.mode)
 	if m.stage == createStagePreset {
-		return m.presetModel.View()
+		return m.presetModel.ViewWithHeader(modeLine)
 	}
 	if m.stage == createStagePresetDesc {
 		frame := NewFrame(m.theme, m.useColor)
@@ -584,6 +586,7 @@ func (m createFlowModel) View() string {
 		labelWorkspace := promptLabel(m.theme, m.useColor, "workspace id")
 		labelDesc := promptLabel(m.theme, m.useColor, "description")
 		frame.SetInputsPrompt(
+			modeLine,
 			fmt.Sprintf("%s: %s", labelSelection, m.selectionValue()),
 			fmt.Sprintf("%s: %s", labelWorkspace, m.workspaceID()),
 			fmt.Sprintf("%s: %s", labelDesc, m.descInput.View()),
@@ -595,6 +598,7 @@ func (m createFlowModel) View() string {
 		labelWorkspace := promptLabel(m.theme, m.useColor, "workspace id")
 		labelDesc := promptLabel(m.theme, m.useColor, "description")
 		lines := []string{
+			modeLine,
 			fmt.Sprintf("%s: %s", labelSelection, m.selectionValue()),
 			fmt.Sprintf("%s: %s", labelWorkspace, m.workspaceID()),
 		}
@@ -604,19 +608,19 @@ func (m createFlowModel) View() string {
 		return m.branchModel.ViewWithHeader(lines...)
 	}
 	if m.stage == createStageReviewRepo {
-		return m.reviewRepoModel.View()
+		return m.reviewRepoModel.ViewWithHeader(modeLine)
 	}
 	if m.stage == createStageReviewPRs {
 		labelRepo := promptLabel(m.theme, m.useColor, "repo")
-		return renderMultiSelectFrame(m.reviewPRModel, m.reviewPRModel.height, fmt.Sprintf("%s: %s", labelRepo, m.reviewRepo))
+		return renderMultiSelectFrame(m.reviewPRModel, m.reviewPRModel.height, modeLine, fmt.Sprintf("%s: %s", labelRepo, m.reviewRepo))
 	}
 	if m.stage == createStageIssueRepo {
-		return m.issueRepoModel.View()
+		return m.issueRepoModel.ViewWithHeader(modeLine)
 	}
 	if m.stage == createStageIssueIssues {
 		labelRepo := promptLabel(m.theme, m.useColor, "repo")
 		if m.issueIssueModel.stage == issueBranchStageEdit {
-			return m.issueIssueModel.branchModel.ViewWithHeader(fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
+			return m.issueIssueModel.branchModel.ViewWithHeader(modeLine, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
 		}
 		return renderMultiSelectFrame(multiSelectModel{
 			title:     m.issueIssueModel.title,
@@ -630,18 +634,17 @@ func (m createFlowModel) View() string {
 			useColor:  m.issueIssueModel.useColor,
 			input:     m.issueIssueModel.input,
 			height:    m.issueIssueModel.height,
-		}, m.issueIssueModel.height, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
+		}, m.issueIssueModel.height, modeLine, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
 	}
 	if m.stage == createStageRepoSelect {
-		return m.repoSelectModel.View()
+		return m.repoSelectModel.ViewWithHeader(modeLine)
 	}
 	if m.stage == createStageRepoWorkspace {
-		return m.presetModel.View()
+		return m.presetModel.ViewWithHeader(modeLine)
 	}
 
 	frame := NewFrame(m.theme, m.useColor)
-	label := promptLabel(m.theme, m.useColor, "mode")
-	frame.SetInputsPrompt(renderPromptValueLine(label, m.pendingMode))
+	frame.SetInputsPrompt(renderPromptValueLine(modeLabel, m.pendingMode))
 	assistLines := []string(nil)
 	if !m.confirming {
 		assistLines = singleSelectAssistLines("select", m.modeInput.Value(), m.theme, m.useColor)
@@ -821,13 +824,17 @@ func (m inputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m inputsModel) View() string {
+	return m.ViewWithHeader()
+}
+
+func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := strings.TrimSpace(m.label)
 	if label == "" {
 		label = "preset"
 	}
 	labelPreset := promptLabel(m.theme, m.useColor, label)
-	var promptLines []string
+	promptLines := append([]string(nil), headerLines...)
 	if m.stage == stagePreset {
 		promptLines = append(promptLines, fmt.Sprintf("%s: %s", labelPreset, m.search.View()))
 	} else {
@@ -1533,9 +1540,15 @@ func (m choiceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m choiceSelectModel) View() string {
+	return m.ViewWithHeader()
+}
+
+func (m choiceSelectModel) ViewWithHeader(headerLines ...string) string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, m.label)
-	frame.SetInputsPrompt(renderPromptValueLine(label, m.value))
+	promptLines := append([]string(nil), headerLines...)
+	promptLines = append(promptLines, renderPromptValueLine(label, m.value))
+	frame.SetInputsPrompt(promptLines...)
 
 	infoLines := 0
 	if m.errorLine != "" {
@@ -2585,9 +2598,15 @@ func (m workspaceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m workspaceSelectModel) View() string {
+	return m.ViewWithHeader()
+}
+
+func (m workspaceSelectModel) ViewWithHeader(headerLines ...string) string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace id")
-	frame.SetInputsPrompt(renderPromptValueLine(label, m.workspaceID))
+	promptLines := append([]string(nil), headerLines...)
+	promptLines = append(promptLines, renderPromptValueLine(label, m.workspaceID))
+	frame.SetInputsPrompt(promptLines...)
 	var blockedLines []string
 	infoLines := 0
 	if len(m.blocked) > 0 {

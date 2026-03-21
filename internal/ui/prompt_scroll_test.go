@@ -361,6 +361,9 @@ func TestCreateFlowModeView_ShowsSingleSelectAssistLines(t *testing.T) {
 	model.filtered = model.filterModes()
 
 	view := model.View()
+	if !strings.Contains(view, "• mode:") {
+		t.Fatalf("expected mode header line, got: %q", view)
+	}
 	if !strings.Contains(view, "filter: s") {
 		t.Fatalf("expected filter assist line, got: %q", view)
 	}
@@ -369,6 +372,103 @@ func TestCreateFlowModeView_ShowsSingleSelectAssistLines(t *testing.T) {
 	}
 	if !strings.Contains(view, "○ issue") {
 		t.Fatalf("expected single-select row markers, got: %q", view)
+	}
+}
+
+func TestCreateFlowRepoSelectView_ShowsAccumulatedModeHeader(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		[]PromptChoice{{Label: "example/repo-a", Value: "a"}},
+		nil,
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"repo",
+		"",
+	)
+
+	view := model.View()
+	if !strings.Contains(view, "• mode: repo") {
+		t.Fatalf("repo selection should show accumulated mode header, got: %q", view)
+	}
+	if !strings.Contains(view, "• repo:") {
+		t.Fatalf("repo selection should keep repo header line, got: %q", view)
+	}
+}
+
+func TestCreateFlowReviewRepoView_ShowsAccumulatedModeHeader(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		[]PromptChoice{{Label: "chatwork/terraforms", Value: "chatwork/terraforms"}},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"review",
+		"",
+	)
+
+	view := model.View()
+	if !strings.Contains(view, "• mode: review") {
+		t.Fatalf("review repo selection should show accumulated mode header, got: %q", view)
+	}
+	if !strings.Contains(view, "• repo:") {
+		t.Fatalf("review repo selection should keep repo header line, got: %q", view)
+	}
+}
+
+func TestCreateFlowReviewPRsView_ShowsAccumulatedHeaders(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"review",
+		"",
+	)
+	model.stage = createStageReviewPRs
+	model.mode = "review"
+	model.reviewRepo = "chatwork/terraforms"
+	model.reviewPRModel = newMultiSelectModel("gion manifest add", "pull request", []PromptChoice{{Label: "#1", Value: "1"}}, DefaultTheme(), false)
+
+	view := model.View()
+	if !strings.Contains(view, "• mode: review") || !strings.Contains(view, "• repo: chatwork/terraforms") {
+		t.Fatalf("review PR selection should show accumulated headers, got: %q", view)
 	}
 }
 
