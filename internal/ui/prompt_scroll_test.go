@@ -209,6 +209,72 @@ func TestMultiSelectModel_SpaceTogglesSelection(t *testing.T) {
 	}
 }
 
+func TestChoiceSelectView_ShowsSingleSelectAssistLines(t *testing.T) {
+	model := newChoiceSelectModel("title", "repo", []PromptChoice{
+		{Label: "example/repo-a", Value: "a"},
+		{Label: "example/repo-b", Value: "b"},
+	}, DefaultTheme(), false)
+	model.input.SetValue("repo")
+
+	view := model.View()
+	if !strings.Contains(view, "filter: repo") {
+		t.Fatalf("expected filter assist line, got: %q", view)
+	}
+	if !strings.Contains(view, "space/enter select") {
+		t.Fatalf("expected single-select hint line, got: %q", view)
+	}
+	if strings.Contains(view, "selected:") {
+		t.Fatalf("single-select should not show selected summary, got: %q", view)
+	}
+}
+
+func TestWorkspaceSelectView_ShowsSingleSelectAssistLines(t *testing.T) {
+	model := newWorkspaceSelectModel("title", []WorkspaceChoice{
+		{ID: "WS-1", Description: "first"},
+		{ID: "WS-2", Description: "second"},
+	}, DefaultTheme(), false)
+	model.input.SetValue("WS")
+
+	view := model.View()
+	if !strings.Contains(view, "filter: WS") {
+		t.Fatalf("expected filter assist line, got: %q", view)
+	}
+	if !strings.Contains(view, "space/enter select") {
+		t.Fatalf("expected single-select hint line, got: %q", view)
+	}
+	if strings.Contains(view, "selected:") {
+		t.Fatalf("single-select should not show selected summary, got: %q", view)
+	}
+}
+
+func TestChoiceSelectModel_SpaceSelectsCurrent(t *testing.T) {
+	model := newChoiceSelectModel("title", "repo", []PromptChoice{
+		{Label: "example/repo-a", Value: "a"},
+		{Label: "example/repo-b", Value: "b"},
+	}, DefaultTheme(), false)
+	model.cursor = 1
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	next := updated.(choiceSelectModel)
+	if next.value != "b" || !next.done {
+		t.Fatalf("expected space to select b, got value=%q done=%v", next.value, next.done)
+	}
+}
+
+func TestWorkspaceSelectModel_SpaceSelectsCurrent(t *testing.T) {
+	model := newWorkspaceSelectModel("title", []WorkspaceChoice{
+		{ID: "WS-1", Description: "first"},
+		{ID: "WS-2", Description: "second"},
+	}, DefaultTheme(), false)
+	model.cursor = 1
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	next := updated.(workspaceSelectModel)
+	if next.workspaceID != "WS-2" {
+		t.Fatalf("expected space to select WS-2, got %q", next.workspaceID)
+	}
+}
+
 func TestStableLayout_TruncatesLinesWithDots(t *testing.T) {
 	setWrapWidth(20)
 	defer setWrapWidth(0)

@@ -1429,6 +1429,25 @@ func (m choiceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.value = choice.Value
 			m.done = true
 			return m, tea.Quit
+		case tea.KeySpace:
+			if len(m.filtered) == 0 {
+				m.errorLine = "select a value"
+				return m, nil
+			}
+			choice := m.filtered[m.cursor]
+			m.value = choice.Value
+			m.done = true
+			return m, tea.Quit
+		}
+		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				m.errorLine = "select a value"
+				return m, nil
+			}
+			choice := m.filtered[m.cursor]
+			m.value = choice.Value
+			m.done = true
+			return m, tea.Quit
 		}
 	}
 
@@ -1453,11 +1472,13 @@ func (m choiceSelectModel) View() string {
 	if m.errorLine != "" {
 		infoLines = 1
 	}
-	maxLines := listMaxLines(m.height, 1, infoLines)
+	assistLines := singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
+	maxLines := listMaxLines(m.height, 1+len(assistLines), infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderRepoChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
+		renderRepoMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, nil, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	frame.AppendInputsRaw(assistLines...)
 
 	if m.errorLine != "" {
 		msg := m.errorLine
@@ -2433,6 +2454,19 @@ func (m workspaceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.workspaceID = m.filtered[m.cursor].ID
 			return m, tea.Quit
+		case tea.KeySpace:
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			m.workspaceID = m.filtered[m.cursor].ID
+			return m, tea.Quit
+		}
+		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			m.workspaceID = m.filtered[m.cursor].ID
+			return m, tea.Quit
 		}
 	}
 
@@ -2457,11 +2491,13 @@ func (m workspaceSelectModel) View() string {
 		})
 		infoLines = 1 + len(blockedLines)
 	}
-	maxLines := listMaxLines(m.height, 1, infoLines)
+	assistLines := singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
+	maxLines := listMaxLines(m.height, 1+len(assistLines), infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderWorkspaceChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
+		renderWorkspaceMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, nil, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	frame.AppendInputsRaw(assistLines...)
 	if len(m.blocked) > 0 {
 		frame.SetInfo("blocked workspaces")
 		frame.AppendInfoRaw(blockedLines...)
@@ -3026,6 +3062,13 @@ func multiSelectAssistLines(selected []string, total int, action string, filterV
 	}
 }
 
+func singleSelectAssistLines(action string, filterValue string, theme Theme, useColor bool) []string {
+	return []string{
+		renderMultiSelectFilterLine(filterValue, theme, useColor),
+		renderSingleSelectFooterLine(action, theme, useColor),
+	}
+}
+
 func renderMultiSelectFilterLine(filterValue string, theme Theme, useColor bool) string {
 	body := strings.TrimSpace(filterValue)
 	line := fmt.Sprintf("%sfilter: %s", output.Indent, body)
@@ -3043,6 +3086,17 @@ func renderMultiSelectFooterLine(selectedCount int, total int, action string, th
 		action = "apply"
 	}
 	line := fmt.Sprintf("%sselected: %d/%d  ↑↓ move  space toggle  enter %s  type filter  esc cancel", output.Indent, selectedCount, total, action)
+	if useColor {
+		line = theme.Muted.Render(line)
+	}
+	return wrapRawLineToWidth(line, currentWrapWidth())[0]
+}
+
+func renderSingleSelectFooterLine(action string, theme Theme, useColor bool) string {
+	if strings.TrimSpace(action) == "" {
+		action = "select"
+	}
+	line := fmt.Sprintf("%s↑↓ move  space/enter %s  type filter  esc cancel", output.Indent, action)
 	if useColor {
 		line = theme.Muted.Render(line)
 	}
