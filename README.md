@@ -140,8 +140,8 @@ Resulting worktree:
 # Setup (once; shell integration + completion):
 eval "$(gion shell init zsh --with-completion)"
 
-# Optional: keep giongo shortcut too
-eval "$(giongo init)"
+# Optional: if you use giongo for fast navigation
+# eval "$(giongo init)"
 giongo
 ```
 
@@ -261,15 +261,15 @@ giongo() {
 }
 ```
 
-Shortcut (auto-generate the function for your shell):
+Optional shortcut (auto-generate the function for your shell if you use `giongo`):
 
 ```bash
 eval "$(giongo init)"
 ```
 
 Notes:
-- `giongo init` outputs a bash/zsh function definition.
 - `gion shell init` is the primary shell integration path for `gion` commands.
+- `giongo init` is only for the `giongo` jump helper.
 - For a permanent setup, paste the output into `~/.zshrc` or `~/.bashrc`.
 
 ### Cleanup

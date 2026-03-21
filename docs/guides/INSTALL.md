@@ -47,6 +47,8 @@ Verify:
 - `giongo --version`
 
 Shell integration (optional):
+- `eval "$(gion shell init zsh --with-completion)"`
+- `eval "$(gion shell init bash --with-completion)"`
+
+Optional `giongo` helper setup:
 - `eval "$(giongo init)"`
-- `eval "$(gion shell init zsh)"`
-- `eval "$(gion shell init bash)"`
