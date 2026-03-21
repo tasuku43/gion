@@ -144,5 +144,24 @@ gion() {
   fi
   rm -f "$__gion_action_file"
 }
+
+giongo() {
+  if [ "$1" = "init" ] || [ "$1" = "--help" ] || [ "$1" = "-h" ] || [ "$1" = "--version" ] || [ "$1" = "--print" ]; then
+    command giongo "$@"
+    return $?
+  fi
+  local __gion_action_file __gion_status
+  __gion_action_file="$(mktemp "${TMPDIR:-/tmp}/gion-shell-action.XXXXXX")" || return 1
+  GION_SHELL_ACTION_FILE="$__gion_action_file" command giongo "$@"
+  __gion_status=$?
+  if [ $__gion_status -ne 0 ]; then
+    rm -f "$__gion_action_file"
+    return $__gion_status
+  fi
+  if [ -s "$__gion_action_file" ]; then
+    eval "$(cat "$__gion_action_file")"
+  fi
+  rm -f "$__gion_action_file"
+}
 `, shellName, shellName), nil
 }

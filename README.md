@@ -139,9 +139,6 @@ Resulting worktree:
 ```bash
 # Setup (once; shell integration + completion):
 eval "$(gion shell init zsh --with-completion)"
-
-# Optional: if you use giongo for fast navigation
-# eval "$(giongo init)"
 giongo
 ```
 
@@ -246,6 +243,7 @@ eval "$(gion shell init zsh --with-completion)"
 This enables:
 - parent-shell `cd` after successful destructive workspace removal
 - shell completion in the same setup step
+- `giongo` navigation without a separate `giongo init` step
 
 Example (zsh function):
 
@@ -261,15 +259,9 @@ giongo() {
 }
 ```
 
-Optional shortcut (auto-generate the function for your shell if you use `giongo`):
-
-```bash
-eval "$(giongo init)"
-```
-
 Notes:
 - `gion shell init` is the primary shell integration path for `gion` commands.
-- `giongo init` is only for the `giongo` jump helper.
+- `gion shell init` also installs the `giongo` shell wrapper.
 - For a permanent setup, paste the output into `~/.zshrc` or `~/.bashrc`.
 
 ### Cleanup

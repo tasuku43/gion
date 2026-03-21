@@ -15,6 +15,7 @@ import (
 	"github.com/muesli/termenv"
 	"github.com/tasuku43/gion/internal/domain/workspace"
 	"github.com/tasuku43/gion/internal/infra/paths"
+	"github.com/tasuku43/gion/internal/infra/shellaction"
 	"github.com/tasuku43/gion/internal/ui"
 )
 
@@ -98,8 +99,7 @@ func RunGiongo() error {
 		if strings.TrimSpace(selected) == "" {
 			return nil
 		}
-		fmt.Fprintln(os.Stdout, selected)
-		return nil
+		return finalizeGiongoSelection(selected, true)
 	}
 	selected, err := ui.PromptWorkspaceRepoSelectWithOutput("giongo", choices, theme, useColor, out)
 	if err != nil {
@@ -111,10 +111,7 @@ func RunGiongo() error {
 	if strings.TrimSpace(selected) == "" {
 		return nil
 	}
-	if printFlag {
-		fmt.Fprintln(os.Stdout, selected)
-	}
-	return nil
+	return finalizeGiongoSelection(selected, printFlag)
 }
 
 func runGiongoInit(args []string) error {
@@ -179,13 +176,37 @@ func giongoInitScriptFor(rcFile string) string {
 		"    command giongo \"$@\"",
 		"    return $?",
 		"  fi",
-		"  local dest",
-		"  dest=\"$(command giongo --print \"$@\")\" || return $?",
-		"  [[ -n \"$dest\" ]] && cd \"$dest\"",
+		"  local __gion_action_file __gion_status",
+		"  __gion_action_file=\"$(mktemp \"${TMPDIR:-/tmp}/gion-shell-action.XXXXXX\")\" || return 1",
+		"  GION_SHELL_ACTION_FILE=\"$__gion_action_file\" command giongo \"$@\"",
+		"  __gion_status=$?",
+		"  if [ $__gion_status -ne 0 ]; then",
+		"    rm -f \"$__gion_action_file\"",
+		"    return $__gion_status",
+		"  fi",
+		"  if [ -s \"$__gion_action_file\" ]; then",
+		"    eval \"$(cat \"$__gion_action_file\")\"",
+		"  fi",
+		"  rm -f \"$__gion_action_file\"",
 		"}",
 		"",
 	}
 	return strings.Join(lines, "\n")
+}
+
+func finalizeGiongoSelection(selected string, print bool) error {
+	selected = strings.TrimSpace(selected)
+	if selected == "" {
+		return nil
+	}
+	if print {
+		fmt.Fprintln(os.Stdout, selected)
+		return nil
+	}
+	if err := shellaction.EmitCD(selected); err != nil {
+		return err
+	}
+	return nil
 }
 
 func buildGiongoWorkspaceChoices(ctx context.Context, entries []workspace.Entry) ([]ui.WorkspaceChoice, error) {

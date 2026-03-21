@@ -16,8 +16,8 @@ func TestGiongoInitScriptForZsh(t *testing.T) {
 	if !strings.Contains(script, "command giongo \"$@\"") {
 		t.Fatalf("expected init bypass")
 	}
-	if !strings.Contains(script, "command giongo --print") {
-		t.Fatalf("expected --print wrapper")
+	if !strings.Contains(script, "GION_SHELL_ACTION_FILE") {
+		t.Fatalf("expected action-file wrapper")
 	}
 }
 

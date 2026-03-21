@@ -30,6 +30,9 @@ func TestRunShellInit_WithCompletion(t *testing.T) {
 	if !strings.Contains(output, "GION_SHELL_ACTION_FILE") {
 		t.Fatalf("shell init output missing action wrapper: %q", output)
 	}
+	if !strings.Contains(output, "giongo() {") {
+		t.Fatalf("shell init output missing giongo wrapper: %q", output)
+	}
 	if !strings.Contains(output, "#compdef gion") {
 		t.Fatalf("shell init output missing zsh completion: %q", output)
 	}

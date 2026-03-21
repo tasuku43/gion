@@ -72,7 +72,7 @@ Common flags:
 `giongo` is a companion binary for fast navigation. It does not change any state.
 
 - `giongo --print` - select a destination and print its path.
-- `giongo init` - print a shell function for `cd "$(giongo --print ...)"` integration.
+- `giongo init` - legacy helper that prints a shell function for `giongo` integration.
 
 ## Further reading
 
