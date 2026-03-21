@@ -26,6 +26,13 @@ Reconcile the filesystem to match `gion.yaml` by computing a diff, showing a pla
 - During destructive workspace removal, if the current process cwd is inside `workspaces/<id>/...`, gion must first shift process cwd to `<root>` before any worktree removal starts.
   - When shell integration from `gion shell init` is active, successful workspace removal must emit a shell action that changes the parent shell cwd to `<root>`.
   - On failure, gion must not emit a shell action.
+- During destructive workspace removal, gion must persist transient operation state at `<root>/.gion/state/operations/workspace-remove/<workspace-id>.json`.
+  - The state file tracks which repo aliases were already removed and whether the workspace directory is still present.
+  - The state file is operational metadata only; it is not part of the canonical manifest inventory and must not be imported into `gion.yaml`.
+  - On successful workspace removal, gion must delete the state file.
+- Before applying a destructive workspace removal, gion must check for an existing unfinished state file for that workspace.
+  - If one exists, `gion apply` must fail fast before starting any new destructive work for that workspace.
+  - The error must identify the workspace and summarize the partial progress so the user can inspect the unfinished removal state.
 - When applying `add` actions that require creating a new branch:
   - If the target `branch` already exists in the bare store, gion checks it out when adding the worktree.
   - If the branch does not exist, gion creates it from:
@@ -51,3 +58,4 @@ Reconcile the filesystem to match `gion.yaml` by computing a diff, showing a pla
 - Manifest file missing or invalid.
 - Filesystem or git errors while applying actions.
 - `--no-prompt` used with destructive actions.
+- Unfinished workspace removal state already exists at `<root>/.gion/state/operations/workspace-remove/<workspace-id>.json`.

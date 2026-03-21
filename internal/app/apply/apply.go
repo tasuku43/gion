@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -32,6 +33,9 @@ func Apply(ctx context.Context, rootDir string, plan manifestplan.Result, opts O
 	for _, change := range execPlan.WorkspaceRemovals {
 		if change.Kind != manifestplan.WorkspaceRemove {
 			continue
+		}
+		if err := ensureNoIncompleteWorkspaceRemoval(rootDir, change.WorkspaceID); err != nil {
+			return err
 		}
 		logStep(opts.Step, fmt.Sprintf("remove workspace %s", change.WorkspaceID))
 		if err := rm.Remove(ctx, rootDir, change.WorkspaceID, opts.AllowDirty); err != nil {
@@ -255,6 +259,22 @@ func logStep(step func(text string), text string) {
 		return
 	}
 	step(text)
+}
+
+func ensureNoIncompleteWorkspaceRemoval(rootDir, workspaceID string) error {
+	state, ok, err := workspace.LoadRemoveState(rootDir, workspaceID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	return fmt.Errorf(
+		"workspace removal is incomplete for %s: %s; inspect %s and resolve the partial state before retrying gion apply",
+		workspaceID,
+		state.Summary(),
+		filepath.Join(rootDir, workspace.MetadataDirName, "state", "operations", "workspace-remove", workspaceID+".json"),
+	)
 }
 
 func desiredBaseRef(desired manifest.File, workspaceID, alias string) string {

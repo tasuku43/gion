@@ -17,6 +17,12 @@ type RemoveOptions struct {
 	AllowDirty       bool
 }
 
+var (
+	worktreeRemoveFn    = gitcmd.WorktreeRemove
+	removeWorkspaceFn   = os.RemoveAll
+	deleteRemoveStateFn = DeleteRemoveState
+)
+
 func Remove(ctx context.Context, rootDir, workspaceID string) error {
 	return RemoveWithOptions(ctx, rootDir, workspaceID, RemoveOptions{})
 }
@@ -48,6 +54,10 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 		return err
 	}
 	_ = warnings
+	aliases := make([]string, 0, len(repos))
+	for _, repo := range repos {
+		aliases = append(aliases, repo.Alias)
+	}
 
 	for _, repo := range repos {
 		if repo.WorktreePath == "" {
@@ -68,6 +78,11 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 		}
 	}
 
+	state := NewRemoveState(workspaceID, aliases, true)
+	if err := SaveRemoveState(rootDir, state); err != nil {
+		return err
+	}
+
 	for _, repo := range repos {
 		if repo.StorePath == "" {
 			continue
@@ -81,13 +96,37 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 		} else {
 			gitcmd.Logf("git worktree remove %s", repo.WorktreePath)
 		}
-		if err := gitcmd.WorktreeRemove(ctx, repo.StorePath, repo.WorktreePath, force); err != nil {
+		if err := worktreeRemoveFn(ctx, repo.StorePath, repo.WorktreePath, force); err != nil {
+			state.LastError = fmt.Sprintf("remove worktree %q: %v", repo.Alias, err)
+			state.UpdatedAt = removeStateNow()
+			if saveErr := SaveRemoveState(rootDir, state); saveErr != nil {
+				return fmt.Errorf("remove worktree %q: %w (also failed to save remove state: %v)", repo.Alias, err, saveErr)
+			}
 			return fmt.Errorf("remove worktree %q: %w", repo.Alias, err)
+		}
+		state.RemovedAliases = append(state.RemovedAliases, repo.Alias)
+		state.PendingAliases = removePendingAlias(state.PendingAliases, repo.Alias)
+		state.UpdatedAt = removeStateNow()
+		state.LastError = ""
+		if err := SaveRemoveState(rootDir, state); err != nil {
+			return err
 		}
 	}
 
-	if err := os.RemoveAll(wsDir); err != nil {
+	if err := removeWorkspaceFn(wsDir); err != nil {
+		state.WorkspaceDirPresent = true
+		state.LastError = fmt.Sprintf("remove workspace dir: %v", err)
+		state.UpdatedAt = removeStateNow()
+		if saveErr := SaveRemoveState(rootDir, state); saveErr != nil {
+			return fmt.Errorf("remove workspace dir: %w (also failed to save remove state: %v)", err, saveErr)
+		}
 		return fmt.Errorf("remove workspace dir: %w", err)
+	}
+	state.WorkspaceDirPresent = false
+	state.LastError = ""
+	state.UpdatedAt = removeStateNow()
+	if err := deleteRemoveStateFn(rootDir, workspaceID); err != nil {
+		return err
 	}
 	if shifted {
 		if err := shellaction.EmitCD(rootDir); err != nil {
@@ -136,4 +175,19 @@ func pathInside(base, target string) bool {
 		return true
 	}
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func removePendingAlias(pending []string, alias string) []string {
+	next := make([]string, 0, len(pending))
+	for _, candidate := range pending {
+		if candidate == alias {
+			continue
+		}
+		next = append(next, candidate)
+	}
+	return next
+}
+
+func removeStateNow() string {
+	return removeStateTimestamp()
 }
