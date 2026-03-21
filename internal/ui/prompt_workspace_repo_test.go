@@ -170,7 +170,7 @@ func TestWorkspaceRepoView_ShowsFocusMarkerOnSelectedRepo(t *testing.T) {
 	if !strings.Contains(out, ">") {
 		t.Fatalf("expected focused row marker in output, got: %q", out)
 	}
-	if !strings.Contains(out, ">     └─ gion (branch: feature/test)") {
+	if !strings.Contains(out, "  >   └─ gion (branch: feature/test)") {
 		t.Fatalf("expected focused repo row marker, got: %q", out)
 	}
 }

@@ -3630,7 +3630,7 @@ func buildWorkspaceRepoChoiceGroups(items []WorkspaceChoice, cursor int, useColo
 		if !selected {
 			return baseIndent
 		}
-		return ">" + baseIndent[1:]
+		return output.Indent + "> "
 	}
 
 	cursorWorkspace := -1
