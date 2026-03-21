@@ -98,6 +98,9 @@ func TestMultiSelectView_ShowsAssistLines(t *testing.T) {
 	model.input.SetValue("repo")
 
 	view := model.View()
+	if strings.Contains(view, "• repo: repo") {
+		t.Fatalf("active filter should not be echoed in multi-select header, got: %q", view)
+	}
 	if !strings.Contains(view, "filter: repo") {
 		t.Fatalf("expected filter assist line, got: %q", view)
 	}
@@ -109,6 +112,9 @@ func TestMultiSelectView_ShowsAssistLines(t *testing.T) {
 	}
 	if !strings.Contains(view, "enter apply") {
 		t.Fatalf("expected action hint line, got: %q", view)
+	}
+	if !strings.Contains(view, "\n\n  filter: repo") {
+		t.Fatalf("expected a blank line before filter assist line, got: %q", view)
 	}
 }
 
@@ -122,6 +128,9 @@ func TestWorkspaceMultiSelectView_ShowsAssistLines(t *testing.T) {
 	model.input.SetValue("WS")
 
 	view := model.View()
+	if strings.Contains(view, "• workspace: WS") {
+		t.Fatalf("active filter should not be echoed in workspace multi-select header, got: %q", view)
+	}
 	if !strings.Contains(view, "filter: WS") {
 		t.Fatalf("expected filter assist line, got: %q", view)
 	}
@@ -133,6 +142,9 @@ func TestWorkspaceMultiSelectView_ShowsAssistLines(t *testing.T) {
 	}
 	if !strings.Contains(view, "enter apply") {
 		t.Fatalf("expected apply action hint line, got: %q", view)
+	}
+	if !strings.Contains(view, "\n\n  filter: WS") {
+		t.Fatalf("expected a blank line before filter assist line, got: %q", view)
 	}
 }
 
@@ -277,6 +289,9 @@ func TestChoiceSelectView_ShowsSingleSelectAssistLines(t *testing.T) {
 	if strings.Contains(view, "selected:") {
 		t.Fatalf("single-select should not show selected summary, got: %q", view)
 	}
+	if !strings.Contains(view, "\n\n  filter: repo") {
+		t.Fatalf("expected a blank line before filter assist line, got: %q", view)
+	}
 }
 
 func TestWorkspaceSelectView_ShowsSingleSelectAssistLines(t *testing.T) {
@@ -298,6 +313,9 @@ func TestWorkspaceSelectView_ShowsSingleSelectAssistLines(t *testing.T) {
 	}
 	if strings.Contains(view, "selected:") {
 		t.Fatalf("single-select should not show selected summary, got: %q", view)
+	}
+	if !strings.Contains(view, "\n\n  filter: WS") {
+		t.Fatalf("expected a blank line before filter assist line, got: %q", view)
 	}
 }
 
@@ -372,6 +390,9 @@ func TestCreateFlowModeView_ShowsSingleSelectAssistLines(t *testing.T) {
 	}
 	if !strings.Contains(view, "○ issue") {
 		t.Fatalf("expected single-select row markers, got: %q", view)
+	}
+	if !strings.Contains(view, "\n\n  filter: s") {
+		t.Fatalf("expected a blank line before filter assist line, got: %q", view)
 	}
 }
 

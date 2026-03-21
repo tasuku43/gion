@@ -174,3 +174,32 @@ func TestWorkspaceRepoView_ShowsFocusMarkerOnSelectedRepo(t *testing.T) {
 		t.Fatalf("expected focused repo row marker, got: %q", out)
 	}
 }
+
+func TestWorkspaceRepoView_UsesFilterLineForActiveInput(t *testing.T) {
+	model := newWorkspaceRepoSelectModel("giongo", []WorkspaceChoice{
+		{
+			ID: "gion",
+			Repos: []PromptChoice{
+				{
+					Label:   "gion (branch: feature/test)",
+					Value:   "/ws/gion/gion",
+					Details: []string{"repo: github.com/tasuku43/gion"},
+				},
+			},
+		},
+	}, DefaultTheme(), false)
+	model.input.SetValue("gio")
+	model.filtered = model.filterWorkspaces()
+	model.rebuildSelections()
+
+	view := model.View()
+	if strings.Contains(view, "• workspace: gio") {
+		t.Fatalf("active filter should not be echoed in workspace repo header, got: %q", view)
+	}
+	if !strings.Contains(view, "filter: gio") {
+		t.Fatalf("expected filter assist line, got: %q", view)
+	}
+	if !strings.Contains(view, "\n\n  filter: gio") {
+		t.Fatalf("expected a blank line before filter assist line, got: %q", view)
+	}
+}

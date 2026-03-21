@@ -649,12 +649,17 @@ func (m createFlowModel) View() string {
 	if !m.confirming {
 		assistLines = singleSelectAssistLines("select", m.modeInput.Value(), m.theme, m.useColor)
 	}
-	maxLines := listMaxLines(m.height, 1+len(assistLines), 0)
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+extraAssistGap, 0)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderRepoSingleSelectChoiceList(b, m.filtered, m.cursor, maxLines, m.pendingMode, m.confirming, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
 	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
 		frame.AppendInputsRaw(assistLines...)
 	}
 	return frame.Render()
@@ -1558,12 +1563,17 @@ func (m choiceSelectModel) ViewWithHeader(headerLines ...string) string {
 	if !m.confirming {
 		assistLines = singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
 	}
-	maxLines := listMaxLines(m.height, 1+len(assistLines), infoLines)
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderRepoSingleSelectChoiceList(b, m.filtered, m.cursor, maxLines, m.value, m.confirming, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
 	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
 		frame.AppendInputsRaw(assistLines...)
 	}
 
@@ -1786,7 +1796,7 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	frame := NewFrame(model.theme, model.useColor)
 	lines := append([]string(nil), headerLines...)
 	label := promptLabel(model.theme, model.useColor, model.label)
-	lines = append(lines, fmt.Sprintf("%s: %s", label, model.input.View()))
+	lines = append(lines, renderPromptValueLine(label, ""))
 	frame.SetInputsPrompt(lines...)
 
 	hasError := model.errorLine != ""
@@ -1798,12 +1808,17 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	if !model.confirming {
 		assistLines = multiSelectAssistLines(model.selectedValues, len(model.choices), "apply", model.input.Value(), model.theme, model.useColor)
 	}
-	maxLines := listMaxLines(height, len(lines)+len(assistLines), infoLines)
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(height, len(lines)+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderRepoMultiSelectChoiceList(b, model.filtered, model.cursor, maxLines, selectedChoiceSet(model.selectedValues), model.confirming, model.useColor, model.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
 	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
 		frame.AppendInputsRaw(assistLines...)
 	}
 
@@ -2619,12 +2634,17 @@ func (m workspaceSelectModel) ViewWithHeader(headerLines ...string) string {
 	if !m.confirming {
 		assistLines = singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
 	}
-	maxLines := listMaxLines(m.height, 1+len(assistLines), infoLines)
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceSingleSelectChoiceList(b, m.filtered, m.cursor, maxLines, m.workspaceID, m.confirming, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
 	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
 		frame.AppendInputsRaw(assistLines...)
 	}
 	if len(m.blocked) > 0 {
@@ -2748,12 +2768,15 @@ func (m workspaceRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m workspaceRepoSelectModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
-	maxLines := listMaxLines(m.height, 1, 0)
+	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
+	assistLines := singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+1, 0)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceRepoChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	frame.AppendInputsRaw("")
+	frame.AppendInputsRaw(assistLines...)
 	return frame.Render()
 }
 
@@ -3103,7 +3126,7 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m workspaceMultiSelectModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
 	var blockedLines []string
 	infoLines := 0
 	if m.errorLine != "" {
@@ -3119,12 +3142,17 @@ func (m workspaceMultiSelectModel) View() string {
 	if !m.confirming {
 		assistLines = multiSelectAssistLines(m.selectedIDs, len(m.workspaces), "apply", m.input.Value(), m.theme, m.useColor)
 	}
-	maxLines := listMaxLines(m.height, 1+len(assistLines), infoLines)
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, selectedWorkspaceSet(m.selectedIDs), m.confirming, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
 	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
 		frame.AppendInputsRaw(assistLines...)
 	}
 

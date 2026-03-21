@@ -180,6 +180,10 @@ func (cw *countingWriter) Write(p []byte) (int, error) {
 }
 
 func renderLine(r *Renderer, line frameLine) {
+	if line.kind == lineRaw && line.text == "" {
+		r.LineRaw("")
+		return
+	}
 	if strings.TrimSpace(line.text) == "" {
 		return
 	}
@@ -211,6 +215,10 @@ func copyRawLines(lines []string) []frameLine {
 	var out []frameLine
 	for _, line := range lines {
 		trimmed := strings.TrimRight(line, "\n")
+		if trimmed == "" {
+			out = append(out, frameLine{text: "", kind: lineRaw})
+			continue
+		}
 		if strings.TrimSpace(trimmed) == "" {
 			continue
 		}
