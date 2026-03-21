@@ -9,6 +9,7 @@ import (
 
 	"github.com/tasuku43/gion/internal/infra/gitcmd"
 	"github.com/tasuku43/gion/internal/infra/paths"
+	"github.com/tasuku43/gion/internal/infra/shellaction"
 )
 
 type RemoveOptions struct {
@@ -37,7 +38,8 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 	} else if !exists {
 		return fmt.Errorf("workspace does not exist: %s", wsDir)
 	}
-	if err := shiftCWDToRootIfInsideWorkspace(rootDir, wsDir); err != nil {
+	shifted, err := shiftCWDToRootIfInsideWorkspace(rootDir, wsDir)
+	if err != nil {
 		return err
 	}
 
@@ -87,25 +89,30 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 	if err := os.RemoveAll(wsDir); err != nil {
 		return fmt.Errorf("remove workspace dir: %w", err)
 	}
+	if shifted {
+		if err := shellaction.EmitCD(rootDir); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
-func shiftCWDToRootIfInsideWorkspace(rootDir, workspaceDir string) error {
+func shiftCWDToRootIfInsideWorkspace(rootDir, workspaceDir string) (bool, error) {
 	if strings.TrimSpace(rootDir) == "" || strings.TrimSpace(workspaceDir) == "" {
-		return nil
+		return false, nil
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("get working dir: %w", err)
+		return false, fmt.Errorf("get working dir: %w", err)
 	}
 	if !pathInside(workspaceDir, cwd) {
-		return nil
+		return false, nil
 	}
 	if err := os.Chdir(rootDir); err != nil {
-		return fmt.Errorf("shift process cwd to root: %w", err)
+		return false, fmt.Errorf("shift process cwd to root: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 func pathInside(base, target string) bool {

@@ -14,6 +14,9 @@ func TestPrintBashCompletion(t *testing.T) {
 	if !strings.Contains(output, "_gion_completion") {
 		t.Error("missing _gion_completion function")
 	}
+	if strings.Contains(output, "GION_SHELL_ACTION_FILE") {
+		t.Error("completion should not include shell action wrapper")
+	}
 	if !strings.Contains(output, "complete -F _gion_completion gion") {
 		t.Error("missing complete command")
 	}
@@ -26,6 +29,9 @@ func TestPrintZshCompletion(t *testing.T) {
 
 	if !strings.Contains(output, "#compdef gion") {
 		t.Error("missing #compdef directive")
+	}
+	if strings.Contains(output, "GION_SHELL_ACTION_FILE") {
+		t.Error("completion should not include shell action wrapper")
 	}
 	if !strings.Contains(output, "_gion") {
 		t.Error("missing _gion function")

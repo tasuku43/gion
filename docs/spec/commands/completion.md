@@ -30,7 +30,7 @@ If no shell is specified, defaults to `bash`.
 Add to `~/.bashrc`:
 
 ```bash
-eval "$(gion completion bash)"
+source <(gion completion bash)
 ```
 
 ### zsh
@@ -38,8 +38,10 @@ eval "$(gion completion bash)"
 Add to `~/.zshrc`:
 
 ```zsh
-eval "$(gion completion zsh)"
+source <(gion completion zsh)
 ```
+
+Shell integration is handled separately by `gion shell init`.
 
 ## Completion Coverage
 
