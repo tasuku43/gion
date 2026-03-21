@@ -641,7 +641,7 @@ func (m createFlowModel) View() string {
 
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "mode")
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.modeInput.View()))
+	frame.SetInputsPrompt(renderPromptValueLine(label, m.pendingMode))
 	assistLines := []string(nil)
 	if !m.confirming {
 		assistLines = singleSelectAssistLines("select", m.modeInput.Value(), m.theme, m.useColor)
@@ -1535,7 +1535,7 @@ func (m choiceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m choiceSelectModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, m.label)
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+	frame.SetInputsPrompt(renderPromptValueLine(label, m.value))
 
 	infoLines := 0
 	if m.errorLine != "" {
@@ -2587,7 +2587,7 @@ func (m workspaceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m workspaceSelectModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace id")
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+	frame.SetInputsPrompt(renderPromptValueLine(label, m.workspaceID))
 	var blockedLines []string
 	infoLines := 0
 	if len(m.blocked) > 0 {
@@ -3186,6 +3186,14 @@ func renderMultiSelectFilterLine(filterValue string, theme Theme, useColor bool)
 		line = theme.Muted.Render(output.Indent+"filter: ") + body
 	}
 	return wrapRawLineToWidth(line, currentWrapWidth())[0]
+}
+
+func renderPromptValueLine(label, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Sprintf("%s:", label)
+	}
+	return fmt.Sprintf("%s: %s", label, value)
 }
 
 func renderMultiSelectFooterLine(selectedCount int, total int, action string, theme Theme, useColor bool) string {

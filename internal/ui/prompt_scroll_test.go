@@ -265,6 +265,9 @@ func TestChoiceSelectView_ShowsSingleSelectAssistLines(t *testing.T) {
 	model.input.SetValue("repo")
 
 	view := model.View()
+	if strings.Contains(view, "• repo: repo") {
+		t.Fatalf("active filter should not be echoed in header line, got: %q", view)
+	}
 	if !strings.Contains(view, "filter: repo") {
 		t.Fatalf("expected filter assist line, got: %q", view)
 	}
@@ -284,6 +287,9 @@ func TestWorkspaceSelectView_ShowsSingleSelectAssistLines(t *testing.T) {
 	model.input.SetValue("WS")
 
 	view := model.View()
+	if strings.Contains(view, "• workspace id: WS") {
+		t.Fatalf("active filter should not be echoed in header line, got: %q", view)
+	}
 	if !strings.Contains(view, "filter: WS") {
 		t.Fatalf("expected filter assist line, got: %q", view)
 	}
@@ -579,6 +585,9 @@ func TestCreateFlowModeView_HidesAssistAndMutesOthersWhileConfirming(t *testing.
 	model.cursor = 1
 
 	view := model.View()
+	if !strings.Contains(view, "• mode: issue") {
+		t.Fatalf("confirming mode view should show selected mode in header, got: %q", view)
+	}
 	if strings.Contains(view, "filter:") || strings.Contains(view, "space/enter") {
 		t.Fatalf("confirming mode view should hide assist lines, got: %q", view)
 	}
@@ -587,6 +596,23 @@ func TestCreateFlowModeView_HidesAssistAndMutesOthersWhileConfirming(t *testing.
 	}
 	if !strings.Contains(view, "○ repo - 1 repo only") {
 		t.Fatalf("confirming mode view should keep unselected rows visible, got: %q", view)
+	}
+}
+
+func TestChoiceSelectView_ShowsSelectedValueInHeaderWhileConfirming(t *testing.T) {
+	model := newChoiceSelectModel("title", "repo", []PromptChoice{
+		{Label: "example/repo-a", Value: "a"},
+		{Label: "example/repo-b", Value: "b"},
+	}, DefaultTheme(), false)
+	model.value = "b"
+	model.confirming = true
+
+	view := model.View()
+	if !strings.Contains(view, "• repo: b") {
+		t.Fatalf("confirming single-select should show selected value in header, got: %q", view)
+	}
+	if strings.Contains(view, "filter:") {
+		t.Fatalf("confirming single-select should hide filter line, got: %q", view)
 	}
 }
 
