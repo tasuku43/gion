@@ -12,6 +12,7 @@ import (
 
 	"github.com/tasuku43/gion/internal/domain/repo"
 	"github.com/tasuku43/gion/internal/domain/workspace"
+	"github.com/tasuku43/gion/internal/infra/shellaction"
 )
 
 func TestRepoGetWorkspaceAddRemove(t *testing.T) {
@@ -137,6 +138,8 @@ func TestWorkspaceRemoveShiftsProcessCWDWhenInsideTargetWorkspace(t *testing.T) 
 		t.Fatalf("Getwd() error: %v", err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(origWD) })
+	actionFile := filepath.Join(t.TempDir(), "action.sh")
+	t.Setenv(shellaction.FileEnv, actionFile)
 
 	worktreePath := workspace.WorktreePath(rootDir, "WS-1", "repo")
 	if err := os.Chdir(worktreePath); err != nil {
@@ -161,6 +164,14 @@ func TestWorkspaceRemoveShiftsProcessCWDWhenInsideTargetWorkspace(t *testing.T) 
 	}
 	if afterResolved != rootResolved {
 		t.Fatalf("process cwd = %q (resolved=%q), want %q (resolved=%q)", afterWD, afterResolved, rootDir, rootResolved)
+	}
+	actionData, err := os.ReadFile(actionFile)
+	if err != nil {
+		t.Fatalf("ReadFile(action) error: %v", err)
+	}
+	wantAction := fmt.Sprintf("builtin cd -- '%s'\n", rootDir)
+	if string(actionData) != wantAction {
+		t.Fatalf("shell action = %q, want %q", string(actionData), wantAction)
 	}
 }
 

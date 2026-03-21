@@ -27,6 +27,22 @@ func runCompletion(args []string) error {
 
 func printBashCompletion(w io.Writer) {
 	fmt.Fprintln(w, `# gion bash completion
+__gion_run() {
+  local action_file
+  action_file="$(mktemp "${TMPDIR:-/tmp}/gion-shell-action.XXXXXX")" || return $?
+  GION_SHELL_ACTION_FILE="$action_file" command gion "$@"
+  local status=$?
+  if [[ $status -eq 0 && -s "$action_file" ]]; then
+    source "$action_file"
+  fi
+  rm -f "$action_file"
+  return $status
+}
+
+gion() {
+  __gion_run "$@"
+}
+
 _gion_completion() {
   local cur prev words cword
   _init_completion || return
@@ -114,6 +130,18 @@ complete -F _gion_completion gion`)
 
 func printZshCompletion(w io.Writer) {
 	fmt.Fprintln(w, `#compdef gion
+
+gion() {
+  local action_file
+  action_file="$(mktemp "${TMPDIR:-/tmp}/gion-shell-action.XXXXXX")" || return $?
+  GION_SHELL_ACTION_FILE="$action_file" command gion "$@"
+  local status=$?
+  if [[ $status -eq 0 && -s "$action_file" ]]; then
+    source "$action_file"
+  fi
+  rm -f "$action_file"
+  return $status
+}
 
 _gion() {
   local -a commands

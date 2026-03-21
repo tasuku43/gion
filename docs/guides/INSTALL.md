@@ -48,3 +48,4 @@ Verify:
 
 Shell integration (optional):
 - `eval "$(giongo init)"`
+- `eval "$(gion completion zsh)"` or `eval "$(gion completion bash)"`
