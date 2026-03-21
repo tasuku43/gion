@@ -355,6 +355,87 @@ func TestCreateFlowMode_SpaceSelectsCurrentMode(t *testing.T) {
 	}
 }
 
+func TestCreateFlowReviewRepo_ConfirmAdvancesToPRSelection(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		[]PromptChoice{{Label: "chatwork/terraforms", Value: "chatwork/terraforms"}},
+		nil,
+		func(string) ([]PromptChoice, error) {
+			return []PromptChoice{{Label: "#1", Value: "1"}}, nil
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"review",
+		"",
+	)
+	model.cursor = 0
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next := updated.(createFlowModel)
+	if !next.reviewRepoModel.confirming {
+		t.Fatalf("expected review repo to enter confirming state")
+	}
+	if cmd == nil {
+		t.Fatalf("expected confirm timer command")
+	}
+
+	updated, _ = next.Update(singleSelectConfirmDoneMsg{})
+	next = updated.(createFlowModel)
+	if next.stage != createStageReviewPRs {
+		t.Fatalf("expected confirm to advance to PR selection, got %v", next.stage)
+	}
+}
+
+func TestCreateFlowRepoSelect_ConfirmAdvancesToWorkspaceStep(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		[]PromptChoice{{Label: "chatwork/terraforms", Value: "chatwork/terraforms"}},
+		nil,
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"repo",
+		"",
+	)
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next := updated.(createFlowModel)
+	if !next.repoSelectModel.confirming {
+		t.Fatalf("expected repo select to enter confirming state")
+	}
+	if cmd == nil {
+		t.Fatalf("expected confirm timer command")
+	}
+
+	updated, _ = next.Update(singleSelectConfirmDoneMsg{})
+	next = updated.(createFlowModel)
+	if next.stage != createStageRepoWorkspace {
+		t.Fatalf("expected confirm to advance to repo workspace step, got %v", next.stage)
+	}
+}
+
 func TestChoiceSelectView_HidesAssistAndMutesOthersWhileConfirming(t *testing.T) {
 	model := newChoiceSelectModel("title", "repo", []PromptChoice{
 		{Label: "example/repo-a", Value: "a"},

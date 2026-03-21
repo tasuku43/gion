@@ -349,7 +349,6 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.stage == createStageMode && m.confirming {
 			return m.applySelectedMode()
 		}
-		return m, nil
 	case tea.KeyMsg:
 		if m.stage == createStageMode && m.confirming {
 			return m, nil
@@ -473,7 +472,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.stage == createStageReviewRepo {
-		model, _ := m.reviewRepoModel.Update(msg)
+		model, cmd := m.reviewRepoModel.Update(msg)
 		m.reviewRepoModel = model.(choiceSelectModel)
 		if m.reviewRepoModel.done {
 			m.reviewRepo = m.reviewRepoModel.value
@@ -492,7 +491,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.reviewPRModel = newMultiSelectModel(m.title, "pull request", choices, m.theme, m.useColor)
 			m.stage = createStageReviewPRs
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	if m.stage == createStageReviewPRs {
@@ -506,7 +505,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.stage == createStageIssueRepo {
-		model, _ := m.issueRepoModel.Update(msg)
+		model, cmd := m.issueRepoModel.Update(msg)
 		m.issueRepoModel = model.(choiceSelectModel)
 		if m.issueRepoModel.done {
 			m.issueRepo = m.issueRepoModel.value
@@ -525,7 +524,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.issueIssueModel = newIssueBranchSelectModel(m.title, "issue", choices, m.validateBranch, m.theme, m.useColor)
 			m.stage = createStageIssueIssues
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	if m.stage == createStageIssueIssues {
@@ -539,7 +538,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.stage == createStageRepoSelect {
-		model, _ := m.repoSelectModel.Update(msg)
+		model, cmd := m.repoSelectModel.Update(msg)
 		m.repoSelectModel = model.(choiceSelectModel)
 		if m.repoSelectModel.done {
 			m.repoSelected = m.repoSelectModel.value
@@ -550,7 +549,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.presetModel = newInputsModelWithLabel(m.title, nil, m.repoSelected, m.defaultWorkspaceID, "repo", m.validateWorkspaceID, m.theme, m.useColor)
 			m.stage = createStageRepoWorkspace
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	if m.stage == createStageRepoWorkspace {
