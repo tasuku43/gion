@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/tasuku43/gion/internal/infra/output"
 )
@@ -89,6 +90,7 @@ func TestMultiSelectView_DoesNotExceedHeight(t *testing.T) {
 
 func TestMultiSelectView_ShowsAssistLines(t *testing.T) {
 	model := newMultiSelectModel("title", "repo", []PromptChoice{
+		{Label: "example/repo-a", Value: "a"},
 		{Label: "example/repo-b", Value: "b"},
 	}, DefaultTheme(), false)
 	model.selectedValues = []string{"a"}
@@ -102,13 +104,17 @@ func TestMultiSelectView_ShowsAssistLines(t *testing.T) {
 	if !strings.Contains(view, "selected: 1/2") {
 		t.Fatalf("expected selected summary line, got: %q", view)
 	}
-	if !strings.Contains(view, "enter add") {
+	if !strings.Contains(view, "space toggle") {
+		t.Fatalf("expected toggle hint line, got: %q", view)
+	}
+	if !strings.Contains(view, "enter apply") {
 		t.Fatalf("expected action hint line, got: %q", view)
 	}
 }
 
 func TestWorkspaceMultiSelectView_ShowsAssistLines(t *testing.T) {
 	model := newWorkspaceMultiSelectModel("gion manifest rm", []WorkspaceChoice{
+		{ID: "WS-1", Description: "first"},
 		{ID: "WS-2", Description: "second"},
 	}, nil, DefaultTheme(), false)
 	model.selectedIDs = []string{"WS-1"}
@@ -122,8 +128,11 @@ func TestWorkspaceMultiSelectView_ShowsAssistLines(t *testing.T) {
 	if !strings.Contains(view, "selected: 1/2") {
 		t.Fatalf("expected selected summary line, got: %q", view)
 	}
-	if !strings.Contains(view, "enter remove") {
-		t.Fatalf("expected remove action hint line, got: %q", view)
+	if !strings.Contains(view, "space toggle") {
+		t.Fatalf("expected toggle hint line, got: %q", view)
+	}
+	if !strings.Contains(view, "enter apply") {
+		t.Fatalf("expected apply action hint line, got: %q", view)
 	}
 }
 
@@ -150,6 +159,53 @@ func TestWorkspaceMultiSelectCandidateRows_ShowFocusMarker(t *testing.T) {
 	out := b.String()
 	if !strings.Contains(out, "> └─ WS-1 - first") {
 		t.Fatalf("expected focused workspace row marker, got: %q", out)
+	}
+}
+
+func TestRepoMultiSelectRows_ShowSelectionMarker(t *testing.T) {
+	var b strings.Builder
+	renderRepoMultiSelectChoiceList(&b, []PromptChoice{
+		{Label: "example/repo-a", Value: "a"},
+		{Label: "example/repo-b", Value: "b"},
+	}, 0, 10, map[string]bool{"b": true}, false, DefaultTheme())
+
+	out := b.String()
+	if !strings.Contains(out, "○ example/repo-a") || !strings.Contains(out, "● example/repo-b") {
+		t.Fatalf("expected selection markers, got: %q", out)
+	}
+}
+
+func TestWorkspaceMultiSelectRows_ShowSelectionMarker(t *testing.T) {
+	var b strings.Builder
+	renderWorkspaceMultiSelectChoiceList(&b, []WorkspaceChoice{
+		{ID: "WS-1", Description: "first"},
+		{ID: "WS-2", Description: "second"},
+	}, 0, 10, map[string]bool{"WS-2": true}, false, DefaultTheme())
+
+	out := b.String()
+	if !strings.Contains(out, "○ WS-1 - first") || !strings.Contains(out, "● WS-2 - second") {
+		t.Fatalf("expected selection markers, got: %q", out)
+	}
+}
+
+func TestMultiSelectModel_SpaceTogglesSelection(t *testing.T) {
+	model := newMultiSelectModel("title", "repo", []PromptChoice{
+		{Label: "example/repo-a", Value: "a"},
+		{Label: "example/repo-b", Value: "b"},
+	}, DefaultTheme(), false)
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	next := updated.(multiSelectModel)
+	if len(next.selectedValues) != 1 || next.selectedValues[0] != "a" {
+		t.Fatalf("expected first toggle to select a, got: %+v", next.selectedValues)
+	}
+
+	updated, _ = next.Update(tea.KeyMsg{Type: tea.KeyUp})
+	next = updated.(multiSelectModel)
+	updated, _ = next.Update(tea.KeyMsg{Type: tea.KeySpace})
+	next = updated.(multiSelectModel)
+	if len(next.selectedValues) != 0 {
+		t.Fatalf("expected second toggle to clear selection, got: %+v", next.selectedValues)
 	}
 }
 
