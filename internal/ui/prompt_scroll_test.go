@@ -390,10 +390,13 @@ func TestCreateFlowReviewRepo_ConfirmAdvancesToPRSelection(t *testing.T) {
 		t.Fatalf("expected confirm timer command")
 	}
 
-	updated, _ = next.Update(singleSelectConfirmDoneMsg{})
+	updated, cmd = next.Update(singleSelectConfirmDoneMsg{})
 	next = updated.(createFlowModel)
 	if next.stage != createStageReviewPRs {
 		t.Fatalf("expected confirm to advance to PR selection, got %v", next.stage)
+	}
+	if cmd != nil {
+		t.Fatalf("expected no quit command after advancing to PR selection")
 	}
 }
 
@@ -429,10 +432,13 @@ func TestCreateFlowRepoSelect_ConfirmAdvancesToWorkspaceStep(t *testing.T) {
 		t.Fatalf("expected confirm timer command")
 	}
 
-	updated, _ = next.Update(singleSelectConfirmDoneMsg{})
+	updated, cmd = next.Update(singleSelectConfirmDoneMsg{})
 	next = updated.(createFlowModel)
 	if next.stage != createStageRepoWorkspace {
 		t.Fatalf("expected confirm to advance to repo workspace step, got %v", next.stage)
+	}
+	if cmd != nil {
+		t.Fatalf("expected no quit command after advancing to repo workspace step")
 	}
 }
 

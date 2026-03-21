@@ -490,6 +490,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.reviewPRModel = newMultiSelectModel(m.title, "pull request", choices, m.theme, m.useColor)
 			m.stage = createStageReviewPRs
+			return m, nil
 		}
 		return m, cmd
 	}
@@ -523,6 +524,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.issueIssueModel = newIssueBranchSelectModel(m.title, "issue", choices, m.validateBranch, m.theme, m.useColor)
 			m.stage = createStageIssueIssues
+			return m, nil
 		}
 		return m, cmd
 	}
@@ -548,6 +550,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.presetModel = newInputsModelWithLabel(m.title, nil, m.repoSelected, m.defaultWorkspaceID, "repo", m.validateWorkspaceID, m.theme, m.useColor)
 			m.stage = createStageRepoWorkspace
+			return m, nil
 		}
 		return m, cmd
 	}
