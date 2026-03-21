@@ -11,6 +11,7 @@ This document describes the implementation structure (separation of concerns) th
 - Always guarantee the fixed section order: Inputs → Info → Steps → Result → Suggestion
 - Avoid per-command bespoke rendering; enforce the contract through shared components
 - Prevent duplicate Inputs output during interactive flows (update in-place instead)
+- Keep selector implementations aligned with [UI-SELECTOR.md](/Users/tasuku43/gionroot/workspaces/gion/gion/docs/spec/ui/UI-SELECTOR.md)
 
 ## Components
 
@@ -37,6 +38,7 @@ This document describes the implementation structure (separation of concerns) th
 **Responsibilities**
 - Input/selection state transitions and validation
 - `View()` should only update Inputs/Info via Frame
+- Selector-family behavior should be centralized here rather than duplicated in command handlers
 
 ## Implementation Rules
 - Do not print UI output directly with `fmt.Fprintf/Printf/Println` (use Renderer/Frame)
@@ -47,3 +49,4 @@ This document describes the implementation structure (separation of concerns) th
 ## Applying to Existing Flows
 - Prefer a single Frame that updates across multiple prompt steps
 - Use `AppendInputsRaw(...)` for list/tree lines to keep the section order intact
+- Treat selector copy, finish hints, and selected-set rendering as shared UI behavior, not per-command wording

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -14,6 +15,16 @@ import (
 )
 
 var ErrPromptCanceled = errors.New("prompt canceled")
+
+const singleSelectConfirmDelay = 200 * time.Millisecond
+
+type singleSelectConfirmDoneMsg struct{}
+
+func singleSelectConfirmCmd() tea.Cmd {
+	return tea.Tick(singleSelectConfirmDelay, func(time.Time) tea.Msg {
+		return singleSelectConfirmDoneMsg{}
+	})
+}
 
 type PromptChoice struct {
 	Label       string
@@ -98,10 +109,12 @@ type createFlowModel struct {
 	presets []string
 	tmplErr error
 
-	modeInput textinput.Model
-	filtered  []PromptChoice
-	cursor    int
-	err       error
+	modeInput   textinput.Model
+	filtered    []PromptChoice
+	cursor      int
+	err         error
+	confirming  bool
+	pendingMode string
 
 	presetModel        inputsModel
 	presetRepos        []string
@@ -189,6 +202,57 @@ func newCreateFlowModel(title string, presets []string, tmplErr error, repoChoic
 
 func (m createFlowModel) Init() tea.Cmd {
 	return textinput.Blink
+}
+
+func (m *createFlowModel) confirmSelectedMode(mode string) (tea.Model, tea.Cmd) {
+	m.pendingMode = strings.TrimSpace(mode)
+	m.confirming = true
+	m.modeInput.Blur()
+	return m, singleSelectConfirmCmd()
+}
+
+func (m *createFlowModel) applySelectedMode() (tea.Model, tea.Cmd) {
+	m.confirming = false
+	m.mode = m.pendingMode
+	m.pendingMode = ""
+	switch m.mode {
+	case "preset":
+		if m.tmplErr != nil {
+			m.err = m.tmplErr
+			return m, tea.Quit
+		}
+		m.stage = createStagePreset
+		m.presetModel = newInputsModel(m.title, m.presets, "", "", m.theme, m.useColor)
+	case "review":
+		if len(m.reviewRepos) == 0 {
+			m.err = fmt.Errorf("no GitHub repos found")
+			return m, tea.Quit
+		}
+		m.stage = createStageReviewRepo
+		m.reviewRepoModel = newChoiceSelectModel(m.title, "repo", m.reviewRepos, m.theme, m.useColor)
+	case "issue":
+		if len(m.issueRepos) == 0 {
+			m.err = fmt.Errorf("no repos with supported hosts found")
+			return m, tea.Quit
+		}
+		m.stage = createStageIssueRepo
+		m.issueRepoModel = newChoiceSelectModel(m.title, "repo", m.issueRepos, m.theme, m.useColor)
+	case "repo":
+		if m.repoErr != nil {
+			m.err = m.repoErr
+			return m, tea.Quit
+		}
+		if len(m.repoChoices) == 0 {
+			m.err = fmt.Errorf("no repos found")
+			return m, tea.Quit
+		}
+		m.stage = createStageRepoSelect
+		m.repoSelectModel = newChoiceSelectModel(m.title, "repo", m.repoChoices, m.theme, m.useColor)
+	default:
+		m.err = fmt.Errorf("unknown mode: %s", m.mode)
+		return m, tea.Quit
+	}
+	return m, nil
 }
 
 func (m *createFlowModel) startMode(mode, presetName string) {
@@ -281,7 +345,14 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg := msg.(type) {
+	case singleSelectConfirmDoneMsg:
+		if m.stage == createStageMode && m.confirming {
+			return m.applySelectedMode()
+		}
 	case tea.KeyMsg:
+		if m.stage == createStageMode && m.confirming {
+			return m, nil
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.err = ErrPromptCanceled
@@ -301,46 +372,21 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.filtered) == 0 {
 					return m, nil
 				}
-				m.mode = m.filtered[m.cursor].Value
-				switch m.mode {
-				case "preset":
-					if m.tmplErr != nil {
-						m.err = m.tmplErr
-						return m, tea.Quit
-					}
-					m.stage = createStagePreset
-					m.presetModel = newInputsModel(m.title, m.presets, "", "", m.theme, m.useColor)
-				case "review":
-					if len(m.reviewRepos) == 0 {
-						m.err = fmt.Errorf("no GitHub repos found")
-						return m, tea.Quit
-					}
-					m.stage = createStageReviewRepo
-					m.reviewRepoModel = newChoiceSelectModel(m.title, "repo", m.reviewRepos, m.theme, m.useColor)
-				case "issue":
-					if len(m.issueRepos) == 0 {
-						m.err = fmt.Errorf("no repos with supported hosts found")
-						return m, tea.Quit
-					}
-					m.stage = createStageIssueRepo
-					m.issueRepoModel = newChoiceSelectModel(m.title, "repo", m.issueRepos, m.theme, m.useColor)
-				case "repo":
-					if m.repoErr != nil {
-						m.err = m.repoErr
-						return m, tea.Quit
-					}
-					if len(m.repoChoices) == 0 {
-						m.err = fmt.Errorf("no repos found")
-						return m, tea.Quit
-					}
-					m.stage = createStageRepoSelect
-					m.repoSelectModel = newChoiceSelectModel(m.title, "repo", m.repoChoices, m.theme, m.useColor)
-				default:
-					m.err = fmt.Errorf("unknown mode: %s", m.mode)
-					return m, tea.Quit
+				return m.confirmSelectedMode(m.filtered[m.cursor].Value)
+			}
+		case tea.KeySpace:
+			if m.stage == createStageMode {
+				if len(m.filtered) == 0 {
+					return m, nil
 				}
+				return m.confirmSelectedMode(m.filtered[m.cursor].Value)
+			}
+		}
+		if m.stage == createStageMode && msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
 				return m, nil
 			}
+			return m.confirmSelectedMode(m.filtered[m.cursor].Value)
 		}
 	}
 
@@ -426,7 +472,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.stage == createStageReviewRepo {
-		model, _ := m.reviewRepoModel.Update(msg)
+		model, cmd := m.reviewRepoModel.Update(msg)
 		m.reviewRepoModel = model.(choiceSelectModel)
 		if m.reviewRepoModel.done {
 			m.reviewRepo = m.reviewRepoModel.value
@@ -444,22 +490,23 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.reviewPRModel = newMultiSelectModel(m.title, "pull request", choices, m.theme, m.useColor)
 			m.stage = createStageReviewPRs
+			return m, nil
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	if m.stage == createStageReviewPRs {
-		model, _ := m.reviewPRModel.Update(msg)
+		model, cmd := m.reviewPRModel.Update(msg)
 		m.reviewPRModel = model.(multiSelectModel)
 		if m.reviewPRModel.done {
 			m.reviewPRs = append([]string(nil), m.reviewPRModel.selectedValues...)
 			return m, tea.Quit
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	if m.stage == createStageIssueRepo {
-		model, _ := m.issueRepoModel.Update(msg)
+		model, cmd := m.issueRepoModel.Update(msg)
 		m.issueRepoModel = model.(choiceSelectModel)
 		if m.issueRepoModel.done {
 			m.issueRepo = m.issueRepoModel.value
@@ -477,8 +524,9 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.issueIssueModel = newIssueBranchSelectModel(m.title, "issue", choices, m.validateBranch, m.theme, m.useColor)
 			m.stage = createStageIssueIssues
+			return m, nil
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	if m.stage == createStageIssueIssues {
@@ -492,7 +540,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.stage == createStageRepoSelect {
-		model, _ := m.repoSelectModel.Update(msg)
+		model, cmd := m.repoSelectModel.Update(msg)
 		m.repoSelectModel = model.(choiceSelectModel)
 		if m.repoSelectModel.done {
 			m.repoSelected = m.repoSelectModel.value
@@ -502,8 +550,9 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.presetModel = newInputsModelWithLabel(m.title, nil, m.repoSelected, m.defaultWorkspaceID, "repo", m.validateWorkspaceID, m.theme, m.useColor)
 			m.stage = createStageRepoWorkspace
+			return m, nil
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	if m.stage == createStageRepoWorkspace {
@@ -526,8 +575,10 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m createFlowModel) View() string {
+	modeLabel := promptLabel(m.theme, m.useColor, "mode")
+	modeLine := renderPromptValueLine(modeLabel, m.mode)
 	if m.stage == createStagePreset {
-		return m.presetModel.View()
+		return m.presetModel.ViewWithHeader(modeLine)
 	}
 	if m.stage == createStagePresetDesc {
 		frame := NewFrame(m.theme, m.useColor)
@@ -535,6 +586,7 @@ func (m createFlowModel) View() string {
 		labelWorkspace := promptLabel(m.theme, m.useColor, "workspace id")
 		labelDesc := promptLabel(m.theme, m.useColor, "description")
 		frame.SetInputsPrompt(
+			modeLine,
 			fmt.Sprintf("%s: %s", labelSelection, m.selectionValue()),
 			fmt.Sprintf("%s: %s", labelWorkspace, m.workspaceID()),
 			fmt.Sprintf("%s: %s", labelDesc, m.descInput.View()),
@@ -546,6 +598,7 @@ func (m createFlowModel) View() string {
 		labelWorkspace := promptLabel(m.theme, m.useColor, "workspace id")
 		labelDesc := promptLabel(m.theme, m.useColor, "description")
 		lines := []string{
+			modeLine,
 			fmt.Sprintf("%s: %s", labelSelection, m.selectionValue()),
 			fmt.Sprintf("%s: %s", labelWorkspace, m.workspaceID()),
 		}
@@ -555,19 +608,19 @@ func (m createFlowModel) View() string {
 		return m.branchModel.ViewWithHeader(lines...)
 	}
 	if m.stage == createStageReviewRepo {
-		return m.reviewRepoModel.View()
+		return m.reviewRepoModel.ViewWithHeader(modeLine)
 	}
 	if m.stage == createStageReviewPRs {
 		labelRepo := promptLabel(m.theme, m.useColor, "repo")
-		return renderMultiSelectFrame(m.reviewPRModel, m.reviewPRModel.height, fmt.Sprintf("%s: %s", labelRepo, m.reviewRepo))
+		return renderMultiSelectFrame(m.reviewPRModel, m.reviewPRModel.height, modeLine, fmt.Sprintf("%s: %s", labelRepo, m.reviewRepo))
 	}
 	if m.stage == createStageIssueRepo {
-		return m.issueRepoModel.View()
+		return m.issueRepoModel.ViewWithHeader(modeLine)
 	}
 	if m.stage == createStageIssueIssues {
 		labelRepo := promptLabel(m.theme, m.useColor, "repo")
 		if m.issueIssueModel.stage == issueBranchStageEdit {
-			return m.issueIssueModel.branchModel.ViewWithHeader(fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
+			return m.issueIssueModel.branchModel.ViewWithHeader(modeLine, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
 		}
 		return renderMultiSelectFrame(multiSelectModel{
 			title:     m.issueIssueModel.title,
@@ -581,23 +634,34 @@ func (m createFlowModel) View() string {
 			useColor:  m.issueIssueModel.useColor,
 			input:     m.issueIssueModel.input,
 			height:    m.issueIssueModel.height,
-		}, m.issueIssueModel.height, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
+		}, m.issueIssueModel.height, modeLine, fmt.Sprintf("%s: %s", labelRepo, m.issueRepo))
 	}
 	if m.stage == createStageRepoSelect {
-		return m.repoSelectModel.View()
+		return m.repoSelectModel.ViewWithHeader(modeLine)
 	}
 	if m.stage == createStageRepoWorkspace {
-		return m.presetModel.View()
+		return m.presetModel.ViewWithHeader(modeLine)
 	}
 
 	frame := NewFrame(m.theme, m.useColor)
-	label := promptLabel(m.theme, m.useColor, "mode")
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.modeInput.View()))
-	maxLines := listMaxLines(m.height, 1, 0)
+	frame.SetInputsPrompt(renderPromptValueLine(modeLabel, m.pendingMode))
+	assistLines := []string(nil)
+	if !m.confirming {
+		assistLines = singleSelectAssistLines("select", m.modeInput.Value(), m.theme, m.useColor)
+	}
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+extraAssistGap, 0)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderRepoChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
+		renderRepoSingleSelectChoiceList(b, m.filtered, m.cursor, maxLines, m.pendingMode, m.confirming, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
+		frame.AppendInputsRaw(assistLines...)
+	}
 	return frame.Render()
 }
 
@@ -765,13 +829,17 @@ func (m inputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m inputsModel) View() string {
+	return m.ViewWithHeader()
+}
+
+func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := strings.TrimSpace(m.label)
 	if label == "" {
 		label = "preset"
 	}
 	labelPreset := promptLabel(m.theme, m.useColor, label)
-	var promptLines []string
+	promptLines := append([]string(nil), headerLines...)
 	if m.stage == stagePreset {
 		promptLines = append(promptLines, fmt.Sprintf("%s: %s", labelPreset, m.search.View()))
 	} else {
@@ -1229,24 +1297,35 @@ func (m presetRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errorLine = ""
 				return m, nil
 			}
-			value := strings.TrimSpace(m.repoInput.Value())
-			if value == "done" {
-				if len(m.selected) == 0 {
-					m.errorLine = "select at least one repo"
-					return m, nil
-				}
-				return m, tea.Quit
+			if len(m.selected) == 0 {
+				m.errorLine = "select at least one repo"
+				return m, nil
+			}
+			return m, tea.Quit
+		case tea.KeySpace:
+			if m.stage == stagePresetName {
+				return m, nil
 			}
 			if len(m.filtered) == 0 {
 				return m, nil
 			}
 			choice := m.filtered[m.cursor]
-			m.selected = append(m.selected, choice.Value)
-			m.choices = removeChoice(m.choices, choice.Value)
-			m.repoInput.SetValue("")
-			m.filtered = m.filterChoices()
-			if m.cursor >= len(m.filtered) {
-				m.cursor = max(0, len(m.filtered)-1)
+			m.selected = toggleSelectedValue(m.selected, choice.Value)
+			if m.cursor < len(m.filtered)-1 {
+				m.cursor++
+			}
+			m.addedNote = choice.Label
+			m.errorLine = ""
+			return m, nil
+		}
+		if m.stage == stageRepoSelect && msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			choice := m.filtered[m.cursor]
+			m.selected = toggleSelectedValue(m.selected, choice.Value)
+			if m.cursor < len(m.filtered)-1 {
+				m.cursor++
 			}
 			m.addedNote = choice.Label
 			m.errorLine = ""
@@ -1288,26 +1367,17 @@ func (m presetRepoSelectModel) View() string {
 		fmt.Sprintf("%s: %s", labelRepo, repoInput),
 	)
 
-	selectedLines := collectLines(func(b *strings.Builder) {
-		renderSelectedRepoTree(b, m.selected, m.useColor, m.theme)
-	})
-	infoLines := 1 + len(selectedLines) + 1
+	infoLines := 0
 	if m.errorLine != "" {
 		infoLines++
 	}
-	// +1 for the inline "finish" help line appended under Inputs.
-	maxLines := listMaxLines(m.height, 3, infoLines)
+	assistLines := multiSelectAssistLines(m.selected, len(m.choices), "apply", m.repoInput.Value(), m.theme, m.useColor)
+	maxLines := listMaxLines(m.height, 2+len(assistLines), infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderRepoChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
+		renderRepoMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, selectedChoiceSet(m.selected), false, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
-
-	if m.useColor {
-		frame.SetInfo(m.theme.Accent.Render("selected"))
-	} else {
-		frame.SetInfo("selected")
-	}
-	frame.AppendInfoRaw(selectedLines...)
+	frame.AppendInputsRaw(assistLines...)
 
 	if m.errorLine != "" {
 		msg := m.errorLine
@@ -1317,10 +1387,6 @@ func (m presetRepoSelectModel) View() string {
 		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
 	}
 
-	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
-	frame.AppendInputsRaw(
-		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
-	)
 	return frame.Render()
 }
 
@@ -1371,9 +1437,10 @@ type choiceSelectModel struct {
 	errorLine string
 	done      bool
 
-	theme    Theme
-	useColor bool
-	input    textinput.Model
+	theme      Theme
+	useColor   bool
+	input      textinput.Model
+	confirming bool
 
 	height int
 }
@@ -1407,7 +1474,16 @@ func (m choiceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
 		return m, nil
+	case singleSelectConfirmDoneMsg:
+		if m.confirming {
+			m.done = true
+			return m, tea.Quit
+		}
+		return m, nil
 	case tea.KeyMsg:
+		if m.confirming {
+			return m, nil
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.err = ErrPromptCanceled
@@ -1429,8 +1505,30 @@ func (m choiceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			choice := m.filtered[m.cursor]
 			m.value = choice.Value
-			m.done = true
-			return m, tea.Quit
+			m.confirming = true
+			m.input.Blur()
+			return m, singleSelectConfirmCmd()
+		case tea.KeySpace:
+			if len(m.filtered) == 0 {
+				m.errorLine = "select a value"
+				return m, nil
+			}
+			choice := m.filtered[m.cursor]
+			m.value = choice.Value
+			m.confirming = true
+			m.input.Blur()
+			return m, singleSelectConfirmCmd()
+		}
+		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				m.errorLine = "select a value"
+				return m, nil
+			}
+			choice := m.filtered[m.cursor]
+			m.value = choice.Value
+			m.confirming = true
+			m.input.Blur()
+			return m, singleSelectConfirmCmd()
 		}
 	}
 
@@ -1447,19 +1545,37 @@ func (m choiceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m choiceSelectModel) View() string {
+	return m.ViewWithHeader()
+}
+
+func (m choiceSelectModel) ViewWithHeader(headerLines ...string) string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, m.label)
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+	promptLines := append([]string(nil), headerLines...)
+	promptLines = append(promptLines, renderPromptValueLine(label, m.value))
+	frame.SetInputsPrompt(promptLines...)
 
 	infoLines := 0
 	if m.errorLine != "" {
 		infoLines = 1
 	}
-	maxLines := listMaxLines(m.height, 1, infoLines)
+	assistLines := []string(nil)
+	if !m.confirming {
+		assistLines = singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
+	}
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderRepoChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
+		renderRepoSingleSelectChoiceList(b, m.filtered, m.cursor, maxLines, m.value, m.confirming, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
+		frame.AppendInputsRaw(assistLines...)
+	}
 
 	if m.errorLine != "" {
 		msg := m.errorLine
@@ -1496,12 +1612,75 @@ type multiSelectModel struct {
 	err            error
 	errorLine      string
 	done           bool
+	confirming     bool
 
 	theme    Theme
 	useColor bool
 	input    textinput.Model
 
 	height int
+}
+
+func selectedChoiceSet(values []string) map[string]bool {
+	out := make(map[string]bool, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		out[value] = true
+	}
+	return out
+}
+
+func toggleSelectedValue(values []string, value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return append([]string(nil), values...)
+	}
+	for i, current := range values {
+		if current != value {
+			continue
+		}
+		out := append([]string(nil), values[:i]...)
+		out = append(out, values[i+1:]...)
+		return out
+	}
+	return append(append([]string(nil), values...), value)
+}
+
+func selectedChoicesFromValues(choices []PromptChoice, values []string) []PromptChoice {
+	selected := selectedChoiceSet(values)
+	out := make([]PromptChoice, 0, len(values))
+	for _, choice := range choices {
+		if selected[choice.Value] {
+			out = append(out, choice)
+		}
+	}
+	return out
+}
+
+func selectedWorkspaceSet(values []string) map[string]bool {
+	out := make(map[string]bool, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		out[value] = true
+	}
+	return out
+}
+
+func selectedWorkspacesFromIDs(workspaces []WorkspaceChoice, ids []string) []WorkspaceChoice {
+	selected := selectedWorkspaceSet(ids)
+	out := make([]WorkspaceChoice, 0, len(ids))
+	for _, workspace := range workspaces {
+		if selected[workspace.ID] {
+			out = append(out, workspace)
+		}
+	}
+	return out
 }
 
 func newMultiSelectModel(title, label string, choices []PromptChoice, theme Theme, useColor bool) multiSelectModel {
@@ -1533,7 +1712,16 @@ func (m multiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
 		return m, nil
+	case singleSelectConfirmDoneMsg:
+		if m.confirming {
+			m.done = true
+			return m, tea.Quit
+		}
+		return m, nil
 	case tea.KeyMsg:
+		if m.confirming {
+			return m, nil
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.err = ErrPromptCanceled
@@ -1556,26 +1744,35 @@ func (m multiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case tea.KeyEnter:
-			value := strings.TrimSpace(m.input.Value())
-			if value == "done" {
-				if len(m.selected) == 0 {
-					m.errorLine = fmt.Sprintf("select at least one %s", m.label)
-					return m, nil
-				}
-				m.done = true
-				return m, tea.Quit
+			if len(m.selected) == 0 {
+				m.errorLine = fmt.Sprintf("select at least one %s", m.label)
+				return m, nil
 			}
+			m.confirming = true
+			m.input.Blur()
+			return m, singleSelectConfirmCmd()
+		case tea.KeySpace:
 			if len(m.filtered) == 0 {
 				return m, nil
 			}
 			choice := m.filtered[m.cursor]
-			m.selected = append(m.selected, choice)
-			m.selectedValues = append(m.selectedValues, choice.Value)
-			m.choices = removeChoice(m.choices, choice.Value)
-			m.input.SetValue("")
-			m.filtered = m.filterChoices()
-			if m.cursor >= len(m.filtered) {
-				m.cursor = max(0, len(m.filtered)-1)
+			m.selectedValues = toggleSelectedValue(m.selectedValues, choice.Value)
+			m.selected = selectedChoicesFromValues(m.choices, m.selectedValues)
+			if m.cursor < len(m.filtered)-1 {
+				m.cursor++
+			}
+			m.errorLine = ""
+			return m, nil
+		}
+		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			choice := m.filtered[m.cursor]
+			m.selectedValues = toggleSelectedValue(m.selectedValues, choice.Value)
+			m.selected = selectedChoicesFromValues(m.choices, m.selectedValues)
+			if m.cursor < len(m.filtered)-1 {
+				m.cursor++
 			}
 			m.errorLine = ""
 			return m, nil
@@ -1599,40 +1796,30 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	frame := NewFrame(model.theme, model.useColor)
 	lines := append([]string(nil), headerLines...)
 	label := promptLabel(model.theme, model.useColor, model.label)
-	lines = append(lines, fmt.Sprintf("%s: %s", label, model.input.View()))
+	lines = append(lines, renderPromptValueLine(label, ""))
 	frame.SetInputsPrompt(lines...)
 
-	hasSelected := len(model.selected) > 0
 	hasError := model.errorLine != ""
-
-	var selectedLines []string
 	infoLines := 0
-	if hasSelected {
-		selectedLines = collectLines(func(b *strings.Builder) {
-			renderSelectedChoiceTree(b, model.selected, model.useColor, model.theme)
-		})
-		// "selected" header + selected lines
-		infoLines += 1 + len(selectedLines)
-	}
 	if hasError {
 		infoLines++
 	}
-	// +1 for the inline "finish" help line appended under Inputs.
-	maxLines := listMaxLines(height, len(lines)+1, infoLines)
+	assistLines := []string(nil)
+	if !model.confirming {
+		assistLines = multiSelectAssistLines(model.selectedValues, len(model.choices), "apply", model.input.Value(), model.theme, model.useColor)
+	}
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(height, len(lines)+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderRepoChoiceList(b, model.filtered, model.cursor, maxLines, model.useColor, model.theme)
+		renderRepoMultiSelectChoiceList(b, model.filtered, model.cursor, maxLines, selectedChoiceSet(model.selectedValues), model.confirming, model.useColor, model.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
-
-	if hasSelected || hasError {
-		if hasSelected {
-			if model.useColor {
-				frame.SetInfo(model.theme.Accent.Render("selected"))
-			} else {
-				frame.SetInfo("selected")
-			}
-			frame.AppendInfoRaw(selectedLines...)
-		}
+	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
+		frame.AppendInputsRaw(assistLines...)
 	}
 
 	if hasError {
@@ -1643,10 +1830,6 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), msg))
 	}
 
-	infoPrefix := mutedToken(model.theme, model.useColor, output.StepPrefix)
-	frame.AppendInputsRaw(
-		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
-	)
 	return frame.Render()
 }
 
@@ -1946,29 +2129,48 @@ func (m issueBranchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case tea.KeyEnter:
 			if m.stage == issueBranchStageSelect {
-				value := strings.TrimSpace(m.input.Value())
-				if value == "done" {
-					if len(m.selected) == 0 {
-						m.errorLine = fmt.Sprintf("select at least one %s", m.label)
-						return m, nil
-					}
-					m = m.startBranchInput()
+				if len(m.selected) == 0 {
+					m.errorLine = fmt.Sprintf("select at least one %s", m.label)
 					return m, nil
 				}
+				m = m.startBranchInput()
+				return m, nil
+			}
+		case tea.KeySpace:
+			if m.stage == issueBranchStageSelect {
 				if len(m.filtered) == 0 {
 					return m, nil
 				}
 				choice := m.filtered[m.cursor]
-				m.selected = append(m.selected, choice)
-				m.choices = removeChoice(m.choices, choice.Value)
-				m.input.SetValue("")
-				m.filtered = m.filterChoices()
-				if m.cursor >= len(m.filtered) {
-					m.cursor = max(0, len(m.filtered)-1)
+				values := make([]string, 0, len(m.selected))
+				for _, selected := range m.selected {
+					values = append(values, selected.Value)
+				}
+				values = toggleSelectedValue(values, choice.Value)
+				m.selected = selectedChoicesFromValues(m.choices, values)
+				if m.cursor < len(m.filtered)-1 {
+					m.cursor++
 				}
 				m.errorLine = ""
 				return m, nil
 			}
+		}
+		if m.stage == issueBranchStageSelect && msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			choice := m.filtered[m.cursor]
+			values := make([]string, 0, len(m.selected))
+			for _, selected := range m.selected {
+				values = append(values, selected.Value)
+			}
+			values = toggleSelectedValue(values, choice.Value)
+			m.selected = selectedChoicesFromValues(m.choices, values)
+			if m.cursor < len(m.filtered)-1 {
+				m.cursor++
+			}
+			m.errorLine = ""
+			return m, nil
 		}
 	}
 
@@ -2013,11 +2215,18 @@ func (m issueBranchSelectModel) View() string {
 		return m.branchModel.ViewWithHeader()
 	}
 	return renderMultiSelectFrame(multiSelectModel{
-		title:     m.title,
-		label:     m.label,
-		choices:   m.choices,
-		filtered:  m.filtered,
-		selected:  m.selected,
+		title:    m.title,
+		label:    m.label,
+		choices:  m.choices,
+		filtered: m.filtered,
+		selected: m.selected,
+		selectedValues: func() []string {
+			out := make([]string, 0, len(m.selected))
+			for _, selected := range m.selected {
+				out = append(out, selected.Value)
+			}
+			return out
+		}(),
 		cursor:    m.cursor,
 		errorLine: m.errorLine,
 		theme:     m.theme,
@@ -2305,6 +2514,7 @@ type workspaceSelectModel struct {
 	err      error
 
 	workspaceID string
+	confirming  bool
 
 	height int
 }
@@ -2342,7 +2552,15 @@ func (m workspaceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
 		return m, nil
+	case singleSelectConfirmDoneMsg:
+		if m.confirming {
+			return m, tea.Quit
+		}
+		return m, nil
 	case tea.KeyMsg:
+		if m.confirming {
+			return m, nil
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.err = ErrPromptCanceled
@@ -2362,7 +2580,26 @@ func (m workspaceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.workspaceID = m.filtered[m.cursor].ID
-			return m, tea.Quit
+			m.confirming = true
+			m.input.Blur()
+			return m, singleSelectConfirmCmd()
+		case tea.KeySpace:
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			m.workspaceID = m.filtered[m.cursor].ID
+			m.confirming = true
+			m.input.Blur()
+			return m, singleSelectConfirmCmd()
+		}
+		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			m.workspaceID = m.filtered[m.cursor].ID
+			m.confirming = true
+			m.input.Blur()
+			return m, singleSelectConfirmCmd()
 		}
 	}
 
@@ -2376,9 +2613,15 @@ func (m workspaceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m workspaceSelectModel) View() string {
+	return m.ViewWithHeader()
+}
+
+func (m workspaceSelectModel) ViewWithHeader(headerLines ...string) string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace id")
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+	promptLines := append([]string(nil), headerLines...)
+	promptLines = append(promptLines, renderPromptValueLine(label, m.workspaceID))
+	frame.SetInputsPrompt(promptLines...)
 	var blockedLines []string
 	infoLines := 0
 	if len(m.blocked) > 0 {
@@ -2387,11 +2630,23 @@ func (m workspaceSelectModel) View() string {
 		})
 		infoLines = 1 + len(blockedLines)
 	}
-	maxLines := listMaxLines(m.height, 1, infoLines)
+	assistLines := []string(nil)
+	if !m.confirming {
+		assistLines = singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
+	}
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderWorkspaceChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
+		renderWorkspaceSingleSelectChoiceList(b, m.filtered, m.cursor, maxLines, m.workspaceID, m.confirming, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
+		frame.AppendInputsRaw(assistLines...)
+	}
 	if len(m.blocked) > 0 {
 		frame.SetInfo("blocked workspaces")
 		frame.AppendInfoRaw(blockedLines...)
@@ -2513,12 +2768,15 @@ func (m workspaceRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m workspaceRepoSelectModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
-	maxLines := listMaxLines(m.height, 1, 0)
+	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
+	assistLines := singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+1, 0)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceRepoChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	frame.AppendInputsRaw("")
+	frame.AppendInputsRaw(assistLines...)
 	return frame.Render()
 }
 
@@ -2749,6 +3007,7 @@ type workspaceMultiSelectModel struct {
 	errorLine   string
 	canceled    bool
 	finalizing  bool
+	confirming  bool
 
 	theme    Theme
 	useColor bool
@@ -2787,7 +3046,16 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg := msg.(type) {
+	case singleSelectConfirmDoneMsg:
+		if m.confirming {
+			m.finalizing = true
+			return m, tea.Quit
+		}
+		return m, nil
 	case tea.KeyMsg:
+		if m.confirming {
+			return m, nil
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.err = ErrPromptCanceled
@@ -2797,8 +3065,9 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errorLine = "select at least one workspace"
 				return m, nil
 			}
-			m.finalizing = true
-			return m, tea.Quit
+			m.confirming = true
+			m.input.Blur()
+			return m, singleSelectConfirmCmd()
 		case tea.KeyUp:
 			if m.cursor > 0 {
 				m.cursor--
@@ -2810,26 +3079,35 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case tea.KeyEnter:
-			value := strings.TrimSpace(m.input.Value())
-			if value == "done" {
-				if len(m.selected) == 0 {
-					m.errorLine = "select at least one workspace"
-					return m, nil
-				}
-				m.finalizing = true
-				return m, tea.Quit
+			if len(m.selected) == 0 {
+				m.errorLine = "select at least one workspace"
+				return m, nil
 			}
+			m.confirming = true
+			m.input.Blur()
+			return m, singleSelectConfirmCmd()
+		case tea.KeySpace:
 			if len(m.filtered) == 0 {
 				return m, nil
 			}
 			choice := m.filtered[m.cursor]
-			m.selected = append(m.selected, choice)
-			m.selectedIDs = append(m.selectedIDs, choice.ID)
-			m.workspaces = removeWorkspaceChoice(m.workspaces, choice.ID)
-			m.input.SetValue("")
-			m.filtered = m.filterWorkspaces()
-			if m.cursor >= len(m.filtered) {
-				m.cursor = max(0, len(m.filtered)-1)
+			m.selectedIDs = toggleSelectedValue(m.selectedIDs, choice.ID)
+			m.selected = selectedWorkspacesFromIDs(m.workspaces, m.selectedIDs)
+			if m.cursor < len(m.filtered)-1 {
+				m.cursor++
+			}
+			m.errorLine = ""
+			return m, nil
+		}
+		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			choice := m.filtered[m.cursor]
+			m.selectedIDs = toggleSelectedValue(m.selectedIDs, choice.ID)
+			m.selected = selectedWorkspacesFromIDs(m.workspaces, m.selectedIDs)
+			if m.cursor < len(m.filtered)-1 {
+				m.cursor++
 			}
 			m.errorLine = ""
 			return m, nil
@@ -2846,31 +3124,11 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m workspaceMultiSelectModel) View() string {
-	if m.finalizing {
-		frame := NewFrame(m.theme, m.useColor)
-		frame.NoBlankAfterInfo = true
-		label := promptLabel(m.theme, m.useColor, "workspace")
-		frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
-		selectedLines := collectLines(func(b *strings.Builder) {
-			renderSelectedWorkspaceTree(b, m.selected, m.useColor, m.theme)
-		})
-		if m.useColor {
-			frame.SetInfo(m.theme.Accent.Render("selected"))
-		} else {
-			frame.SetInfo("selected")
-		}
-		frame.AppendInfoRaw(selectedLines...)
-		return frame.Render()
-	}
-
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
-	selectedLines := collectLines(func(b *strings.Builder) {
-		renderSelectedWorkspaceTree(b, m.selected, m.useColor, m.theme)
-	})
+	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
 	var blockedLines []string
-	infoLines := 1 + len(selectedLines) + 1
+	infoLines := 0
 	if m.errorLine != "" {
 		infoLines++
 	}
@@ -2880,19 +3138,23 @@ func (m workspaceMultiSelectModel) View() string {
 		})
 		infoLines += 1 + len(blockedLines)
 	}
-	// +1 for the inline "finish" help line appended under Inputs.
-	maxLines := listMaxLines(m.height, 2, infoLines)
+	assistLines := []string(nil)
+	if !m.confirming {
+		assistLines = multiSelectAssistLines(m.selectedIDs, len(m.workspaces), "apply", m.input.Value(), m.theme, m.useColor)
+	}
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(m.height, 1+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderWorkspaceChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
+		renderWorkspaceMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, selectedWorkspaceSet(m.selectedIDs), m.confirming, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
-
-	if m.useColor {
-		frame.SetInfo(m.theme.Accent.Render("selected"))
-	} else {
-		frame.SetInfo("selected")
+	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
+		frame.AppendInputsRaw(assistLines...)
 	}
-	frame.AppendInfoRaw(selectedLines...)
 
 	if m.errorLine != "" {
 		msg := m.errorLine
@@ -2901,9 +3163,6 @@ func (m workspaceMultiSelectModel) View() string {
 		}
 		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
 	}
-
-	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
-	frame.AppendInputsRaw(fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix))
 
 	if len(blockedLines) > 0 {
 		frame.AppendInfo("blocked workspaces")
@@ -2951,6 +3210,62 @@ func listWindow(total int, cursor int, maxVisible int) (int, int) {
 		start = total - maxVisible
 	}
 	return start, start + maxVisible
+}
+
+func multiSelectAssistLines(selected []string, total int, action string, filterValue string, theme Theme, useColor bool) []string {
+	return []string{
+		renderMultiSelectFilterLine(filterValue, theme, useColor),
+		renderMultiSelectFooterLine(len(selected), total, action, theme, useColor),
+	}
+}
+
+func singleSelectAssistLines(action string, filterValue string, theme Theme, useColor bool) []string {
+	return []string{
+		renderMultiSelectFilterLine(filterValue, theme, useColor),
+		renderSingleSelectFooterLine(action, theme, useColor),
+	}
+}
+
+func renderMultiSelectFilterLine(filterValue string, theme Theme, useColor bool) string {
+	body := strings.TrimSpace(filterValue)
+	line := fmt.Sprintf("%sfilter: %s", output.Indent, body)
+	if useColor {
+		line = theme.Muted.Render(output.Indent+"filter: ") + body
+	}
+	return wrapRawLineToWidth(line, currentWrapWidth())[0]
+}
+
+func renderPromptValueLine(label, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Sprintf("%s:", label)
+	}
+	return fmt.Sprintf("%s: %s", label, value)
+}
+
+func renderMultiSelectFooterLine(selectedCount int, total int, action string, theme Theme, useColor bool) string {
+	if total < selectedCount {
+		total = selectedCount
+	}
+	if strings.TrimSpace(action) == "" {
+		action = "apply"
+	}
+	line := fmt.Sprintf("%sselected: %d/%d  ↑↓ move  space toggle  enter %s  type filter  esc cancel", output.Indent, selectedCount, total, action)
+	if useColor {
+		line = theme.Muted.Render(line)
+	}
+	return wrapRawLineToWidth(line, currentWrapWidth())[0]
+}
+
+func renderSingleSelectFooterLine(action string, theme Theme, useColor bool) string {
+	if strings.TrimSpace(action) == "" {
+		action = "select"
+	}
+	line := fmt.Sprintf("%s↑↓ move  space/enter %s  type filter  esc cancel", output.Indent, action)
+	if useColor {
+		line = theme.Muted.Render(line)
+	}
+	return wrapRawLineToWidth(line, currentWrapWidth())[0]
 }
 
 func renderChoiceList(b *strings.Builder, items []string, cursor int, maxVisible int, useColor bool, theme Theme) {
@@ -3015,6 +3330,10 @@ func renderRepoChoiceList(b *strings.Builder, items []PromptChoice, cursor int, 
 	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
 	for i := range items {
 		item := items[i]
+		focusMark := " "
+		if i == cursor {
+			focusMark = ">"
+		}
 		connector := output.TreeBranchMid
 		if i == len(items)-1 {
 			connector = output.TreeBranchLast
@@ -3031,8 +3350,149 @@ func renderRepoChoiceList(b *strings.Builder, items []PromptChoice, cursor int, 
 				display += " - " + desc
 			}
 		}
-		line := fmt.Sprintf("%s%s%s", output.Indent+output.Indent, mutedToken(theme, useColor, connector), display)
+		line := fmt.Sprintf("%s%s %s%s", output.Indent, focusMark, mutedToken(theme, useColor, connector), display)
 		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapRawLineToWidth(line, width)})
+	}
+
+	if cursor < 0 || cursor >= len(groups) {
+		cursor = 0
+	}
+	if len(groups[cursor].lines) > maxVisible {
+		start, end := listWindow(len(groups[cursor].lines), 0, maxVisible)
+		for i := start; i < end; i++ {
+			b.WriteString(groups[cursor].lines[i])
+			b.WriteString("\n")
+		}
+		return
+	}
+	startGroup, endGroup := groupWindowByLineBudget(groups, cursor, maxVisible)
+	for gi := startGroup; gi < endGroup; gi++ {
+		for _, line := range groups[gi].lines {
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	}
+}
+
+func renderRepoMultiSelectChoiceList(b *strings.Builder, items []PromptChoice, cursor int, maxVisible int, selected map[string]bool, confirming bool, useColor bool, theme Theme) {
+	if maxVisible <= 0 {
+		return
+	}
+	if len(items) == 0 {
+		msg := "no matches"
+		if useColor {
+			msg = theme.Muted.Render(msg)
+		}
+		b.WriteString(fmt.Sprintf("%s%s%s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.TreeBranchLast), msg))
+		return
+	}
+
+	width := currentWrapWidth()
+	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
+	for i := range items {
+		item := items[i]
+		focusMark := " "
+		if i == cursor {
+			focusMark = ">"
+		}
+		selectMark := "○"
+		if selected[item.Value] {
+			selectMark = "●"
+		}
+		if useColor && selected[item.Value] {
+			selectMark = theme.Accent.Render(selectMark)
+		}
+		display := item.Label
+		if i == cursor && useColor && !confirming {
+			display = lipgloss.NewStyle().Bold(true).Render(display)
+		}
+		desc := strings.TrimSpace(item.Description)
+		if desc != "" {
+			if useColor {
+				display += theme.Muted.Render(" - " + desc)
+			} else {
+				display += " - " + desc
+			}
+		}
+		line := fmt.Sprintf("%s%s %s %s", output.Indent, focusMark, selectMark, display)
+		wrapped := wrapRawLineToWidth(line, width)
+		if confirming && !selected[item.Value] && useColor {
+			for i := range wrapped {
+				wrapped[i] = theme.Muted.Render(ansi.Strip(wrapped[i]))
+			}
+		}
+		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapped})
+	}
+
+	if cursor < 0 || cursor >= len(groups) {
+		cursor = 0
+	}
+	if len(groups[cursor].lines) > maxVisible {
+		start, end := listWindow(len(groups[cursor].lines), 0, maxVisible)
+		for i := start; i < end; i++ {
+			b.WriteString(groups[cursor].lines[i])
+			b.WriteString("\n")
+		}
+		return
+	}
+	startGroup, endGroup := groupWindowByLineBudget(groups, cursor, maxVisible)
+	for gi := startGroup; gi < endGroup; gi++ {
+		for _, line := range groups[gi].lines {
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	}
+}
+
+func renderRepoSingleSelectChoiceList(b *strings.Builder, items []PromptChoice, cursor int, maxVisible int, selectedValue string, confirming bool, useColor bool, theme Theme) {
+	if maxVisible <= 0 {
+		return
+	}
+	if len(items) == 0 {
+		msg := "no matches"
+		if useColor {
+			msg = theme.Muted.Render(msg)
+		}
+		b.WriteString(fmt.Sprintf("%s%s%s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.TreeBranchLast), msg))
+		return
+	}
+
+	width := currentWrapWidth()
+	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
+	for i := range items {
+		item := items[i]
+		focusMark := " "
+		if i == cursor {
+			focusMark = ">"
+		}
+		selected := item.Value == selectedValue
+		selectMark := "○"
+		if selected {
+			selectMark = "●"
+		}
+		if useColor && selected {
+			selectMark = theme.Accent.Render(selectMark)
+		}
+		display := item.Label
+		if i == cursor && useColor && !confirming {
+			display = lipgloss.NewStyle().Bold(true).Render(display)
+		}
+		desc := strings.TrimSpace(item.Description)
+		if desc != "" {
+			if useColor {
+				display += theme.Muted.Render(" - " + desc)
+			} else {
+				display += " - " + desc
+			}
+		}
+		line := fmt.Sprintf("%s%s %s %s", output.Indent, focusMark, selectMark, display)
+		wrapped := wrapRawLineToWidth(line, width)
+		if confirming && !selected && useColor {
+			for i := range wrapped {
+				wrapped[i] = theme.Muted.Render(ansi.Strip(wrapped[i]))
+			}
+		}
+		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapped})
 	}
 
 	if cursor < 0 || cursor >= len(groups) {
@@ -3222,10 +3682,10 @@ func buildWorkspaceRepoChoiceGroups(items []WorkspaceChoice, cursor int, useColo
 
 	baseIndent := output.Indent + output.Indent
 	selectIndent := func(selected bool) string {
-		if !selected || useColor {
+		if !selected {
 			return baseIndent
 		}
-		return ">" + baseIndent[1:]
+		return output.Indent + "> "
 	}
 
 	cursorWorkspace := -1
@@ -3441,6 +3901,10 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
 	for i := range items {
 		item := items[i]
+		focusMark := " "
+		if i == cursor {
+			focusMark = ">"
+		}
 		connectorToken := mutedToken(theme, useColor, output.LogConnector)
 		displayID := item.ID
 		warnValue := shortWarningTag(item.Warning)
@@ -3476,8 +3940,193 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 				display += " - " + desc
 			}
 		}
-		line := fmt.Sprintf("%s%s %s", output.Indent+output.Indent, connectorToken, display)
+		line := fmt.Sprintf("%s%s %s %s", output.Indent, focusMark, connectorToken, display)
 		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapRawLineToWidth(line, width)})
+	}
+
+	if cursor < 0 || cursor >= len(groups) {
+		cursor = 0
+	}
+	if len(groups[cursor].lines) > maxVisible {
+		start, end := listWindow(len(groups[cursor].lines), 0, maxVisible)
+		for i := start; i < end; i++ {
+			b.WriteString(groups[cursor].lines[i])
+			b.WriteString("\n")
+		}
+		return
+	}
+	startGroup, endGroup := groupWindowByLineBudget(groups, cursor, maxVisible)
+	for gi := startGroup; gi < endGroup; gi++ {
+		for _, line := range groups[gi].lines {
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	}
+}
+
+func renderWorkspaceMultiSelectChoiceList(b *strings.Builder, items []WorkspaceChoice, cursor int, maxVisible int, selected map[string]bool, confirming bool, useColor bool, theme Theme) {
+	if maxVisible <= 0 {
+		return
+	}
+	if len(items) == 0 {
+		msg := "no matches"
+		if useColor {
+			msg = theme.Muted.Render(msg)
+		}
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
+		return
+	}
+
+	width := currentWrapWidth()
+	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
+	for i := range items {
+		item := items[i]
+		focusMark := " "
+		if i == cursor {
+			focusMark = ">"
+		}
+		selectMark := "○"
+		if selected[item.ID] {
+			selectMark = "●"
+		}
+		if useColor && selected[item.ID] {
+			selectMark = theme.Accent.Render(selectMark)
+		}
+		displayID := item.ID
+		warnValue := shortWarningTag(item.Warning)
+		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
+		warnStyle := theme.Warn
+		if item.WarningStrong {
+			warnStyle = theme.Error
+		}
+		warnTag := ""
+		if hasWarn {
+			warnTag = "[" + warnValue + "]"
+		}
+		if useColor && i == cursor && !confirming {
+			displayID = lipgloss.NewStyle().Bold(true).Render(displayID)
+		}
+		display := displayID
+		if warnTag != "" {
+			tag := warnTag
+			if useColor {
+				if hasWarn {
+					tag = warnStyle.Render(warnTag)
+				} else {
+					tag = theme.Accent.Render(warnTag)
+				}
+			}
+			display += tag
+		}
+		desc := strings.TrimSpace(item.Description)
+		if desc != "" {
+			if useColor {
+				display += theme.Muted.Render(" - " + desc)
+			} else {
+				display += " - " + desc
+			}
+		}
+		line := fmt.Sprintf("%s%s %s %s", output.Indent, focusMark, selectMark, display)
+		wrapped := wrapRawLineToWidth(line, width)
+		if confirming && !selected[item.ID] && useColor {
+			for i := range wrapped {
+				wrapped[i] = theme.Muted.Render(ansi.Strip(wrapped[i]))
+			}
+		}
+		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapped})
+	}
+
+	if cursor < 0 || cursor >= len(groups) {
+		cursor = 0
+	}
+	if len(groups[cursor].lines) > maxVisible {
+		start, end := listWindow(len(groups[cursor].lines), 0, maxVisible)
+		for i := start; i < end; i++ {
+			b.WriteString(groups[cursor].lines[i])
+			b.WriteString("\n")
+		}
+		return
+	}
+	startGroup, endGroup := groupWindowByLineBudget(groups, cursor, maxVisible)
+	for gi := startGroup; gi < endGroup; gi++ {
+		for _, line := range groups[gi].lines {
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	}
+}
+
+func renderWorkspaceSingleSelectChoiceList(b *strings.Builder, items []WorkspaceChoice, cursor int, maxVisible int, selectedID string, confirming bool, useColor bool, theme Theme) {
+	if maxVisible <= 0 {
+		return
+	}
+	if len(items) == 0 {
+		msg := "no matches"
+		if useColor {
+			msg = theme.Muted.Render(msg)
+		}
+		b.WriteString(fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), msg))
+		return
+	}
+
+	width := currentWrapWidth()
+	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
+	for i := range items {
+		item := items[i]
+		focusMark := " "
+		if i == cursor {
+			focusMark = ">"
+		}
+		selected := item.ID == selectedID
+		selectMark := "○"
+		if selected {
+			selectMark = "●"
+		}
+		if useColor && selected {
+			selectMark = theme.Accent.Render(selectMark)
+		}
+		displayID := item.ID
+		warnValue := shortWarningTag(item.Warning)
+		hasWarn := strings.TrimSpace(warnValue) != "" && strings.TrimSpace(strings.ToLower(warnValue)) != "clean"
+		warnStyle := theme.Warn
+		if item.WarningStrong {
+			warnStyle = theme.Error
+		}
+		warnTag := ""
+		if hasWarn {
+			warnTag = "[" + warnValue + "]"
+		}
+		if useColor && i == cursor && !confirming {
+			displayID = lipgloss.NewStyle().Bold(true).Render(displayID)
+		}
+		display := displayID
+		if warnTag != "" {
+			tag := warnTag
+			if useColor {
+				if hasWarn {
+					tag = warnStyle.Render(warnTag)
+				} else {
+					tag = theme.Accent.Render(warnTag)
+				}
+			}
+			display += tag
+		}
+		desc := strings.TrimSpace(item.Description)
+		if desc != "" {
+			if useColor {
+				display += theme.Muted.Render(" - " + desc)
+			} else {
+				display += " - " + desc
+			}
+		}
+		line := fmt.Sprintf("%s%s %s %s", output.Indent, focusMark, selectMark, display)
+		wrapped := wrapRawLineToWidth(line, width)
+		if confirming && !selected && useColor {
+			for i := range wrapped {
+				wrapped[i] = theme.Muted.Render(ansi.Strip(wrapped[i]))
+			}
+		}
+		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapped})
 	}
 
 	if cursor < 0 || cursor >= len(groups) {

@@ -62,7 +62,11 @@ func (r *Renderer) Step(text string) {
 
 func (r *Renderer) StepLog(text string) {
 	// Align nested logs with the Plan tree indentation.
-	r.writeWithPrefix(output.Indent+output.LogConnector+" ", r.style(text, r.theme.Muted))
+	prefix := output.Indent + output.LogConnector + " "
+	if r.useColor {
+		prefix = r.style(prefix, r.theme.Muted)
+	}
+	r.writeWithPrefix(prefix, r.style(text, r.theme.Muted))
 }
 
 func (r *Renderer) StepLogOutput(text string) {

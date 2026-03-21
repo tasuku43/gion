@@ -2,11 +2,14 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/tasuku43/gion/internal/domain/workspace"
 	"github.com/tasuku43/gion/internal/infra/shellaction"
 )
 
@@ -87,5 +90,43 @@ func TestFinalizeGiongoSelection_EmitsShellAction(t *testing.T) {
 	}
 	if string(data) != "builtin cd -- '/tmp/example'\n" {
 		t.Fatalf("action file = %q", string(data))
+	}
+}
+
+func TestBuildGiongoWorkspaceChoices_OmitsDuplicateBranchDetail(t *testing.T) {
+	root := t.TempDir()
+	wsPath := filepath.Join(root, "WS-1")
+	repoPath := filepath.Join(wsPath, "gion")
+	if err := os.MkdirAll(repoPath, 0o755); err != nil {
+		t.Fatalf("mkdir repo: %v", err)
+	}
+
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repoPath
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed: %v\n%s", args, err, string(out))
+		}
+	}
+	run("init", "-b", "feature/test")
+	run("remote", "add", "origin", "git@github.com:tasuku43/gion.git")
+
+	choices, err := buildGiongoWorkspaceChoices(context.Background(), []workspace.Entry{{
+		WorkspaceID:   "WS-1",
+		WorkspacePath: wsPath,
+	}})
+	if err != nil {
+		t.Fatalf("buildGiongoWorkspaceChoices() error: %v", err)
+	}
+	if len(choices) != 1 || len(choices[0].Repos) != 1 {
+		t.Fatalf("unexpected choices: %+v", choices)
+	}
+	repoChoice := choices[0].Repos[0]
+	if repoChoice.Label != "gion (branch: feature/test)" {
+		t.Fatalf("repo label = %q", repoChoice.Label)
+	}
+	if len(repoChoice.Details) != 1 || repoChoice.Details[0] != "repo: github.com/tasuku43/gion" {
+		t.Fatalf("repo details = %#v", repoChoice.Details)
 	}
 }
