@@ -256,8 +256,14 @@ func TestChoiceSelectModel_SpaceSelectsCurrent(t *testing.T) {
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeySpace})
 	next := updated.(choiceSelectModel)
-	if next.value != "b" || !next.done {
-		t.Fatalf("expected space to select b, got value=%q done=%v", next.value, next.done)
+	if next.value != "b" || !next.confirming || next.done {
+		t.Fatalf("expected space to enter confirming for b, got value=%q confirming=%v done=%v", next.value, next.confirming, next.done)
+	}
+
+	updated, _ = next.Update(singleSelectConfirmDoneMsg{})
+	next = updated.(choiceSelectModel)
+	if !next.done {
+		t.Fatalf("expected confirm message to complete selection")
 	}
 }
 
@@ -270,8 +276,8 @@ func TestWorkspaceSelectModel_SpaceSelectsCurrent(t *testing.T) {
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeySpace})
 	next := updated.(workspaceSelectModel)
-	if next.workspaceID != "WS-2" {
-		t.Fatalf("expected space to select WS-2, got %q", next.workspaceID)
+	if next.workspaceID != "WS-2" || !next.confirming {
+		t.Fatalf("expected space to enter confirming for WS-2, got workspaceID=%q confirming=%v", next.workspaceID, next.confirming)
 	}
 }
 
@@ -337,9 +343,75 @@ func TestCreateFlowMode_SpaceSelectsCurrentMode(t *testing.T) {
 	model.cursor = 2
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeySpace})
-	next := updated.(createFlowModel)
+	next := updated.(*createFlowModel)
+	if !next.confirming || next.pendingMode != "review" {
+		t.Fatalf("expected space to enter confirming review mode, got confirming=%v pendingMode=%q", next.confirming, next.pendingMode)
+	}
+
+	updated, _ = next.Update(singleSelectConfirmDoneMsg{})
+	next = updated.(*createFlowModel)
 	if next.stage != createStageReviewRepo {
-		t.Fatalf("expected space to move to review repo stage, got %v", next.stage)
+		t.Fatalf("expected confirm message to move to review repo stage, got %v", next.stage)
+	}
+}
+
+func TestChoiceSelectView_HidesAssistAndMutesOthersWhileConfirming(t *testing.T) {
+	model := newChoiceSelectModel("title", "repo", []PromptChoice{
+		{Label: "example/repo-a", Value: "a"},
+		{Label: "example/repo-b", Value: "b"},
+	}, DefaultTheme(), true)
+	model.value = "b"
+	model.confirming = true
+	model.cursor = 1
+
+	view := model.View()
+	if strings.Contains(view, "filter:") || strings.Contains(view, "space/enter") {
+		t.Fatalf("confirming view should hide assist lines, got: %q", view)
+	}
+	if !strings.Contains(view, "●") {
+		t.Fatalf("confirming view should show selected marker, got: %q", view)
+	}
+	if !strings.Contains(view, "○ example/repo-a") {
+		t.Fatalf("confirming view should keep unselected rows visible, got: %q", view)
+	}
+}
+
+func TestCreateFlowModeView_HidesAssistAndMutesOthersWhileConfirming(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		true,
+		"",
+		"",
+	)
+	model.confirming = true
+	model.pendingMode = "issue"
+	model.filtered = model.filterModes()
+	model.cursor = 1
+
+	view := model.View()
+	if strings.Contains(view, "filter:") || strings.Contains(view, "space/enter") {
+		t.Fatalf("confirming mode view should hide assist lines, got: %q", view)
+	}
+	if !strings.Contains(view, "●") {
+		t.Fatalf("confirming mode view should show selected marker, got: %q", view)
+	}
+	if !strings.Contains(view, "○ repo - 1 repo only") {
+		t.Fatalf("confirming mode view should keep unselected rows visible, got: %q", view)
 	}
 }
 
