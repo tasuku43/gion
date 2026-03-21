@@ -87,6 +87,72 @@ func TestMultiSelectView_DoesNotExceedHeight(t *testing.T) {
 	}
 }
 
+func TestMultiSelectView_ShowsAssistLines(t *testing.T) {
+	model := newMultiSelectModel("title", "repo", []PromptChoice{
+		{Label: "example/repo-b", Value: "b"},
+	}, DefaultTheme(), false)
+	model.selectedValues = []string{"a"}
+	model.selected = []PromptChoice{{Label: "example/repo-a", Value: "a"}}
+	model.input.SetValue("repo")
+
+	view := model.View()
+	if !strings.Contains(view, "filter: repo") {
+		t.Fatalf("expected filter assist line, got: %q", view)
+	}
+	if !strings.Contains(view, "selected: 1/2") {
+		t.Fatalf("expected selected summary line, got: %q", view)
+	}
+	if !strings.Contains(view, "enter add") {
+		t.Fatalf("expected action hint line, got: %q", view)
+	}
+}
+
+func TestWorkspaceMultiSelectView_ShowsAssistLines(t *testing.T) {
+	model := newWorkspaceMultiSelectModel("gion manifest rm", []WorkspaceChoice{
+		{ID: "WS-2", Description: "second"},
+	}, nil, DefaultTheme(), false)
+	model.selectedIDs = []string{"WS-1"}
+	model.selected = []WorkspaceChoice{{ID: "WS-1", Description: "first"}}
+	model.input.SetValue("WS")
+
+	view := model.View()
+	if !strings.Contains(view, "filter: WS") {
+		t.Fatalf("expected filter assist line, got: %q", view)
+	}
+	if !strings.Contains(view, "selected: 1/2") {
+		t.Fatalf("expected selected summary line, got: %q", view)
+	}
+	if !strings.Contains(view, "enter remove") {
+		t.Fatalf("expected remove action hint line, got: %q", view)
+	}
+}
+
+func TestMultiSelectCandidateRows_ShowFocusMarker(t *testing.T) {
+	var b strings.Builder
+	renderRepoChoiceList(&b, []PromptChoice{
+		{Label: "example/repo-a", Value: "a"},
+		{Label: "example/repo-b", Value: "b"},
+	}, 1, 10, false, DefaultTheme())
+
+	out := b.String()
+	if !strings.Contains(out, "> └─ example/repo-b") {
+		t.Fatalf("expected focused repo row marker, got: %q", out)
+	}
+}
+
+func TestWorkspaceMultiSelectCandidateRows_ShowFocusMarker(t *testing.T) {
+	var b strings.Builder
+	renderWorkspaceChoiceList(&b, []WorkspaceChoice{
+		{ID: "WS-1", Description: "first"},
+		{ID: "WS-2", Description: "second"},
+	}, 0, 10, false, DefaultTheme())
+
+	out := b.String()
+	if !strings.Contains(out, "> └─ WS-1 - first") {
+		t.Fatalf("expected focused workspace row marker, got: %q", out)
+	}
+}
+
 func TestStableLayout_TruncatesLinesWithDots(t *testing.T) {
 	setWrapWidth(20)
 	defer setWrapWidth(0)

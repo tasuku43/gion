@@ -103,7 +103,13 @@ Steps
 - Help line: muted color, minimal content
 - Long selection lists should scroll so Inputs stay visible.
 
+Selector-specific interaction and visual rules are documented in
+[UI-SELECTOR.md](/Users/tasuku43/gionroot/workspaces/gion/gion/docs/spec/ui/UI-SELECTOR.md).
+
 ## Pickers
+
+Pickers in `gion` are flow-oriented by default. They should share visual language
+with `kra`, but are not required to copy `kra`'s in-list toggle model.
 
 ### Workspace picker line format
 When rendering workspace candidates (e.g. in `gion manifest rm`), use a compact single-line display:

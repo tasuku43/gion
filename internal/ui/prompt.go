@@ -1617,12 +1617,13 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	if hasError {
 		infoLines++
 	}
-	// +1 for the inline "finish" help line appended under Inputs.
-	maxLines := listMaxLines(height, len(lines)+1, infoLines)
+	assistLines := multiSelectAssistLines(model.selectedValues, len(model.choices)+len(model.selected), "add", model.input.Value(), model.theme, model.useColor)
+	maxLines := listMaxLines(height, len(lines)+len(assistLines), infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderRepoChoiceList(b, model.filtered, model.cursor, maxLines, model.useColor, model.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	frame.AppendInputsRaw(assistLines...)
 
 	if hasSelected || hasError {
 		if hasSelected {
@@ -1643,10 +1644,6 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(model.theme, model.useColor, output.LogConnector), msg))
 	}
 
-	infoPrefix := mutedToken(model.theme, model.useColor, output.StepPrefix)
-	frame.AppendInputsRaw(
-		fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix),
-	)
 	return frame.Render()
 }
 
@@ -2880,12 +2877,13 @@ func (m workspaceMultiSelectModel) View() string {
 		})
 		infoLines += 1 + len(blockedLines)
 	}
-	// +1 for the inline "finish" help line appended under Inputs.
-	maxLines := listMaxLines(m.height, 2, infoLines)
+	assistLines := multiSelectAssistLines(m.selectedIDs, len(m.workspaces)+len(m.selected), "remove", m.input.Value(), m.theme, m.useColor)
+	maxLines := listMaxLines(m.height, 1+len(assistLines), infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
+	frame.AppendInputsRaw(assistLines...)
 
 	if m.useColor {
 		frame.SetInfo(m.theme.Accent.Render("selected"))
@@ -2901,9 +2899,6 @@ func (m workspaceMultiSelectModel) View() string {
 		}
 		frame.AppendInfoRaw(fmt.Sprintf("%s%s %s", output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
 	}
-
-	infoPrefix := mutedToken(m.theme, m.useColor, output.StepPrefix)
-	frame.AppendInputsRaw(fmt.Sprintf("%s%s finish: Ctrl+D or type \"done\"", output.Indent, infoPrefix))
 
 	if len(blockedLines) > 0 {
 		frame.AppendInfo("blocked workspaces")
@@ -2951,6 +2946,36 @@ func listWindow(total int, cursor int, maxVisible int) (int, int) {
 		start = total - maxVisible
 	}
 	return start, start + maxVisible
+}
+
+func multiSelectAssistLines(selected []string, total int, action string, filterValue string, theme Theme, useColor bool) []string {
+	return []string{
+		renderMultiSelectFilterLine(filterValue, theme, useColor),
+		renderMultiSelectFooterLine(len(selected), total, action, theme, useColor),
+	}
+}
+
+func renderMultiSelectFilterLine(filterValue string, theme Theme, useColor bool) string {
+	body := strings.TrimSpace(filterValue)
+	line := fmt.Sprintf("%sfilter: %s", output.Indent, body)
+	if useColor {
+		line = theme.Muted.Render(output.Indent+"filter: ") + body
+	}
+	return wrapRawLineToWidth(line, currentWrapWidth())[0]
+}
+
+func renderMultiSelectFooterLine(selectedCount int, total int, action string, theme Theme, useColor bool) string {
+	if total < selectedCount {
+		total = selectedCount
+	}
+	if strings.TrimSpace(action) == "" {
+		action = "add"
+	}
+	line := fmt.Sprintf("%sselected: %d/%d  ↑↓ move  enter %s  ctrl+d finish  esc cancel", output.Indent, selectedCount, total, action)
+	if useColor {
+		line = theme.Muted.Render(line)
+	}
+	return wrapRawLineToWidth(line, currentWrapWidth())[0]
 }
 
 func renderChoiceList(b *strings.Builder, items []string, cursor int, maxVisible int, useColor bool, theme Theme) {
@@ -3015,6 +3040,10 @@ func renderRepoChoiceList(b *strings.Builder, items []PromptChoice, cursor int, 
 	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
 	for i := range items {
 		item := items[i]
+		focusMark := " "
+		if i == cursor {
+			focusMark = ">"
+		}
 		connector := output.TreeBranchMid
 		if i == len(items)-1 {
 			connector = output.TreeBranchLast
@@ -3031,7 +3060,7 @@ func renderRepoChoiceList(b *strings.Builder, items []PromptChoice, cursor int, 
 				display += " - " + desc
 			}
 		}
-		line := fmt.Sprintf("%s%s%s", output.Indent+output.Indent, mutedToken(theme, useColor, connector), display)
+		line := fmt.Sprintf("%s%s %s%s", output.Indent, focusMark, mutedToken(theme, useColor, connector), display)
 		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapRawLineToWidth(line, width)})
 	}
 
@@ -3441,6 +3470,10 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
 	for i := range items {
 		item := items[i]
+		focusMark := " "
+		if i == cursor {
+			focusMark = ">"
+		}
 		connectorToken := mutedToken(theme, useColor, output.LogConnector)
 		displayID := item.ID
 		warnValue := shortWarningTag(item.Warning)
@@ -3476,7 +3509,7 @@ func renderWorkspaceChoiceList(b *strings.Builder, items []WorkspaceChoice, curs
 				display += " - " + desc
 			}
 		}
-		line := fmt.Sprintf("%s%s %s", output.Indent+output.Indent, connectorToken, display)
+		line := fmt.Sprintf("%s%s %s %s", output.Indent, focusMark, connectorToken, display)
 		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapRawLineToWidth(line, width)})
 	}
 
