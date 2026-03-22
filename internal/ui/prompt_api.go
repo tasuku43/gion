@@ -316,7 +316,7 @@ func PromptCreateFlow(title string, startMode string, defaultWorkspaceID string,
 func WorkspaceChoiceLines(items []WorkspaceChoice, cursor int, useColor bool, theme Theme) []string {
 	var lines []string
 	builder := &strings.Builder{}
-	renderWorkspaceChoiceList(builder, items, cursor, listMaxLines(0, len(items), 0), useColor, theme)
+	renderWorkspaceChoiceList(builder, items, cursor, len(items), useColor, theme)
 	lines = append(lines, splitLines(builder.String())...)
 	return lines
 }

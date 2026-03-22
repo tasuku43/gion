@@ -843,6 +843,93 @@ func TestConfirmInlineLineModel_IsMultiline(t *testing.T) {
 	}
 }
 
+func TestConfirmInlineLineModel_HidesStepWhileConfirming(t *testing.T) {
+	model := newConfirmInlineLineModel("Apply changes? (default: No)", DefaultTheme(), false)
+	model.confirming = true
+
+	out := model.View()
+	if strings.TrimSpace(out) != "" {
+		t.Fatalf("expected confirming view to hide step, got: %q", out)
+	}
+}
+
+func TestCreateFlowView_ShowsPendingModeInContext(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"",
+		"",
+	)
+
+	view := model.View()
+	if !strings.Contains(view, "Context") {
+		t.Fatalf("expected context section, got: %q", view)
+	}
+	if !strings.Contains(view, "• mode: ") && !strings.Contains(view, "• mode:") {
+		t.Fatalf("expected pending mode line in context, got: %q", view)
+	}
+}
+
+func TestInputsModelPresetView_ShowsPendingPresetInContext(t *testing.T) {
+	model := newInputsModel("title", []string{"repo-a"}, "", "", DefaultTheme(), false)
+
+	view := model.View()
+	if !strings.Contains(view, "Context") {
+		t.Fatalf("expected context section, got: %q", view)
+	}
+	if !strings.Contains(view, "• preset: ") && !strings.Contains(view, "• preset:") {
+		t.Fatalf("expected pending preset line in context, got: %q", view)
+	}
+}
+
+func TestCreateFlowDescriptionView_ShowsPendingDescriptionInContext(t *testing.T) {
+	model := newCreateFlowModel(
+		"gion manifest add",
+		nil,
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"",
+		"",
+	)
+	model.stage = createStagePresetDesc
+	model.mode = "preset"
+	model.presetModel.preset = "gion"
+	model.presetModel.workspaceID = "ws-test"
+
+	view := model.View()
+	if !strings.Contains(view, "• description: ") && !strings.Contains(view, "• description:") {
+		t.Fatalf("expected pending description line in context, got: %q", view)
+	}
+}
+
 func TestInputsModelPresetView_UsesFilterAssistLines(t *testing.T) {
 	model := newInputsModel("title", []string{"cwrds", "gion", "kra"}, "", "", DefaultTheme(), false)
 	model.search.SetValue("g")
@@ -990,5 +1077,21 @@ func TestPresetNameModel_UsesBottomInputAssistLines(t *testing.T) {
 	}
 	if !strings.Contains(view, "enter confirm  esc cancel") {
 		t.Fatalf("expected text input footer, got: %q", view)
+	}
+	if !strings.Contains(view, "• preset name: ") && !strings.Contains(view, "• preset name:") {
+		t.Fatalf("expected pending preset name line in context, got: %q", view)
+	}
+}
+
+func TestInputInlineModel_ShowsPendingLabelInContext(t *testing.T) {
+	model := newInputInlineModel("description", "", nil, DefaultTheme(), false)
+	model.input.SetValue("draft")
+
+	view := model.View()
+	if !strings.Contains(view, "Context") {
+		t.Fatalf("expected context section, got: %q", view)
+	}
+	if !strings.Contains(view, "• description: ") && !strings.Contains(view, "• description:") {
+		t.Fatalf("expected pending input label in context, got: %q", view)
 	}
 }
