@@ -88,17 +88,18 @@ type inputsModel struct {
 	label       string
 	validateID  func(string) error
 
-	stage     inputsStage
-	theme     Theme
-	useColor  bool
-	search    textinput.Model
-	idInput   textinput.Model
-	filtered  []string
-	cursor    int
-	err       error
-	errorLine string
-	done      bool
-	height    int
+	stage      inputsStage
+	theme      Theme
+	useColor   bool
+	search     textinput.Model
+	idInput    textinput.Model
+	filtered   []string
+	cursor     int
+	err        error
+	errorLine  string
+	confirming bool
+	done       bool
+	height     int
 }
 
 type createFlowModel struct {
@@ -764,7 +765,21 @@ func (m inputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
 		return m, nil
+	case singleSelectConfirmDoneMsg:
+		if m.stage == stagePreset && m.confirming {
+			m.confirming = false
+			if strings.TrimSpace(m.workspaceID) != "" {
+				m.done = true
+				return m, tea.Quit
+			}
+			m.stage = stageWorkspace
+			m.idInput.Focus()
+			return m, nil
+		}
 	case tea.KeyMsg:
+		if m.stage == stagePreset && m.confirming {
+			return m, nil
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.err = ErrPromptCanceled
@@ -775,13 +790,9 @@ func (m inputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				m.preset = m.filtered[m.cursor]
-				if strings.TrimSpace(m.workspaceID) != "" {
-					m.done = true
-					return m, tea.Quit
-				}
-				m.stage = stageWorkspace
-				m.idInput.Focus()
-				return m, nil
+				m.confirming = true
+				m.search.Blur()
+				return m, singleSelectConfirmCmd()
 			}
 			if m.stage == stageWorkspace {
 				value := strings.TrimSpace(m.idInput.Value())
@@ -809,6 +820,25 @@ func (m inputsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 				return m, nil
 			}
+		case tea.KeySpace:
+			if m.stage == stagePreset {
+				if len(m.filtered) == 0 {
+					return m, nil
+				}
+				m.preset = m.filtered[m.cursor]
+				m.confirming = true
+				m.search.Blur()
+				return m, singleSelectConfirmCmd()
+			}
+		}
+		if m.stage == stagePreset && msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && (msg.Runes[0] == ' ' || msg.Runes[0] == '　') {
+			if len(m.filtered) == 0 {
+				return m, nil
+			}
+			m.preset = m.filtered[m.cursor]
+			m.confirming = true
+			m.search.Blur()
+			return m, singleSelectConfirmCmd()
 		}
 	}
 
@@ -841,9 +871,9 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 	labelPreset := promptLabel(m.theme, m.useColor, label)
 	promptLines := append([]string(nil), headerLines...)
 	if m.stage == stagePreset {
-		promptLines = append(promptLines, fmt.Sprintf("%s: %s", labelPreset, m.search.View()))
+		promptLines = append(promptLines, renderPromptValueLine(labelPreset, selectedInputValue(m.confirming, m.preset)))
 	} else {
-		promptLines = append(promptLines, fmt.Sprintf("%s: %s", labelPreset, m.preset))
+		promptLines = append(promptLines, renderPromptValueLine(labelPreset, m.preset))
 	}
 
 	if m.stage == stageWorkspace {
@@ -856,11 +886,23 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 	frame.SetInputsPrompt(promptLines...)
 
 	if m.stage == stagePreset {
-		maxLines := listMaxLines(m.height, len(promptLines), 0)
+		assistLines := []string(nil)
+		if !m.confirming {
+			assistLines = singleSelectAssistLines("select", m.search.Value(), m.theme, m.useColor)
+		}
+		extraAssistGap := 0
+		if len(assistLines) > 0 {
+			extraAssistGap = 1
+		}
+		maxLines := listMaxLines(m.height, len(promptLines)+len(assistLines)+extraAssistGap, 0)
 		rawLines := collectLines(func(b *strings.Builder) {
-			renderChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
+			renderChoiceList(b, m.filtered, m.cursor, maxLines, m.preset, m.confirming, m.useColor, m.theme)
 		})
 		frame.AppendInputsRaw(rawLines...)
+		if len(assistLines) > 0 {
+			frame.AppendInputsRaw("")
+			frame.AppendInputsRaw(assistLines...)
+		}
 	}
 
 	if m.stage == stageWorkspace && m.errorLine != "" {
@@ -1183,6 +1225,7 @@ type presetRepoSelectModel struct {
 	filtered   []PromptChoice
 	selected   []string
 	addedNote  string
+	confirming bool
 
 	theme    Theme
 	useColor bool
@@ -1252,7 +1295,15 @@ func (m presetRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
 		return m, nil
+	case singleSelectConfirmDoneMsg:
+		if m.confirming {
+			return m, tea.Quit
+		}
+		return m, nil
 	case tea.KeyMsg:
+		if m.confirming {
+			return m, nil
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.err = ErrPromptCanceled
@@ -1273,7 +1324,9 @@ func (m presetRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errorLine = "select at least one repo"
 				return m, nil
 			}
-			return m, tea.Quit
+			m.confirming = true
+			m.repoInput.Blur()
+			return m, singleSelectConfirmCmd()
 		case tea.KeyUp:
 			if m.cursor > 0 {
 				m.cursor--
@@ -1301,7 +1354,9 @@ func (m presetRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errorLine = "select at least one repo"
 				return m, nil
 			}
-			return m, tea.Quit
+			m.confirming = true
+			m.repoInput.Blur()
+			return m, singleSelectConfirmCmd()
 		case tea.KeySpace:
 			if m.stage == stagePresetName {
 				return m, nil
@@ -1358,26 +1413,39 @@ func (m presetRepoSelectModel) View() string {
 		presetName = m.nameInput.View()
 	}
 	labelRepo := promptLabel(m.theme, m.useColor, "repo")
-	repoInput := m.repoInput.View()
-	if m.stage == stagePresetName {
-		repoInput = ""
+	repoValue := ""
+	if m.stage == stageRepoSelect && m.confirming {
+		repoValue = strings.Join(m.selected, ", ")
 	}
 	frame.SetInputsPrompt(
 		fmt.Sprintf("%s: %s", labelName, presetName),
-		fmt.Sprintf("%s: %s", labelRepo, repoInput),
+		renderPromptValueLine(labelRepo, repoValue),
 	)
 
 	infoLines := 0
 	if m.errorLine != "" {
 		infoLines++
 	}
-	assistLines := multiSelectAssistLines(m.selected, len(m.choices), "apply", m.repoInput.Value(), m.theme, m.useColor)
-	maxLines := listMaxLines(m.height, 2+len(assistLines), infoLines)
+	assistLines := []string(nil)
+	if m.stage == stageRepoSelect && !m.confirming {
+		assistLines = multiSelectAssistLines(m.selected, len(m.choices), "apply", m.repoInput.Value(), m.theme, m.useColor)
+	}
+	extraAssistGap := 0
+	if len(assistLines) > 0 {
+		extraAssistGap = 1
+	}
+	maxLines := listMaxLines(m.height, 2+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
-		renderRepoMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, selectedChoiceSet(m.selected), false, m.useColor, m.theme)
+		if m.stage == stagePresetName {
+			return
+		}
+		renderRepoMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, selectedChoiceSet(m.selected), m.confirming, m.useColor, m.theme)
 	})
 	frame.AppendInputsRaw(rawLines...)
-	frame.AppendInputsRaw(assistLines...)
+	if len(assistLines) > 0 {
+		frame.AppendInputsRaw("")
+		frame.AppendInputsRaw(assistLines...)
+	}
 
 	if m.errorLine != "" {
 		msg := m.errorLine
@@ -3243,6 +3311,13 @@ func renderPromptValueLine(label, value string) string {
 	return fmt.Sprintf("%s: %s", label, value)
 }
 
+func selectedInputValue(confirming bool, value string) string {
+	if !confirming {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
 func renderMultiSelectFooterLine(selectedCount int, total int, action string, theme Theme, useColor bool) string {
 	if total < selectedCount {
 		total = selectedCount
@@ -3268,7 +3343,7 @@ func renderSingleSelectFooterLine(action string, theme Theme, useColor bool) str
 	return wrapRawLineToWidth(line, currentWrapWidth())[0]
 }
 
-func renderChoiceList(b *strings.Builder, items []string, cursor int, maxVisible int, useColor bool, theme Theme) {
+func renderChoiceList(b *strings.Builder, items []string, cursor int, maxVisible int, selectedValue string, confirming bool, useColor bool, theme Theme) {
 	if maxVisible <= 0 {
 		return
 	}
@@ -3285,12 +3360,34 @@ func renderChoiceList(b *strings.Builder, items []string, cursor int, maxVisible
 	groups := make([]workspaceRepoChoiceGroup, 0, len(items))
 	for i := range items {
 		item := items[i]
+		focusMark := " "
+		if i == cursor {
+			focusMark = ">"
+		}
+		selected := item == selectedValue
+		selectMark := "○"
+		if selected {
+			selectMark = "●"
+		}
+		if useColor && selected {
+			selectMark = theme.Accent.Render(selectMark)
+		}
+		connector := output.TreeBranchMid
+		if i == len(items)-1 {
+			connector = output.TreeBranchLast
+		}
 		display := item
-		if i == cursor && useColor {
+		if i == cursor && useColor && !confirming {
 			display = lipgloss.NewStyle().Bold(true).Render(display)
 		}
-		line := fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), display)
-		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapRawLineToWidth(line, width)})
+		line := fmt.Sprintf("%s%s %s %s %s", output.Indent, focusMark, selectMark, mutedToken(theme, useColor, connector), display)
+		wrapped := wrapRawLineToWidth(line, width)
+		if confirming && !selected && useColor {
+			for i := range wrapped {
+				wrapped[i] = theme.Muted.Render(ansi.Strip(wrapped[i]))
+			}
+		}
+		groups = append(groups, workspaceRepoChoiceGroup{lines: wrapped})
 	}
 
 	if cursor < 0 || cursor >= len(groups) {

@@ -811,3 +811,110 @@ func TestConfirmInlineLineModel_IsMultiline(t *testing.T) {
 		t.Fatalf("expected output to contain connector")
 	}
 }
+
+func TestInputsModelPresetView_UsesFilterAssistLines(t *testing.T) {
+	model := newInputsModel("title", []string{"cwrds", "gion", "kra"}, "", "", DefaultTheme(), false)
+	model.search.SetValue("g")
+
+	view := model.View()
+	if strings.Contains(view, "• preset: g") {
+		t.Fatalf("active filter should not be echoed in preset header, got: %q", view)
+	}
+	if !strings.Contains(view, "filter: g") {
+		t.Fatalf("expected filter assist line, got: %q", view)
+	}
+	if !strings.Contains(view, "space/enter select") {
+		t.Fatalf("expected single-select footer line, got: %q", view)
+	}
+	if !strings.Contains(view, "\n\n  filter: g") {
+		t.Fatalf("expected a blank line before filter assist line, got: %q", view)
+	}
+}
+
+func TestInputsModelPresetRows_ShowTreeAndSelectionMarkers(t *testing.T) {
+	var b strings.Builder
+	renderChoiceList(&b, []string{"cwrds", "gion", "kra"}, 1, 10, "gion", false, false, DefaultTheme())
+
+	out := b.String()
+	if !strings.Contains(out, "○ ├─  cwrds") {
+		t.Fatalf("expected non-last preset row to use tree mid connector, got: %q", out)
+	}
+	if !strings.Contains(out, "> ● ├─  gion") {
+		t.Fatalf("expected focused selected preset row, got: %q", out)
+	}
+	if !strings.Contains(out, "○ └─  kra") {
+		t.Fatalf("expected last preset row to use tree last connector, got: %q", out)
+	}
+}
+
+func TestInputsModelPresetView_HidesAssistLinesWhileConfirming(t *testing.T) {
+	model := newInputsModel("title", []string{"cwrds", "gion"}, "", "", DefaultTheme(), false)
+	model.preset = "gion"
+	model.confirming = true
+
+	view := model.View()
+	if !strings.Contains(view, "• preset: gion") {
+		t.Fatalf("expected confirmed preset to remain in header, got: %q", view)
+	}
+	if strings.Contains(view, "filter:") {
+		t.Fatalf("expected filter assist line to be hidden while confirming, got: %q", view)
+	}
+	if strings.Contains(view, "space/enter select") {
+		t.Fatalf("expected single-select footer line to be hidden while confirming, got: %q", view)
+	}
+}
+
+func TestInputsModelPresetModel_EnterStartsConfirmTimer(t *testing.T) {
+	model := newInputsModel("title", []string{"cwrds"}, "", "", DefaultTheme(), false)
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next := updated.(inputsModel)
+	if !next.confirming {
+		t.Fatalf("expected preset selector to enter confirming state")
+	}
+	if next.preset != "cwrds" {
+		t.Fatalf("expected selected preset to be retained, got: %q", next.preset)
+	}
+	if cmd == nil {
+		t.Fatalf("expected confirm timer command")
+	}
+}
+
+func TestPresetRepoSelectView_UsesFilterAssistLines(t *testing.T) {
+	model := newPresetRepoSelectModel("title", "app", []PromptChoice{
+		{Label: "github.com/org/repo-a", Value: "a"},
+		{Label: "github.com/org/repo-b", Value: "b"},
+	}, DefaultTheme(), false)
+	model.stage = stageRepoSelect
+	model.repoInput.Focus()
+	model.repoInput.SetValue("repo")
+
+	view := model.View()
+	if strings.Contains(view, "• repo: repo") {
+		t.Fatalf("active filter should not be echoed in preset repo header, got: %q", view)
+	}
+	if !strings.Contains(view, "filter: repo") {
+		t.Fatalf("expected filter assist line, got: %q", view)
+	}
+	if !strings.Contains(view, "\n\n  filter: repo") {
+		t.Fatalf("expected a blank line before filter assist line, got: %q", view)
+	}
+}
+
+func TestPresetRepoSelectView_HidesAssistLinesWhileConfirming(t *testing.T) {
+	model := newPresetRepoSelectModel("title", "app", []PromptChoice{
+		{Label: "github.com/org/repo-a", Value: "a"},
+		{Label: "github.com/org/repo-b", Value: "b"},
+	}, DefaultTheme(), false)
+	model.stage = stageRepoSelect
+	model.selected = []string{"a"}
+	model.confirming = true
+
+	view := model.View()
+	if strings.Contains(view, "filter:") || strings.Contains(view, "selected: 1/2") {
+		t.Fatalf("expected preset repo confirm view to hide assist lines, got: %q", view)
+	}
+	if !strings.Contains(view, "• repo: a") {
+		t.Fatalf("expected selected repo value in header while confirming, got: %q", view)
+	}
+}
