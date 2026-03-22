@@ -1123,16 +1123,12 @@ func (m confirmInlineLineModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m confirmInlineLineModel) View() string {
+	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, m.label)
-	line := fmt.Sprintf("%s (y/n)", label)
-
-	prefix := output.StepPrefix + " "
-	if m.useColor {
-		prefix = m.theme.Accent.Render(output.StepPrefix) + " "
-	}
-	connector := mutedToken(m.theme, m.useColor, output.LogConnector)
-	return output.Indent + prefix + line + "\n" +
-		fmt.Sprintf("%s%s %s\n", output.Indent+output.Indent, connector, m.input.View())
+	frame.SetInputsPrompt(fmt.Sprintf("%s (y/n)", label))
+	frame.AppendInputsRaw("")
+	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
+	return frame.Render()
 }
 
 type inputInlineModel struct {

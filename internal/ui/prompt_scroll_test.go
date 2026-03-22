@@ -825,7 +825,7 @@ func TestBranchInputModel_SeparateInputLine_HidesInputAfterDone(t *testing.T) {
 }
 
 func TestConfirmInlineLineModel_IsMultiline(t *testing.T) {
-	setWrapWidth(20)
+	setWrapWidth(40)
 	defer setWrapWidth(0)
 	setStableLayout(true)
 	defer setStableLayout(false)
@@ -835,8 +835,11 @@ func TestConfirmInlineLineModel_IsMultiline(t *testing.T) {
 	if strings.Count(out, "\n") < 2 {
 		t.Fatalf("expected multiline output, got: %q", out)
 	}
-	if !strings.Contains(out, output.LogConnector) {
-		t.Fatalf("expected output to contain connector")
+	if !strings.Contains(out, "input:") {
+		t.Fatalf("expected output to contain input line")
+	}
+	if !strings.Contains(out, "enter confirm  esc cancel") {
+		t.Fatalf("expected output to contain text input footer")
 	}
 }
 
