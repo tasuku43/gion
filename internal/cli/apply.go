@@ -111,7 +111,6 @@ func runApplyInternalWithPlan(ctx context.Context, rootDir string, renderer *ui.
 		}
 	}
 
-	renderer.Blank()
 	renderer.Section("Apply")
 	stepLogger := ui.NewGroupedStepLogger(renderer)
 	output.SetStepLogger(stepLogger)
