@@ -9,6 +9,10 @@ Worktree sprawl brings pain:
 gion makes it safe and repeatable: declare task workspaces in YAML, review diffs (including deletion risk), then create and clean them up in bulk.  
 You don’t have to edit YAML directly—`gion manifest ...` lets you add/remove workspaces interactively and updates the inventory behind the scenes.
 
+> [!TIP]
+> Looking for a more ticket-centric workspace tool?
+> [kra](https://github.com/tasuku43/kra) may fit better if your day-to-day work starts from one issue or ticket, and you want each task to have its own workspace, notes, artifacts, and attached repos.
+
 ## Who it’s for
 
 - Developers working on tasks that span multiple repositories.
