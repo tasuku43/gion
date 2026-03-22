@@ -23,10 +23,22 @@ const (
 	TreeStemLast   = "   "
 )
 
+func DetailTreePrefix(isLast bool) string {
+	if isLast {
+		return TreeStemLast
+	}
+	return TreeStemMid
+}
+
 type StepLogger interface {
 	Step(text string)
 	Log(text string)
 	LogOutput(text string)
+}
+
+type GroupingStepLogger interface {
+	BeginGroup(text string)
+	EndGroup()
 }
 
 var stepLogger StepLogger
@@ -60,6 +72,20 @@ func Log(text string) {
 
 func Logf(format string, args ...any) {
 	Log(fmt.Sprintf(format, args...))
+}
+
+func BeginGroup(text string) {
+	if logger, ok := stepLogger.(GroupingStepLogger); ok {
+		logger.BeginGroup(text)
+		return
+	}
+	Log(text)
+}
+
+func EndGroup() {
+	if logger, ok := stepLogger.(GroupingStepLogger); ok {
+		logger.EndGroup()
+	}
 }
 
 func LogOutput(text string) {

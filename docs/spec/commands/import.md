@@ -22,7 +22,7 @@ Rebuild `gion.yaml` from the filesystem and `.gion/metadata.json` to restore the
 - `--no-prompt` is accepted but currently has no effect (kept for CLI consistency).
 
 ## Output
-- `Inputs` section (optional):
+- `Context` section (optional):
   - Omitted when running with the default root and no flags.
   - Prints `root: <path>` when shown.
   - Prints `no-prompt: true` only when `--no-prompt` is provided.

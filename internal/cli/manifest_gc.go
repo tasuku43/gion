@@ -248,6 +248,7 @@ func runManifestGc(ctx context.Context, rootDir string, args []string, globalNoP
 				r.Bullet("no changes")
 			},
 			RenderInfoBeforeApply: func(r *ui.Renderer, plan manifestplan.Result, _ bool) {
+				r.Blank()
 				r.Section("Info")
 				renderManifestGcInfo(r, candidates, warningLines)
 				r.Bullet(r.AccentText("manifest:") + " " + r.SuccessText("updated") + " " + manifest.FileName + " (" + r.ErrorText(fmt.Sprintf("removed %d workspace(s)", len(candidateIDs))) + ")")

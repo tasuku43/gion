@@ -5,48 +5,53 @@ status: implemented
 
 # UI Architecture
 
-This document describes the implementation structure (separation of concerns) that keeps the UI aligned with the UI.md contract.
+This document describes the implementation structure that keeps the terminal UI aligned with [UI.md](/Users/tasuku43/gionroot/workspaces/gion/gion/docs/spec/ui/UI.md).
 
 ## Goals
-- Always guarantee the fixed section order: Inputs → Info → Steps → Result → Suggestion
-- Avoid per-command bespoke rendering; enforce the contract through shared components
-- Prevent duplicate Inputs output during interactive flows (update in-place instead)
+- Guarantee the fixed section order for the active flow
+- Avoid per-command bespoke rendering
+- Keep prompt state and reconcile summaries aligned with one shared contract
 - Keep selector implementations aligned with [UI-SELECTOR.md](/Users/tasuku43/gionroot/workspaces/gion/gion/docs/spec/ui/UI-SELECTOR.md)
 
 ## Components
 
 ### Frame (`internal/ui/frame.go`)
-**Responsibilities**
-- A single container that centralizes section ordering and rendering rules
-- Holds `Inputs/Info/Steps/Result/Suggestion` content and renders them in a fixed order
 
-**Usage**
-- `SetInputsPrompt(...)` sets prompt lines
-- `AppendInputsRaw(...)` appends already-formatted list/tree lines
-- `SetInfo(...)` / `AppendInfoRaw(...)` manage auxiliary info
+Responsibilities:
+- Centralize `Context / Info / Step / Result / Suggestion` ordering
+- Hold already-classified lines and render them with consistent spacing
 
-**Key points**
-- Frame owns the screen structure
-- Each UI updates only the content
+Usage:
+- `SetContextPrompt(...)` / `AppendContextRaw(...)` for confirmed and pending context
+- `SetStepPrompt(...)` / `AppendStepRaw(...)` for the active selector, text input, or confirmation
+- `SetInfo(...)` / `AppendInfoRaw(...)` for warnings, blocked items, and auxiliary metadata
+
+Key points:
+- `Frame` owns prompt-screen structure
+- Prompt models should update content only, not section ordering
+- `Plan` / `Apply` remain CLI-rendered sections outside `Frame`
 
 ### Renderer (`internal/ui/renderer.go`)
-**Responsibilities**
-- Low-level rendering of headers, bullets, steps, and tree lines
-- Invoked by Frame or CLI render paths
+
+Responsibilities:
+- Low-level rendering of headers, bullets, raw lines, and tree indentation
+- Shared by both `Frame` and CLI output paths
 
 ### Prompt Models (`internal/ui/prompt.go`)
-**Responsibilities**
-- Input/selection state transitions and validation
-- `View()` should only update Inputs/Info via Frame
-- Selector-family behavior should be centralized here rather than duplicated in command handlers
+
+Responsibilities:
+- Own input / selection state transitions and validation
+- Render prompt flows through `Frame`
+- Centralize selector behavior instead of duplicating it in command handlers
 
 ## Implementation Rules
-- Do not print UI output directly with `fmt.Fprintf/Printf/Println` (use Renderer/Frame)
-- Consolidate prompts into `Inputs`, and auxiliary info into `Info`
-- Do not invent custom headers (e.g., “Selected”); fold them into `Info`
-- Do not use AltScreen; keep CLI output non-invasive (`tea.WithAltScreen` is not allowed)
+- Do not print UI output directly with `fmt.Fprintf/Printf/Println` in UI paths
+- Consolidate confirmed state into `Context`, active interaction into `Step`, and auxiliary state into `Info`
+- Do not invent ad-hoc sections for selected items or picker-specific summaries
+- Do not use AltScreen
 
 ## Applying to Existing Flows
-- Prefer a single Frame that updates across multiple prompt steps
-- Use `AppendInputsRaw(...)` for list/tree lines to keep the section order intact
-- Treat selector copy, finish hints, and selected-set rendering as shared UI behavior, not per-command wording
+- Prefer one `Frame` that updates across multiple prompt steps
+- Use `AppendContextRaw(...)` for pending context lines
+- Use `AppendStepRaw(...)` for selector rows, `filter:` / `input:` lines, and footers
+- Treat selector copy, assist-line wording, and confirm transitions as shared UI behavior

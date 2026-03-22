@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tasuku43/gion/internal/app/create"
@@ -94,6 +95,13 @@ func TestApply_BranchRenameInPlace_SucceedsWithDirtyWorktree(t *testing.T) {
 	if branch != "WS-2" {
 		t.Fatalf("branch: got %q, want %q", branch, "WS-2")
 	}
+	out := buf.String()
+	if !strings.Contains(out, "Apply\n  • update workspace WS-1\n    └─ repo (branch: WS-2)\n") {
+		t.Fatalf("apply output missing summary repo line:\n%s", out)
+	}
+	if strings.Contains(out, "git branch -m") {
+		t.Fatalf("apply output should not show raw git command:\n%s", out)
+	}
 
 	rewritten, err := manifest.Load(rootDir)
 	if err != nil {
@@ -105,5 +113,63 @@ func TestApply_BranchRenameInPlace_SucceedsWithDirtyWorktree(t *testing.T) {
 	}
 	if ws.Repos[0].Branch != "WS-2" {
 		t.Fatalf("rewritten branch: got %q, want %q", ws.Repos[0].Branch, "WS-2")
+	}
+}
+
+func TestApply_WorkspaceAdd_RendersSummaryOnly(t *testing.T) {
+	t.Setenv("GIT_AUTHOR_NAME", "gion")
+	t.Setenv("GIT_AUTHOR_EMAIL", "gion@example.com")
+	t.Setenv("GIT_COMMITTER_NAME", "gion")
+	t.Setenv("GIT_COMMITTER_EMAIL", "gion@example.com")
+
+	ctx := context.Background()
+	tmp := t.TempDir()
+	rootDir := filepath.Join(tmp, "gion")
+
+	repoSpec, _ := setupLocalRemoteRepoExampleDotCom(t, tmp)
+	if _, err := repo.Get(ctx, rootDir, repoSpec); err != nil {
+		t.Fatalf("repo get: %v", err)
+	}
+
+	desired := manifest.File{
+		Version: 1,
+		Workspaces: map[string]manifest.Workspace{
+			"WS-2": {
+				Mode: workspace.MetadataModeRepo,
+				Repos: []manifest.Repo{
+					{
+						Alias:   "repo",
+						RepoKey: "example.com/org/repo",
+						Branch:  "WS-2",
+					},
+				},
+			},
+		},
+	}
+	if err := manifest.Save(rootDir, desired); err != nil {
+		t.Fatalf("manifest save: %v", err)
+	}
+
+	plan, err := manifestplan.Plan(ctx, rootDir)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+
+	var buf bytes.Buffer
+	renderer := ui.NewRenderer(&buf, ui.DefaultTheme(), false)
+	got, err := runApplyInternalWithPlan(ctx, rootDir, renderer, true, plan)
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if !got.Applied {
+		t.Fatalf("expected applied, got %+v", got)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "Apply\n  • create workspace WS-2\n    └─ repo (branch: WS-2)\n") {
+		t.Fatalf("apply output missing summary repo line:\n%s", out)
+	}
+	if strings.Contains(out, "git worktree add") {
+		t.Fatalf("apply output should not show raw git command:\n%s", out)
 	}
 }

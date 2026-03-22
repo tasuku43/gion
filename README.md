@@ -9,8 +9,6 @@ Worktree sprawl brings pain:
 gion makes it safe and repeatable: declare task workspaces in YAML, review diffs (including deletion risk), then create and clean them up in bulk.  
 You don’t have to edit YAML directly—`gion manifest ...` lets you add/remove workspaces interactively and updates the inventory behind the scenes.
 
-https://github.com/user-attachments/assets/70da3e63-2bfe-4cca-b5a4-ffc8c153eb4a
-
 ## Who it’s for
 
 - Developers working on tasks that span multiple repositories.
@@ -100,7 +98,8 @@ Add a workspace interactively (example output, trimmed):
 gion manifest add
 ```
 ```bash
-Inputs
+Context
+  • mode: repo
   • repo: git@github.com:org/backend.git
   • workspace id: PROJ-123
   • repo #1 (git@github.com:org/backend.git)
@@ -114,14 +113,15 @@ Plan
     └─ backend (branch: PROJ-123-sample)
        repo: github.com/org/backend
 
+Step
   • Apply changes? (default: No) (y/n)
-    └─ y
+
+  input: y
+  enter confirm  esc cancel
 
 Apply
   • create workspace PROJ-123
-  • worktree add backend
-  └─ $ git worktree add -b PROJ-123-sample …/workspaces/PROJ-123/backend origin/main
-     (git output trimmed)
+    └─ backend (branch: PROJ-123-sample)
 
 Result
   • applied: add=1 update=0 remove=0
@@ -163,14 +163,15 @@ Example plan (add + remove, trimmed):
 ```text
 Plan
   • + add workspace PROJ-123
-    └─ backend  PROJ-123
-       repo: github.com/org/backend.git
+    └─ backend (branch: PROJ-123)
+       repo: github.com/org/backend
   • - remove workspace PROJ-099
-    └─ backend  PROJ-099
+    └─ backend (branch: PROJ-099)
        risk: dirty (unstaged=2)
        sync: upstream=origin/main ahead=1 behind=0
 
-Apply destructive changes? (default: No)
+Step
+  • Apply destructive changes? (default: No) (y/n)
 ```
 
 ### Create workspaces
@@ -244,20 +245,6 @@ This enables:
 - parent-shell `cd` after successful destructive workspace removal
 - shell completion in the same setup step
 - `giongo` navigation without a separate `giongo init` step
-
-Example (zsh function):
-
-```bash
-giongo() {
-  if [[ "$1" == "init" || "$1" == "--help" || "$1" == "-h" || "$1" == "--version" || "$1" == "--print" ]]; then
-    command giongo "$@"
-    return $?
-  fi
-  local dest
-  dest="$(command giongo --print "$@")" || return $?
-  [[ -n "$dest" ]] && cd "$dest"
-}
-```
 
 Notes:
 - `gion shell init` is the primary shell integration path for `gion` commands.

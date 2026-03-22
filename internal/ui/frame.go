@@ -7,9 +7,9 @@ import (
 
 // Frame renders a single-screen layout with fixed section order.
 type Frame struct {
-	Inputs     []frameLine
+	Context    []frameLine
 	Info       []frameLine
-	Steps      []frameLine
+	Step       []frameLine
 	Result     []frameLine
 	Suggestion []frameLine
 
@@ -23,24 +23,48 @@ func NewFrame(theme Theme, useColor bool) *Frame {
 	return &Frame{theme: theme, useColor: useColor}
 }
 
-func (f *Frame) SetInputs(lines ...string) {
-	f.Inputs = copyLines(lines, lineBullet)
+func (f *Frame) SetContext(lines ...string) {
+	f.Context = copyLines(lines, lineBullet)
 }
 
-func (f *Frame) SetInputsPrompt(lines ...string) {
-	f.Inputs = copyLines(lines, linePrompt)
+func (f *Frame) SetContextPrompt(lines ...string) {
+	f.Context = copyLines(lines, linePrompt)
 }
 
-func (f *Frame) AppendInputsPrompt(lines ...string) {
-	f.Inputs = append(f.Inputs, copyLines(lines, linePrompt)...)
+func (f *Frame) AppendContextPrompt(lines ...string) {
+	f.Context = append(f.Context, copyLines(lines, linePrompt)...)
 }
 
-func (f *Frame) SetInputsRaw(lines ...string) {
-	f.Inputs = copyRawLines(lines)
+func (f *Frame) SetContextRaw(lines ...string) {
+	f.Context = copyRawLines(lines)
 }
 
-func (f *Frame) AppendInputsRaw(lines ...string) {
-	f.Inputs = append(f.Inputs, copyRawLines(lines)...)
+func (f *Frame) AppendContextRaw(lines ...string) {
+	f.Context = append(f.Context, copyRawLines(lines)...)
+}
+
+func (f *Frame) SetStep(lines ...string) {
+	f.Step = copyLines(lines, lineBullet)
+}
+
+func (f *Frame) SetStepPrompt(lines ...string) {
+	f.Step = copyLines(lines, linePrompt)
+}
+
+func (f *Frame) AppendStep(lines ...string) {
+	f.Step = append(f.Step, copyLines(lines, lineBullet)...)
+}
+
+func (f *Frame) AppendStepPrompt(lines ...string) {
+	f.Step = append(f.Step, copyLines(lines, linePrompt)...)
+}
+
+func (f *Frame) SetStepRaw(lines ...string) {
+	f.Step = copyRawLines(lines)
+}
+
+func (f *Frame) AppendStepRaw(lines ...string) {
+	f.Step = append(f.Step, copyRawLines(lines)...)
 }
 
 func (f *Frame) SetInfo(lines ...string) {
@@ -67,14 +91,6 @@ func (f *Frame) AppendInfoRaw(lines ...string) {
 	f.Info = append(f.Info, copyRawLines(lines)...)
 }
 
-func (f *Frame) SetSteps(lines ...string) {
-	f.Steps = copyLines(lines, lineStep)
-}
-
-func (f *Frame) AppendSteps(lines ...string) {
-	f.Steps = append(f.Steps, copyLines(lines, lineStep)...)
-}
-
 func (f *Frame) SetResult(lines ...string) {
 	f.Result = copyLines(lines, lineBullet)
 }
@@ -97,12 +113,12 @@ func (f *Frame) WriteTo(w io.Writer) (int64, error) {
 	cw := &countingWriter{w: w}
 	r := NewRenderer(cw, f.theme, f.useColor)
 
-	if len(f.Inputs) > 0 {
-		r.Section("Inputs")
-		for _, line := range f.Inputs {
+	if len(f.Context) > 0 {
+		r.Section("Context")
+		for _, line := range f.Context {
 			renderLine(r, line)
 		}
-		if len(f.Info) > 0 || len(f.Steps) > 0 || len(f.Result) > 0 || len(f.Suggestion) > 0 {
+		if len(f.Info) > 0 || len(f.Step) > 0 || len(f.Result) > 0 || len(f.Suggestion) > 0 {
 			r.Blank()
 		}
 	}
@@ -112,14 +128,14 @@ func (f *Frame) WriteTo(w io.Writer) (int64, error) {
 		for _, line := range f.Info {
 			renderLine(r, line)
 		}
-		if !f.NoBlankAfterInfo && (len(f.Steps) > 0 || len(f.Result) > 0 || len(f.Suggestion) > 0) {
+		if !f.NoBlankAfterInfo && (len(f.Step) > 0 || len(f.Result) > 0 || len(f.Suggestion) > 0) {
 			r.Blank()
 		}
 	}
 
-	if len(f.Steps) > 0 {
-		r.Section("Steps")
-		for _, line := range f.Steps {
+	if len(f.Step) > 0 {
+		r.Section("Step")
+		for _, line := range f.Step {
 			renderLine(r, line)
 		}
 		if len(f.Result) > 0 || len(f.Suggestion) > 0 {
@@ -197,6 +213,26 @@ func renderLine(r *Renderer, line frameLine) {
 	default:
 		r.Bullet(line.text)
 	}
+}
+
+func (f *Frame) SetInputs(lines ...string) {
+	f.SetContext(lines...)
+}
+
+func (f *Frame) SetInputsPrompt(lines ...string) {
+	f.SetContextPrompt(lines...)
+}
+
+func (f *Frame) AppendInputsPrompt(lines ...string) {
+	f.AppendContextPrompt(lines...)
+}
+
+func (f *Frame) SetInputsRaw(lines ...string) {
+	f.SetContextRaw(lines...)
+}
+
+func (f *Frame) AppendInputsRaw(lines ...string) {
+	f.AppendContextRaw(lines...)
 }
 
 func copyLines(lines []string, kind frameLineKind) []frameLine {

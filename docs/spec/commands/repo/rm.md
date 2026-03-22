@@ -15,7 +15,7 @@ Remove one or more bare repo stores under the gion root when they are unused by 
 - When multiple specs are provided, duplicates are removed while preserving order.
 - With no specs and prompts allowed:
   - Loads existing stores via `gion repo ls` and opens a filterable multi-select list.
-  - Selection UX matches `gion manifest preset rm`: `<Enter>` selects and removes from candidates; finish with `<Ctrl+D>` or `done`; minimum 1 selection required.
+  - Selection UX matches the current multi-select contract: `Space` toggles `○/●`, `Enter` applies, and the active query is shown in the bottom `filter:` line.
 - With no specs and `--no-prompt`, returns an error.
 - Before removing:
   - Resolves each repo spec to a canonical repo key (`host/owner/repo`) and store path (`<root>/bare/<host>/<owner>/<repo>.git`).

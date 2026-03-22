@@ -64,9 +64,6 @@ func applyManifestMutation(ctx context.Context, rootDir string, updated manifest
 		return nil
 	}
 
-	if opts.Hooks.ShowPrelude != nil {
-		renderer.Blank()
-	}
 	if opts.Hooks.RenderInfoBeforeApply != nil {
 		opts.Hooks.RenderInfoBeforeApply(renderer, plan, planOK)
 		renderer.Blank()

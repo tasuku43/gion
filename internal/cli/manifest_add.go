@@ -116,6 +116,7 @@ func runManifestAdd(ctx context.Context, rootDir string, args []string, globalNo
 					r.Bullet("no changes")
 				},
 				RenderInfoBeforeApply: func(r *ui.Renderer, plan manifestplan.Result, planOK bool) {
+					r.Blank()
 					r.Section("Info")
 					r.Bullet(fmt.Sprintf("manifest: updated %s", manifest.FileName))
 					if planOK && planIncludesChangesOutsideWorkspaceIDs(plan, addedWorkspaceIDs) {

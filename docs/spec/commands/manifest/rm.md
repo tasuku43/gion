@@ -38,27 +38,35 @@ Remove workspace entries from the inventory (`gion.yaml`) using an interactive U
 
 ## Output (IA)
 - Always uses the common sectioned layout from `docs/spec/ui/UI.md`.
-- `Inputs`: selection inputs (workspace ids, short status tags, optional description).
+- Interactive flows render `Context` and `Step`:
+  - `Context`: confirmed state plus the current unresolved field as a muted pending line.
+  - `Step`: the active workspace selector or confirmation prompt.
 - `Plan`/`Apply`/`Result`: delegated to `gion apply` when apply is run.
 
-### Inputs section (interactive selection)
+### Step section (interactive selection)
 When no `<WORKSPACE_ID>` args are provided, the command enters an interactive multi-select picker.
 
 Picker guidance:
-- Search/filter is supported (filter text is shown as the input value in `Inputs`).
-- Multi-select is supported.
+- Search/filter is supported via the bottom `filter:` line in `Step`.
+- Multi-select uses in-list `○/●` markers.
 - Cancel/empty selection exits 0 with no changes.
 
 Example (interactive selection, conceptual):
 ```
-Inputs
-  • workspace: s
-    └─ PROJ-123 - fix login flow
-    └─ PROJ-999[dirty] - wip refactor
+Context
+  • workspace:
+
+Step
+  • workspace:
+    ○ PROJ-123 - fix login flow
+  > ● PROJ-999[dirty] - wip refactor
+
+  filter: s
+  selected: 1/2  ↑↓ move  space toggle  enter apply  type filter  esc cancel
 ```
 
 ### Info section (when apply runs)
-When apply runs, `gion manifest rm` should emit an `Info` section after `Inputs` to make the two-phase behavior explicit:
+When apply runs, `gion manifest rm` should emit an `Info` section after `Context` to make the two-phase behavior explicit:
 - `manifest: updated gion.yaml (removed N workspace(s))`
 - `apply: reconciling entire root (destructive removals require confirmation)`
 
@@ -86,9 +94,15 @@ Detection guidance:
 
 Example (interactive selection, conceptual):
 ```
-Inputs
-  • workspace: s
-    └─ PROJ-123 - fix login flow
+Context
+  • workspace:
+
+Step
+  • workspace:
+  > ○ PROJ-123 - fix login flow
+
+  filter: s
+  selected: 0/1  ↑↓ move  space toggle  enter apply  type filter  esc cancel
 ```
 
 ## Output examples
@@ -98,7 +112,7 @@ When `--no-apply` is set, `gion manifest rm` does not run apply and prints a sho
 
 Example:
 ```
-Inputs
+Context
   • workspace: PROJ-123
 
 Result
@@ -109,7 +123,7 @@ Suggestion
 ```
 
 ### Output: with apply (default)
-When apply runs, `gion manifest rm` prints `Inputs` first, then streams `gion apply` output (`Info`/`Plan`/`Apply`/`Result`).
+When apply runs, `gion manifest rm` prints `Context` first, then streams `gion apply` output (`Info`/`Plan`/`Step` (while waiting for confirmation only)/`Apply`/`Result`).
 `gion manifest rm` itself does not attempt to summarize the plan beyond what `gion apply` prints.
 
 ## Success Criteria
