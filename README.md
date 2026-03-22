@@ -248,18 +248,11 @@ This enables:
 - shell completion in the same setup step
 - `giongo` navigation without a separate `giongo init` step
 
-Example (zsh function):
+This command installs both shell wrappers for you:
 
 ```bash
-giongo() {
-  if [[ "$1" == "init" || "$1" == "--help" || "$1" == "-h" || "$1" == "--version" || "$1" == "--print" ]]; then
-    command giongo "$@"
-    return $?
-  fi
-  local dest
-  dest="$(command giongo --print "$@")" || return $?
-  [[ -n "$dest" ]] && cd "$dest"
-}
+gion() { ... }
+giongo() { ... }
 ```
 
 Notes:
