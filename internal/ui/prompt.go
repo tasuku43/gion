@@ -650,7 +650,7 @@ func (m createFlowModel) View() string {
 	frame.SetInputsPrompt(renderPromptValueLine(modeLabel, m.pendingMode))
 	assistLines := []string(nil)
 	if !m.confirming {
-		assistLines = singleSelectAssistLines("select", m.modeInput.Value(), m.theme, m.useColor)
+		assistLines = singleSelectAssistLines("select", m.modeInput.View(), m.theme, m.useColor)
 	}
 	extraAssistGap := 0
 	if len(assistLines) > 0 {
@@ -890,7 +890,7 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 	if m.stage == stagePreset {
 		assistLines := []string(nil)
 		if !m.confirming {
-			assistLines = singleSelectAssistLines("select", m.search.Value(), m.theme, m.useColor)
+			assistLines = singleSelectAssistLines("select", m.search.View(), m.theme, m.useColor)
 		}
 		extraAssistGap := 0
 		if len(assistLines) > 0 {
@@ -1435,7 +1435,7 @@ func (m presetRepoSelectModel) View() string {
 	}
 	assistLines := []string(nil)
 	if m.stage == stageRepoSelect && !m.confirming {
-		assistLines = multiSelectAssistLines(m.selected, len(m.choices), "apply", m.repoInput.Value(), m.theme, m.useColor)
+		assistLines = multiSelectAssistLines(m.selected, len(m.choices), "apply", m.repoInput.View(), m.theme, m.useColor)
 	}
 	extraAssistGap := 0
 	if len(assistLines) > 0 {
@@ -1636,7 +1636,7 @@ func (m choiceSelectModel) ViewWithHeader(headerLines ...string) string {
 	}
 	assistLines := []string(nil)
 	if !m.confirming {
-		assistLines = singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
+		assistLines = singleSelectAssistLines("select", m.input.View(), m.theme, m.useColor)
 	}
 	extraAssistGap := 0
 	if len(assistLines) > 0 {
@@ -1881,7 +1881,7 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	}
 	assistLines := []string(nil)
 	if !model.confirming {
-		assistLines = multiSelectAssistLines(model.selectedValues, len(model.choices), "apply", model.input.Value(), model.theme, model.useColor)
+		assistLines = multiSelectAssistLines(model.selectedValues, len(model.choices), "apply", model.input.View(), model.theme, model.useColor)
 	}
 	extraAssistGap := 0
 	if len(assistLines) > 0 {
@@ -2708,7 +2708,7 @@ func (m workspaceSelectModel) ViewWithHeader(headerLines ...string) string {
 	}
 	assistLines := []string(nil)
 	if !m.confirming {
-		assistLines = singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
+		assistLines = singleSelectAssistLines("select", m.input.View(), m.theme, m.useColor)
 	}
 	extraAssistGap := 0
 	if len(assistLines) > 0 {
@@ -2845,7 +2845,7 @@ func (m workspaceRepoSelectModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
 	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
-	assistLines := singleSelectAssistLines("select", m.input.Value(), m.theme, m.useColor)
+	assistLines := singleSelectAssistLines("select", m.input.View(), m.theme, m.useColor)
 	maxLines := listMaxLines(m.height, 1+len(assistLines)+1, 0)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceRepoChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
@@ -3216,7 +3216,7 @@ func (m workspaceMultiSelectModel) View() string {
 	}
 	assistLines := []string(nil)
 	if !m.confirming {
-		assistLines = multiSelectAssistLines(m.selectedIDs, len(m.workspaces), "apply", m.input.Value(), m.theme, m.useColor)
+		assistLines = multiSelectAssistLines(m.selectedIDs, len(m.workspaces), "apply", m.input.View(), m.theme, m.useColor)
 	}
 	extraAssistGap := 0
 	if len(assistLines) > 0 {
@@ -3290,23 +3290,22 @@ func listWindow(total int, cursor int, maxVisible int) (int, int) {
 
 func multiSelectAssistLines(selected []string, total int, action string, filterValue string, theme Theme, useColor bool) []string {
 	return []string{
-		renderMultiSelectFilterLine(filterValue, theme, useColor),
+		renderLabeledAssistLine("filter", filterValue, theme, useColor),
 		renderMultiSelectFooterLine(len(selected), total, action, theme, useColor),
 	}
 }
 
 func singleSelectAssistLines(action string, filterValue string, theme Theme, useColor bool) []string {
 	return []string{
-		renderMultiSelectFilterLine(filterValue, theme, useColor),
+		renderLabeledAssistLine("filter", filterValue, theme, useColor),
 		renderSingleSelectFooterLine(action, theme, useColor),
 	}
 }
 
-func renderMultiSelectFilterLine(filterValue string, theme Theme, useColor bool) string {
-	body := strings.TrimSpace(filterValue)
-	line := fmt.Sprintf("%sfilter: %s", output.Indent, body)
+func renderLabeledAssistLine(label, value string, theme Theme, useColor bool) string {
+	line := fmt.Sprintf("%s%s: %s", output.Indent, label, value)
 	if useColor {
-		line = theme.Muted.Render(output.Indent+"filter: ") + body
+		line = theme.Muted.Render(output.Indent+label+": ") + value
 	}
 	return wrapRawLineToWidth(line, currentWrapWidth())[0]
 }
@@ -3332,17 +3331,9 @@ func renderTextInputValueLine(value string, theme Theme, useColor bool) string {
 
 func renderTextInputAssistLines(value string, theme Theme, useColor bool) []string {
 	return []string{
-		renderTextInputLine(value, theme, useColor),
+		renderLabeledAssistLine("input", value, theme, useColor),
 		renderTextInputFooterLine(theme, useColor),
 	}
-}
-
-func renderTextInputLine(value string, theme Theme, useColor bool) string {
-	line := fmt.Sprintf("%sinput: %s", output.Indent, value)
-	if useColor {
-		line = theme.Muted.Render(output.Indent+"input: ") + value
-	}
-	return wrapRawLineToWidth(line, currentWrapWidth())[0]
 }
 
 func renderTextInputFooterLine(theme Theme, useColor bool) string {
