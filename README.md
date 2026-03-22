@@ -248,13 +248,6 @@ This enables:
 - shell completion in the same setup step
 - `giongo` navigation without a separate `giongo init` step
 
-This command installs both shell wrappers for you:
-
-```bash
-gion() { ... }
-giongo() { ... }
-```
-
 Notes:
 - `gion shell init` is the primary shell integration path for `gion` commands.
 - `gion shell init` also installs the `giongo` shell wrapper.
