@@ -878,7 +878,7 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 
 	if m.stage == stageWorkspace {
 		label := promptLabel(m.theme, m.useColor, "workspace id")
-		promptLines = append(promptLines, fmt.Sprintf("%s: %s", label, m.idInput.View()))
+		promptLines = append(promptLines, renderPromptValueLine(label, ""))
 	} else if strings.TrimSpace(m.workspaceID) != "" {
 		label := promptLabel(m.theme, m.useColor, "workspace id")
 		promptLines = append(promptLines, fmt.Sprintf("%s: %s", label, m.workspaceID))
@@ -903,6 +903,9 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 			frame.AppendInputsRaw("")
 			frame.AppendInputsRaw(assistLines...)
 		}
+	}
+	if m.stage == stageWorkspace {
+		frame.AppendInputsRaw(renderTextInputValueLine(m.idInput.View(), m.theme, m.useColor))
 	}
 
 	if m.stage == stageWorkspace && m.errorLine != "" {
@@ -3316,6 +3319,10 @@ func selectedInputValue(confirming bool, value string) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
+}
+
+func renderTextInputValueLine(value string, theme Theme, useColor bool) string {
+	return fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), value)
 }
 
 func renderMultiSelectFooterLine(selectedCount int, total int, action string, theme Theme, useColor bool) string {

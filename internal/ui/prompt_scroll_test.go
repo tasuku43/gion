@@ -918,3 +918,27 @@ func TestPresetRepoSelectView_HidesAssistLinesWhileConfirming(t *testing.T) {
 		t.Fatalf("expected selected repo value in header while confirming, got: %q", view)
 	}
 }
+
+func TestInputsModelPresetConfirm_TransitionsToWorkspaceInput(t *testing.T) {
+	model := newInputsModel("title", []string{"gion"}, "", "", DefaultTheme(), false)
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next := updated.(inputsModel)
+	if !next.confirming {
+		t.Fatalf("expected preset selector to enter confirming state")
+	}
+
+	updated, _ = next.Update(singleSelectConfirmDoneMsg{})
+	next = updated.(inputsModel)
+	if next.stage != stageWorkspace {
+		t.Fatalf("expected preset confirm to transition to workspace input, got stage=%v", next.stage)
+	}
+
+	view := next.View()
+	if !strings.Contains(view, "• workspace id:") {
+		t.Fatalf("expected workspace id prompt after preset confirm, got: %q", view)
+	}
+	if !strings.Contains(view, "  └─ ") {
+		t.Fatalf("expected inline workspace input line after preset confirm, got: %q", view)
+	}
+}
