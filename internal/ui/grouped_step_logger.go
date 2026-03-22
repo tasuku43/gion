@@ -3,19 +3,21 @@ package ui
 import "github.com/tasuku43/gion/internal/infra/output"
 
 type groupedStepLogger struct {
-	renderer   *Renderer
-	current    *groupedStep
-	currentLog *groupedStepLog
+	renderer     *Renderer
+	current      *groupedStep
+	currentGroup *groupedStepNode
+	currentNode  *groupedStepNode
 }
 
 type groupedStep struct {
 	title string
-	logs  []groupedStepLog
+	nodes []*groupedStepNode
 }
 
-type groupedStepLog struct {
-	text    string
-	outputs []string
+type groupedStepNode struct {
+	title    string
+	outputs  []string
+	children []*groupedStepNode
 }
 
 func NewGroupedStepLogger(renderer *Renderer) *groupedStepLogger {
@@ -27,6 +29,25 @@ func (l *groupedStepLogger) Step(text string) {
 	l.current = &groupedStep{title: text}
 }
 
+func (l *groupedStepLogger) BeginGroup(text string) {
+	if l.renderer == nil {
+		return
+	}
+	if l.current == nil {
+		l.renderer.StepLog(text)
+		return
+	}
+	node := &groupedStepNode{title: text}
+	l.current.nodes = append(l.current.nodes, node)
+	l.currentGroup = node
+	l.currentNode = nil
+}
+
+func (l *groupedStepLogger) EndGroup() {
+	l.currentGroup = nil
+	l.currentNode = nil
+}
+
 func (l *groupedStepLogger) Log(text string) {
 	if l.renderer == nil {
 		return
@@ -35,19 +56,24 @@ func (l *groupedStepLogger) Log(text string) {
 		l.renderer.StepLog(text)
 		return
 	}
-	l.current.logs = append(l.current.logs, groupedStepLog{text: text})
-	l.currentLog = &l.current.logs[len(l.current.logs)-1]
+	node := &groupedStepNode{title: text}
+	if l.currentGroup != nil {
+		l.currentGroup.children = append(l.currentGroup.children, node)
+	} else {
+		l.current.nodes = append(l.current.nodes, node)
+	}
+	l.currentNode = node
 }
 
 func (l *groupedStepLogger) LogOutput(text string) {
 	if l.renderer == nil {
 		return
 	}
-	if l.current == nil || l.currentLog == nil {
+	if l.current == nil || l.currentNode == nil {
 		l.renderer.StepLogOutput(text)
 		return
 	}
-	l.currentLog.outputs = append(l.currentLog.outputs, text)
+	l.currentNode.outputs = append(l.currentNode.outputs, text)
 }
 
 func (l *groupedStepLogger) Flush() {
@@ -56,21 +82,33 @@ func (l *groupedStepLogger) Flush() {
 	}
 
 	l.renderer.Step(l.current.title)
-	for i, entry := range l.current.logs {
+	l.renderNodes(output.Indent, l.current.nodes)
+
+	l.current = nil
+	l.currentGroup = nil
+	l.currentNode = nil
+}
+
+func (l *groupedStepLogger) renderNodes(baseIndent string, nodes []*groupedStepNode) {
+	for i, node := range nodes {
 		prefix := output.TreeBranchMid
-		if i == len(l.current.logs)-1 {
+		if i == len(nodes)-1 {
 			prefix = output.TreeBranchLast
 		}
 		l.renderer.TreeLine(
-			l.renderer.MutedText(output.Indent+prefix),
-			l.renderer.MutedText(entry.text),
+			l.renderer.MutedText(baseIndent+prefix),
+			l.renderer.MutedText(node.title),
 		)
-		detailPrefix := l.renderer.MutedText(output.Indent + output.DetailTreePrefix(i == len(l.current.logs)-1))
-		for _, line := range entry.outputs {
-			l.renderer.TreeLine(detailPrefix, l.renderer.MutedText(line))
+
+		childIndent := baseIndent + output.DetailTreePrefix(i == len(nodes)-1)
+		if len(node.children) > 0 {
+			l.renderNodes(childIndent, node.children)
+		}
+		for _, line := range node.outputs {
+			l.renderer.TreeLine(
+				l.renderer.MutedText(childIndent),
+				l.renderer.MutedText(line),
+			)
 		}
 	}
-
-	l.current = nil
-	l.currentLog = nil
 }

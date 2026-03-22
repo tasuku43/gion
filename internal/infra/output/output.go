@@ -36,6 +36,11 @@ type StepLogger interface {
 	LogOutput(text string)
 }
 
+type GroupingStepLogger interface {
+	BeginGroup(text string)
+	EndGroup()
+}
+
 var stepLogger StepLogger
 var stepIndex uint64
 
@@ -67,6 +72,20 @@ func Log(text string) {
 
 func Logf(format string, args ...any) {
 	Log(fmt.Sprintf(format, args...))
+}
+
+func BeginGroup(text string) {
+	if logger, ok := stepLogger.(GroupingStepLogger); ok {
+		logger.BeginGroup(text)
+		return
+	}
+	Log(text)
+}
+
+func EndGroup() {
+	if logger, ok := stepLogger.(GroupingStepLogger); ok {
+		logger.EndGroup()
+	}
 }
 
 func LogOutput(text string) {

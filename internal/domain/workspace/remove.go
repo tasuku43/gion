@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tasuku43/gion/internal/infra/gitcmd"
+	"github.com/tasuku43/gion/internal/infra/output"
 	"github.com/tasuku43/gion/internal/infra/paths"
 	"github.com/tasuku43/gion/internal/infra/shellaction"
 )
@@ -91,12 +92,19 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 			return fmt.Errorf("missing worktree path for alias %q", repo.Alias)
 		}
 		force := opts.AllowDirty
-		if force {
-			gitcmd.Logf("git worktree remove --force %s", repo.WorktreePath)
-		} else {
-			gitcmd.Logf("git worktree remove %s", repo.WorktreePath)
+		repoLabel := strings.TrimSpace(repo.Alias)
+		if repoLabel == "" {
+			repoLabel = filepath.Base(strings.TrimSpace(repo.WorktreePath))
 		}
+		output.BeginGroup(repoLabel)
+		if force {
+			output.Log("$ git worktree remove --force")
+		} else {
+			output.Log("$ git worktree remove")
+		}
+		output.Log(repo.WorktreePath)
 		if err := worktreeRemoveFn(ctx, repo.StorePath, repo.WorktreePath, force); err != nil {
+			output.EndGroup()
 			state.LastError = fmt.Sprintf("remove worktree %q: %v", repo.Alias, err)
 			state.UpdatedAt = removeStateNow()
 			if saveErr := SaveRemoveState(rootDir, state); saveErr != nil {
@@ -104,6 +112,7 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 			}
 			return fmt.Errorf("remove worktree %q: %w", repo.Alias, err)
 		}
+		output.EndGroup()
 		state.RemovedAliases = append(state.RemovedAliases, repo.Alias)
 		state.PendingAliases = removePendingAlias(state.PendingAliases, repo.Alias)
 		state.UpdatedAt = removeStateNow()
