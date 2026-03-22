@@ -788,11 +788,11 @@ func TestBranchInputModel_SeparateInputLineKeepsBranchVisible(t *testing.T) {
 	model.separateInputLine = true
 
 	out := model.ViewWithHeader("repo: git@github.com:tasuku43/gion.git")
-	if !strings.Contains(out, "branch:") {
-		t.Fatalf("expected output to contain branch line")
+	if !strings.Contains(out, "input: issue/96") {
+		t.Fatalf("expected output to contain bottom input line")
 	}
-	if !strings.Contains(out, "issue/96") {
-		t.Fatalf("expected output to contain current input value")
+	if !strings.Contains(out, "enter confirm  esc cancel") {
+		t.Fatalf("expected output to contain text input footer")
 	}
 }
 
@@ -938,7 +938,26 @@ func TestInputsModelPresetConfirm_TransitionsToWorkspaceInput(t *testing.T) {
 	if !strings.Contains(view, "• workspace id:") {
 		t.Fatalf("expected workspace id prompt after preset confirm, got: %q", view)
 	}
-	if !strings.Contains(view, "  └─ ") {
-		t.Fatalf("expected inline workspace input line after preset confirm, got: %q", view)
+	if !strings.Contains(view, "input:") {
+		t.Fatalf("expected bottom input line after preset confirm, got: %q", view)
+	}
+	if !strings.Contains(view, "enter confirm  esc cancel") {
+		t.Fatalf("expected text input footer after preset confirm, got: %q", view)
+	}
+}
+
+func TestPresetNameModel_UsesBottomInputAssistLines(t *testing.T) {
+	model := newPresetNameModel("title", "", DefaultTheme(), false)
+	model.input.SetValue("my-preset")
+
+	view := model.View()
+	if strings.Contains(view, "• preset name: my-preset") {
+		t.Fatalf("active preset name should not be echoed in header, got: %q", view)
+	}
+	if !strings.Contains(view, "input: my-preset") {
+		t.Fatalf("expected bottom input line, got: %q", view)
+	}
+	if !strings.Contains(view, "enter confirm  esc cancel") {
+		t.Fatalf("expected text input footer, got: %q", view)
 	}
 }

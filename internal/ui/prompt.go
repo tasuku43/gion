@@ -590,8 +590,10 @@ func (m createFlowModel) View() string {
 			modeLine,
 			fmt.Sprintf("%s: %s", labelSelection, m.selectionValue()),
 			fmt.Sprintf("%s: %s", labelWorkspace, m.workspaceID()),
-			fmt.Sprintf("%s: %s", labelDesc, m.descInput.View()),
+			renderPromptValueLine(labelDesc, ""),
 		)
+		frame.AppendInputsRaw("")
+		frame.AppendInputsRaw(renderTextInputAssistLines(m.descInput.Value(), m.theme, m.useColor)...)
 		return frame.Render()
 	}
 	if m.stage == createStagePresetBranch {
@@ -905,7 +907,8 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 		}
 	}
 	if m.stage == stageWorkspace {
-		frame.AppendInputsRaw(renderTextInputValueLine(m.idInput.View(), m.theme, m.useColor))
+		frame.AppendInputsRaw("")
+		frame.AppendInputsRaw(renderTextInputAssistLines(m.idInput.Value(), m.theme, m.useColor)...)
 	}
 
 	if m.stage == stageWorkspace && m.errorLine != "" {
@@ -1209,8 +1212,9 @@ func (m inputInlineModel) View() string {
 	if strings.TrimSpace(m.defaultValue) != "" {
 		defaultText = fmt.Sprintf(" [default: %s]", m.defaultValue)
 	}
-	line := fmt.Sprintf("%s%s: %s", label, defaultText, m.input.View())
-	frame.SetInputsPrompt(line)
+	frame.SetInputsPrompt(renderPromptValueLine(label+defaultText, ""))
+	frame.AppendInputsRaw("")
+	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.Value(), m.theme, m.useColor)...)
 	if strings.TrimSpace(m.errorLine) != "" {
 		errLine := m.errorLine
 		if m.useColor {
@@ -2044,15 +2048,14 @@ func (m branchInputModel) ViewWithHeader(headerLines ...string) string {
 			}
 			frame.AppendInputsPrompt(label)
 
-			value := ""
 			if i < m.index {
-				value = m.selections[i].Branch
-			} else {
-				value = m.input.View()
+				value := m.selections[i].Branch
+				connector := mutedToken(m.theme, m.useColor, output.LogConnector)
+				frame.AppendInputsRaw(fmt.Sprintf("%s%s branch: %s", output.Indent+output.Indent, connector, value))
 			}
-			connector := mutedToken(m.theme, m.useColor, output.LogConnector)
-			frame.AppendInputsRaw(fmt.Sprintf("%s%s branch: %s", output.Indent+output.Indent, connector, value))
 		}
+		frame.AppendInputsRaw("")
+		frame.AppendInputsRaw(renderTextInputAssistLines(m.input.Value(), m.theme, m.useColor)...)
 		if m.errorLine != "" {
 			msg := m.errorLine
 			if m.useColor {
@@ -2413,7 +2416,9 @@ func (m presetNameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m presetNameModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "preset name")
-	frame.SetInputsPrompt(fmt.Sprintf("%s: %s", label, m.input.View()))
+	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
+	frame.AppendInputsRaw("")
+	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.Value(), m.theme, m.useColor)...)
 	if m.errorLine != "" {
 		msg := m.errorLine
 		if m.useColor {
@@ -3323,6 +3328,30 @@ func selectedInputValue(confirming bool, value string) string {
 
 func renderTextInputValueLine(value string, theme Theme, useColor bool) string {
 	return fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(theme, useColor, output.LogConnector), value)
+}
+
+func renderTextInputAssistLines(value string, theme Theme, useColor bool) []string {
+	return []string{
+		renderTextInputLine(value, theme, useColor),
+		renderTextInputFooterLine(theme, useColor),
+	}
+}
+
+func renderTextInputLine(value string, theme Theme, useColor bool) string {
+	body := strings.TrimSpace(value)
+	line := fmt.Sprintf("%sinput: %s", output.Indent, body)
+	if useColor {
+		line = theme.Muted.Render(output.Indent+"input: ") + body
+	}
+	return wrapRawLineToWidth(line, currentWrapWidth())[0]
+}
+
+func renderTextInputFooterLine(theme Theme, useColor bool) string {
+	line := fmt.Sprintf("%senter confirm  esc cancel", output.Indent)
+	if useColor {
+		line = theme.Muted.Render(line)
+	}
+	return wrapRawLineToWidth(line, currentWrapWidth())[0]
 }
 
 func renderMultiSelectFooterLine(selectedCount int, total int, action string, theme Theme, useColor bool) string {
