@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/tasuku43/gion/internal/infra/output"
@@ -16,5 +17,31 @@ func TestRendererStepLog_FormatsWithConnector(t *testing.T) {
 	got := b.String()
 	if got != "  "+output.LogConnector+" $ git worktree remove --force\n" {
 		t.Fatalf("unexpected output: %q", got)
+	}
+}
+
+func TestGroupedStepLogger_RendersTreePerStep(t *testing.T) {
+	var b bytes.Buffer
+	renderer := NewRenderer(&b, DefaultTheme(), false)
+	logger := NewGroupedStepLogger(renderer)
+
+	logger.Step("remove workspace test")
+	logger.Log("$ git worktree remove --force")
+	logger.LogOutput("/tmp/test/gion")
+	logger.Log("$ git worktree remove --force")
+	logger.LogOutput("/tmp/test/kra")
+	logger.Flush()
+
+	got := b.String()
+	wantLines := []string{
+		"  • remove workspace test",
+		"    ├─ $ git worktree remove --force",
+		"    │  /tmp/test/gion",
+		"    └─ $ git worktree remove --force",
+		"       /tmp/test/kra",
+	}
+	want := strings.Join(wantLines, "\n") + "\n"
+	if got != want {
+		t.Fatalf("unexpected output:\n%s\nwant:\n%s", got, want)
 	}
 }

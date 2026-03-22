@@ -23,6 +23,13 @@ const (
 	TreeStemLast   = "   "
 )
 
+func DetailTreePrefix(isLast bool) string {
+	if isLast {
+		return TreeStemLast
+	}
+	return TreeStemMid
+}
+
 type StepLogger interface {
 	Step(text string)
 	Log(text string)

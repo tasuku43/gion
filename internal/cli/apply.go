@@ -61,8 +61,6 @@ func runApplyInternalWithPlan(ctx context.Context, rootDir string, renderer *ui.
 	if renderer == nil {
 		renderer = ui.NewRenderer(os.Stdout, theme, useColor)
 	}
-	output.SetStepLogger(renderer)
-	defer output.SetStepLogger(nil)
 
 	var warningLines []string
 	for _, warn := range plan.Warnings {
@@ -115,6 +113,9 @@ func runApplyInternalWithPlan(ctx context.Context, rootDir string, renderer *ui.
 
 	renderer.Blank()
 	renderer.Section("Apply")
+	stepLogger := ui.NewGroupedStepLogger(renderer)
+	output.SetStepLogger(stepLogger)
+	defer output.SetStepLogger(nil)
 	prefetchOK := true
 	if err := prefetch.WaitAll(ctx, toPrefetch); err != nil {
 		// ここでのfetch失敗はネットワーク要因が多く、apply自体は継続できることもあるため、
@@ -129,8 +130,10 @@ func runApplyInternalWithPlan(ctx context.Context, rootDir string, renderer *ui.
 		PrefetchOK:       prefetchOK,
 		Step:             output.Step,
 	}); err != nil {
+		stepLogger.Flush()
 		return applyInternalResult{HadChanges: true, Confirmed: confirmed, Applied: false}, err
 	}
+	stepLogger.Flush()
 	if err := rebuildManifest(ctx, rootDir); err != nil {
 		return applyInternalResult{HadChanges: true, Confirmed: confirmed, Applied: false}, err
 	}

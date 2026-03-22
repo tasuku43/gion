@@ -234,7 +234,7 @@ func renderPlanWorkspaceAddRepos(renderer *ui.Renderer, changes []manifestplan.R
 			prefix = output.TreeBranchLast
 		}
 		prefix = baseIndent + prefix
-		detailPrefix := baseIndent + detailTreePrefix(i == len(adds)-1)
+		detailPrefix := baseIndent + output.DetailTreePrefix(i == len(adds)-1)
 		name := strings.TrimSpace(change.Alias)
 		if name == "" {
 			name = strings.TrimSpace(change.ToRepo)
@@ -258,7 +258,7 @@ func renderPlanWorkspaceUpdateRepos(renderer *ui.Renderer, change manifestplan.W
 			prefix = output.TreeBranchLast
 		}
 		prefix = baseIndent + prefix
-		detailPrefix := baseIndent + detailTreePrefix(i == len(change.Repos)-1)
+		detailPrefix := baseIndent + output.DetailTreePrefix(i == len(change.Repos)-1)
 
 		name := strings.TrimSpace(repoChange.Alias)
 		if name == "" {
@@ -376,7 +376,7 @@ func renderWorkspaceRiskDetails(renderer *ui.Renderer, status workspace.StatusRe
 		label := formatRepoLabel(name, repoEntry.Branch)
 		renderer.TreeLineBranchMuted(prefix, label, "")
 
-		detailPrefix := extraIndent + detailTreePrefix(i == len(status.Repos)-1)
+		detailPrefix := extraIndent + output.DetailTreePrefix(i == len(status.Repos)-1)
 		lines := buildRepoRiskDetailLines(renderer, repoEntry)
 		for _, line := range lines {
 			if strings.TrimSpace(ansi.Strip(line)) == "" {
@@ -392,13 +392,6 @@ func renderWorkspaceRiskDetails(renderer *ui.Renderer, status workspace.StatusRe
 		}
 		renderer.TreeLine(renderer.MutedText(extraIndent+output.TreeBranchLast), renderer.WarnText(fmt.Sprintf("warning: %s", msg)))
 	}
-}
-
-func detailTreePrefix(isLast bool) string {
-	if isLast {
-		return output.TreeStemLast
-	}
-	return output.TreeStemMid
 }
 
 func buildRepoRiskDetailLines(r *ui.Renderer, repo workspace.RepoStatus) []string {
