@@ -392,7 +392,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.stage == createStagePreset {
-		model, _ := m.presetModel.Update(msg)
+		model, cmd := m.presetModel.Update(msg)
 		m.presetModel = model.(inputsModel)
 		if m.presetModel.done {
 			repos, err := m.loadPresetRepos(m.presetName())
@@ -407,7 +407,7 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.beginDescriptionStage()
 			return m, nil
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	if m.stage == createStagePresetDesc {
@@ -557,13 +557,13 @@ func (m createFlowModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.stage == createStageRepoWorkspace {
-		model, _ := m.presetModel.Update(msg)
+		model, cmd := m.presetModel.Update(msg)
 		m.presetModel = model.(inputsModel)
 		if m.presetModel.done {
 			m.beginDescriptionStage()
 			return m, nil
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	var cmd tea.Cmd

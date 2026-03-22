@@ -28,3 +28,48 @@ func TestCreateFlow_PresetBranchInput_UsesSeparateInputLine(t *testing.T) {
 		t.Fatalf("expected separateInputLine=true for preset branch input")
 	}
 }
+
+func TestCreateFlow_PresetSelect_PropagatesConfirmTimerAndAdvances(t *testing.T) {
+	m := newCreateFlowModel(
+		"gion manifest add",
+		[]string{"gion"},
+		nil,
+		nil,
+		nil,
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		nil,
+		func(string) ([]string, error) { return []string{"git@github.com:tasuku43/gion.git"}, nil },
+		nil,
+		nil,
+		nil,
+		DefaultTheme(),
+		false,
+		"preset",
+		"",
+	)
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next := updated.(createFlowModel)
+	if !next.presetModel.confirming {
+		t.Fatalf("expected preset selector to enter confirming state")
+	}
+	if cmd == nil {
+		t.Fatalf("expected preset selector to return confirm timer command")
+	}
+
+	updated, cmd = next.Update(singleSelectConfirmDoneMsg{})
+	next = updated.(createFlowModel)
+	if next.stage != createStagePreset {
+		t.Fatalf("expected create flow to remain on preset stage until workspace id is entered, got %v", next.stage)
+	}
+	if next.presetModel.stage != stageWorkspace {
+		t.Fatalf("expected preset selector to advance to workspace input stage, got %v", next.presetModel.stage)
+	}
+	if cmd != nil {
+		t.Fatalf("expected no quit command after advancing to workspace input stage")
+	}
+}
