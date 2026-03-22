@@ -139,6 +139,7 @@ func runManifestRm(ctx context.Context, rootDir string, args []string, globalNoP
 				r.Bullet("no changes")
 			},
 			RenderInfoBeforeApply: func(r *ui.Renderer, _ manifestplan.Result, _ bool) {
+				r.Blank()
 				if !selectedFromPrompt {
 					r.Section("Info")
 				}
