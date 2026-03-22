@@ -43,8 +43,10 @@ Reconcile the filesystem to match `gion.yaml` by computing a diff, showing a pla
 
 ## Output (IA)
 - `Plan` section: plan summary (same as `gion plan`).
-  - When interactive, the final confirmation prompt is rendered at the end of `Plan` (with a blank line before it).
-- `Apply` section: execution steps, with partial git command logs nested under each step.
+  - When interactive, the confirmation UI is rendered as a `Step` section between `Plan` and `Apply`.
+  - Once confirmation completes, the `Step` prompt should not remain in the final visible transcript.
+- `Apply` section: execution summary at the workspace / repo level.
+  - Normal output should not dump raw git commands such as `git worktree add` / `git worktree remove`.
 - `Result` section: completion summary (e.g. applied counts) and manifest rewrite note.
 
 ## Flags

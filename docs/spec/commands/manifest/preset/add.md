@@ -33,21 +33,26 @@ Create a preset entry in `gion.yaml` without manual YAML editing.
 - Candidate list is the fetched repos from `gion repo ls` (already in bare store). Unfetched repos are not shown.
 - Prompt behavior mirrors existing gion selection UI:
   - Shows a filterable list. Typing narrows candidates by substring match (case-insensitive). Optionally a lightweight fuzzy match is acceptable.
-  - The first visible item is highlighted. `<Enter>` adds the highlighted repo, removes it from the candidate list.
-  - The prompt loops, allowing repeated add operations. A minimum of 1 selection is required.
-  - Finish keys: `<Ctrl+D>` or typing `done` then `<Enter>`. If no repo has been added yet, finishing triggers an error message and returns to the prompt.
-  - Empty input + `<Enter>` does nothing (stays in the loop) to avoid accidental finish.
+  - The first visible item is highlighted with `>`.
+  - `Space` toggles the highlighted repo with `○/●` markers.
+  - `Enter` applies the selected set. A minimum of 1 selection is required.
+  - The active query is shown in the bottom `filter:` line, not in confirmed context.
 
 ## Output examples
 
 ### Output: interactive (no --repo)
 ```
-Inputs
-  • preset name: hel
-    └─ helmfiles
-  • repo: s
-    └─ git@github.com:org/repo.git
-    └─ git@github.com:org/api.git
+Context
+  • preset name: helmfiles
+  • repo:
+
+Step
+  • repo:
+    ○ git@github.com:org/repo.git
+  > ● git@github.com:org/api.git
+
+  filter: s
+  selected: 1/2  ↑↓ move  space toggle  enter apply  type filter  esc cancel
 
 Result
   • updated gion.yaml
@@ -55,7 +60,7 @@ Result
 
 ### Output: non-interactive (--repo)
 ```
-Inputs
+Context
   • preset name: helmfiles
   • repo: git@github.com:org/repo.git
   • repo: git@github.com:org/api.git

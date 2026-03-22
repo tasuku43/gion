@@ -14,9 +14,9 @@
   - `gion import`: the filesystem (+ `.gion/metadata.json`) is the source of truth; gion rebuilds `gion.yaml`.
 - Command roles:
   - `gion plan`: **read-only** (no side effects). Shows the diff between `gion.yaml` and the filesystem.
-  - `gion apply`: **reconcile**. Output is `Plan` → (confirm y/n) → `Apply` → `Result`
-    - The confirmation prompt is shown at the end of the `Plan` section (with a blank line before the prompt).
-    - `Apply` prints steps plus partial git command logs (tree-style).
+  - `gion apply`: **reconcile**. Output is `Plan` → `Step` (interactive confirm only) → `Apply` → `Result`
+    - The confirmation prompt is rendered as a `Step` section between `Plan` and `Apply`.
+    - Normal `Apply` output is summarized at the workspace / repo level rather than dumping raw git commands.
     - `Result` prints a completion summary (applied counts / manifest rewrite, etc.).
   - `gion import`: **rebuild inventory**. Reconstructs/normalizes `gion.yaml` from the current filesystem.
 - Non-negotiables:
@@ -55,7 +55,7 @@
   - Instead, compute everything up front and render via `applyManifestMutation` hooks:
     - `ShowPrelude` for user-provided inputs (interactive selections / flag-driven args).
     - `RenderInfoBeforeApply` for derived metadata (warnings, scanned/candidates counts, computed candidate lists, etc.).
-  - Rationale: emitting sections before `applyManifestMutation` often leads to ordering drift (`Info` before `Inputs`) or duplicated `Info` sections.
+  - Rationale: emitting sections before `applyManifestMutation` often leads to ordering drift (`Info` before `Context`) or duplicated `Info` sections.
 - When you know the related issue for a PR, include the issue link/number in the PR body(e.g. Fixes #<issue-number>).
 - Command specs live in `docs/spec/commands/` (YAML frontmatter with `status`):
     - `status: planned` means spec-first discussion; implement only after consensus and flip to `implemented`.

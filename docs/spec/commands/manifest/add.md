@@ -22,7 +22,7 @@ Create the desired workspace inventory in `gion.yaml` using an interactive UX, t
 - If none are provided and prompts are allowed, enter an interactive mode picker.
   - The picker presents `preset`, `repo`, `review`, `issue` and supports arrow selection with filterable search.
 - If none are provided and `--no-prompt` is set, error.
-- When prompts are used, mode flags still run the unified prompt flow so the `Inputs` section is rendered as a single in-place interaction.
+- When prompts are used, mode flags still run the unified prompt flow so `Context` and `Step` are rendered as one in-place interaction.
 - The optional positional `[<WORKSPACE_ID>]` overrides the default workspace ID derivation for single-workspace flows.
   - This is supported only for `--preset` and `--repo` (single-workspace flows).
   - For `--review` and `--issue`, the workspace ID is derived mechanically from the URL metadata; providing `[<WORKSPACE_ID>]` is an error.
@@ -136,11 +136,13 @@ Defaults and `--branch` rules:
 
 ## Output (IA)
 - Always uses the common sectioned layout from `docs/spec/ui/UI.md`.
-- `Inputs`: interactive UX inputs (mode, repo/preset, workspace id, branch/base, etc).
+- Interactive flows render `Context` and `Step`:
+  - `Context`: confirmed values plus the current unresolved field as a muted pending line.
+  - `Step`: the active selector, text input, or confirmation prompt.
 - `Plan`/`Apply`/`Result`: delegated to `gion apply` when apply is run.
 
 ### Info section (when apply runs)
-When apply runs, `gion manifest add` should emit an `Info` section after `Inputs` to make the two-phase behavior explicit:
+When apply runs, `gion manifest add` should emit an `Info` section after `Context` to make the two-phase behavior explicit:
 - `manifest: updated gion.yaml`
 - `apply: reconciling entire root (plan may include unrelated drift)`
 
@@ -149,11 +151,12 @@ When `--no-apply` is set, `gion manifest add` does not run apply and prints a sh
 
 Example:
 ```
-Inputs
+Context
   • mode: repo
   • repo: git@github.com:org/repo.git
   • workspace id: PROJ-123
-  • branch: PROJ-123
+  • repo #1 (git@github.com:org/repo.git)
+    └─ branch: PROJ-123
 
 Result
   • updated gion.yaml
@@ -163,7 +166,7 @@ Suggestion
 ```
 
 ### Output: with apply (default)
-When apply runs, `gion manifest add` prints `Inputs` first, then streams `gion apply` output (`Info`/`Plan`/`Apply`/`Result`).
+When apply runs, `gion manifest add` prints `Context` first, then streams `gion apply` output (`Info`/`Plan`/`Step` (while waiting for confirmation only)/`Apply`/`Result`).
 `gion manifest add` itself does not attempt to summarize the plan beyond what `gion apply` prints.
 
 ## Error messages (guidance)

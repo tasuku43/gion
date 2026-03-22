@@ -33,19 +33,25 @@ Remove preset entries from `gion.yaml`.
 - Candidate list is the preset names in `gion.yaml`.
 - Prompt behavior mirrors existing gion selection UI:
   - Shows a filterable list. Typing narrows candidates by substring match (case-insensitive). Optionally a lightweight fuzzy match is acceptable.
-  - The first visible item is highlighted. `<Enter>` adds the highlighted preset name, removes it from the candidate list.
-  - The prompt loops, allowing repeated add operations.
-  - Finish keys: `<Ctrl+D>` or typing `done` then `<Enter>`.
-  - Empty input + `<Enter>` does nothing (stays in the loop) to avoid accidental finish.
+  - The first visible item is highlighted with `>`.
+  - `Space` toggles the highlighted preset with `○/●` markers.
+  - `Enter` applies the selected set.
+  - The active query is shown in the bottom `filter:` line.
 
 ## Output examples
 
 ### Output: interactive (no args)
 ```
-Inputs
-  • preset: he
-    └─ helpdesk
-    └─ helpers
+Context
+  • preset:
+
+Step
+  • preset:
+    ○ helpdesk
+  > ● helpers
+
+  filter: he
+  selected: 1/2  ↑↓ move  space toggle  enter apply  type filter  esc cancel
 
 Result
   • updated gion.yaml (removed 2 presets)
@@ -53,7 +59,7 @@ Result
 
 ### Output: non-interactive (args)
 ```
-Inputs
+Context
   • preset: helpdesk
 
 Result
