@@ -586,14 +586,14 @@ func (m createFlowModel) View() string {
 		labelSelection := promptLabel(m.theme, m.useColor, m.selectionLabel())
 		labelWorkspace := promptLabel(m.theme, m.useColor, "workspace id")
 		labelDesc := promptLabel(m.theme, m.useColor, "description")
-		frame.SetInputsPrompt(
+		frame.SetContextPrompt(
 			modeLine,
 			fmt.Sprintf("%s: %s", labelSelection, m.selectionValue()),
 			fmt.Sprintf("%s: %s", labelWorkspace, m.workspaceID()),
-			renderPromptValueLine(labelDesc, ""),
 		)
-		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(renderTextInputAssistLines(m.descInput.View(), m.theme, m.useColor)...)
+		frame.SetStepPrompt(renderPromptValueLine(labelDesc, ""))
+		frame.AppendStepRaw("")
+		frame.AppendStepRaw(renderTextInputAssistLines(m.descInput.View(), m.theme, m.useColor)...)
 		return frame.Render()
 	}
 	if m.stage == createStagePresetBranch {
@@ -647,7 +647,7 @@ func (m createFlowModel) View() string {
 	}
 
 	frame := NewFrame(m.theme, m.useColor)
-	frame.SetInputsPrompt(renderPromptValueLine(modeLabel, m.pendingMode))
+	frame.SetStepPrompt(renderPromptValueLine(modeLabel, m.pendingMode))
 	assistLines := []string(nil)
 	if !m.confirming {
 		assistLines = singleSelectAssistLines("select", m.modeInput.View(), m.theme, m.useColor)
@@ -660,10 +660,10 @@ func (m createFlowModel) View() string {
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderRepoSingleSelectChoiceList(b, m.filtered, m.cursor, maxLines, m.pendingMode, m.confirming, m.useColor, m.theme)
 	})
-	frame.AppendInputsRaw(rawLines...)
+	frame.AppendStepRaw(rawLines...)
 	if len(assistLines) > 0 {
-		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(assistLines...)
+		frame.AppendStepRaw("")
+		frame.AppendStepRaw(assistLines...)
 	}
 	return frame.Render()
 }
@@ -873,19 +873,20 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 	labelPreset := promptLabel(m.theme, m.useColor, label)
 	promptLines := append([]string(nil), headerLines...)
 	if m.stage == stagePreset {
-		promptLines = append(promptLines, renderPromptValueLine(labelPreset, selectedInputValue(m.confirming, m.preset)))
+		frame.SetContextPrompt(promptLines...)
+		frame.SetStepPrompt(renderPromptValueLine(labelPreset, selectedInputValue(m.confirming, m.preset)))
 	} else {
 		promptLines = append(promptLines, renderPromptValueLine(labelPreset, m.preset))
+		frame.SetContextPrompt(promptLines...)
 	}
 
 	if m.stage == stageWorkspace {
 		label := promptLabel(m.theme, m.useColor, "workspace id")
-		promptLines = append(promptLines, renderPromptValueLine(label, ""))
+		frame.SetStepPrompt(renderPromptValueLine(label, ""))
 	} else if strings.TrimSpace(m.workspaceID) != "" {
 		label := promptLabel(m.theme, m.useColor, "workspace id")
-		promptLines = append(promptLines, fmt.Sprintf("%s: %s", label, m.workspaceID))
+		frame.AppendContextPrompt(fmt.Sprintf("%s: %s", label, m.workspaceID))
 	}
-	frame.SetInputsPrompt(promptLines...)
 
 	if m.stage == stagePreset {
 		assistLines := []string(nil)
@@ -900,15 +901,15 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 		rawLines := collectLines(func(b *strings.Builder) {
 			renderChoiceList(b, m.filtered, m.cursor, maxLines, m.preset, m.confirming, m.useColor, m.theme)
 		})
-		frame.AppendInputsRaw(rawLines...)
+		frame.AppendStepRaw(rawLines...)
 		if len(assistLines) > 0 {
-			frame.AppendInputsRaw("")
-			frame.AppendInputsRaw(assistLines...)
+			frame.AppendStepRaw("")
+			frame.AppendStepRaw(assistLines...)
 		}
 	}
 	if m.stage == stageWorkspace {
-		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(renderTextInputAssistLines(m.idInput.View(), m.theme, m.useColor)...)
+		frame.AppendStepRaw("")
+		frame.AppendStepRaw(renderTextInputAssistLines(m.idInput.View(), m.theme, m.useColor)...)
 	}
 
 	if m.stage == stageWorkspace && m.errorLine != "" {
@@ -916,7 +917,7 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 		if m.useColor {
 			msg = m.theme.Error.Render(msg)
 		}
-		frame.AppendInputsRaw(fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
+		frame.AppendStepRaw(fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
 	}
 
 	return frame.Render()
@@ -1066,26 +1067,22 @@ func (m confirmInlineModel) View() string {
 	if m.useInfo {
 		frame.SetInfoPrompt(line)
 	} else if m.rawAfter {
-		frame.SetInputsPrompt(line)
+		frame.SetStepPrompt(line)
 		if len(m.inputsRaw) > 0 {
-			frame.AppendInputsRaw(m.inputsRaw...)
+			frame.AppendStepRaw(m.inputsRaw...)
 		}
 	} else {
 		if len(m.inputsPrompt) > 0 {
-			frame.SetInputsPrompt(m.inputsPrompt...)
+			frame.SetContextPrompt(m.inputsPrompt...)
 		}
 		if len(m.inputsRaw) > 0 {
-			if len(frame.Inputs) == 0 {
-				frame.SetInputsRaw(m.inputsRaw...)
+			if len(frame.Context) == 0 {
+				frame.SetContextRaw(m.inputsRaw...)
 			} else {
-				frame.AppendInputsRaw(m.inputsRaw...)
+				frame.AppendContextRaw(m.inputsRaw...)
 			}
 		}
-		if len(m.inputsPrompt) == 0 && len(m.inputsRaw) == 0 {
-			frame.SetInputsPrompt(line)
-		} else {
-			frame.AppendInputsPrompt(line)
-		}
+		frame.SetStepPrompt(line)
 	}
 	return frame.Render()
 }
@@ -1125,9 +1122,9 @@ func (m confirmInlineLineModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m confirmInlineLineModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, m.label)
-	frame.SetInputsPrompt(fmt.Sprintf("%s (y/n)", label))
-	frame.AppendInputsRaw("")
-	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
+	frame.SetStepPrompt(fmt.Sprintf("%s (y/n)", label))
+	frame.AppendStepRaw("")
+	frame.AppendStepRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
 	return frame.Render()
 }
 
@@ -1208,15 +1205,15 @@ func (m inputInlineModel) View() string {
 	if strings.TrimSpace(m.defaultValue) != "" {
 		defaultText = fmt.Sprintf(" [default: %s]", m.defaultValue)
 	}
-	frame.SetInputsPrompt(renderPromptValueLine(label+defaultText, ""))
-	frame.AppendInputsRaw("")
-	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
+	frame.SetStepPrompt(renderPromptValueLine(label+defaultText, ""))
+	frame.AppendStepRaw("")
+	frame.AppendStepRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
 	if strings.TrimSpace(m.errorLine) != "" {
 		errLine := m.errorLine
 		if m.useColor {
 			errLine = m.theme.Error.Render(errLine)
 		}
-		frame.AppendInputsRaw(fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), errLine))
+		frame.AppendStepRaw(fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), errLine))
 	}
 	return frame.Render()
 }
@@ -1412,18 +1409,17 @@ func (m presetRepoSelectModel) View() string {
 
 	labelName := promptLabel(m.theme, m.useColor, "preset name")
 	presetName := m.presetName
-	if m.stage == stagePresetName {
-		presetName = m.nameInput.View()
-	}
 	labelRepo := promptLabel(m.theme, m.useColor, "repo")
 	repoValue := ""
 	if m.stage == stageRepoSelect && m.confirming {
 		repoValue = strings.Join(m.selected, ", ")
 	}
-	frame.SetInputsPrompt(
-		fmt.Sprintf("%s: %s", labelName, presetName),
-		renderPromptValueLine(labelRepo, repoValue),
-	)
+	if m.stage == stageRepoSelect {
+		frame.SetContextPrompt(fmt.Sprintf("%s: %s", labelName, presetName))
+		frame.SetStepPrompt(renderPromptValueLine(labelRepo, repoValue))
+	} else {
+		frame.SetStepPrompt(renderPromptValueLine(labelName, ""))
+	}
 
 	infoLines := 0
 	if m.errorLine != "" {
@@ -1444,10 +1440,14 @@ func (m presetRepoSelectModel) View() string {
 		}
 		renderRepoMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, selectedChoiceSet(m.selected), m.confirming, m.useColor, m.theme)
 	})
-	frame.AppendInputsRaw(rawLines...)
+	frame.AppendStepRaw(rawLines...)
 	if len(assistLines) > 0 {
-		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(assistLines...)
+		frame.AppendStepRaw("")
+		frame.AppendStepRaw(assistLines...)
+	}
+	if m.stage == stagePresetName {
+		frame.AppendStepRaw("")
+		frame.AppendStepRaw(renderTextInputAssistLines(m.nameInput.View(), m.theme, m.useColor)...)
 	}
 
 	if m.errorLine != "" {
@@ -1622,9 +1622,8 @@ func (m choiceSelectModel) View() string {
 func (m choiceSelectModel) ViewWithHeader(headerLines ...string) string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, m.label)
-	promptLines := append([]string(nil), headerLines...)
-	promptLines = append(promptLines, renderPromptValueLine(label, m.value))
-	frame.SetInputsPrompt(promptLines...)
+	frame.SetContextPrompt(headerLines...)
+	frame.SetStepPrompt(renderPromptValueLine(label, m.value))
 
 	infoLines := 0
 	if m.errorLine != "" {
@@ -1642,10 +1641,10 @@ func (m choiceSelectModel) ViewWithHeader(headerLines ...string) string {
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderRepoSingleSelectChoiceList(b, m.filtered, m.cursor, maxLines, m.value, m.confirming, m.useColor, m.theme)
 	})
-	frame.AppendInputsRaw(rawLines...)
+	frame.AppendStepRaw(rawLines...)
 	if len(assistLines) > 0 {
-		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(assistLines...)
+		frame.AppendStepRaw("")
+		frame.AppendStepRaw(assistLines...)
 	}
 
 	if m.errorLine != "" {
@@ -1865,10 +1864,9 @@ func (m multiSelectModel) View() string {
 
 func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...string) string {
 	frame := NewFrame(model.theme, model.useColor)
-	lines := append([]string(nil), headerLines...)
 	label := promptLabel(model.theme, model.useColor, model.label)
-	lines = append(lines, renderPromptValueLine(label, ""))
-	frame.SetInputsPrompt(lines...)
+	frame.SetContextPrompt(headerLines...)
+	frame.SetStepPrompt(renderPromptValueLine(label, ""))
 
 	hasError := model.errorLine != ""
 	infoLines := 0
@@ -1883,14 +1881,14 @@ func renderMultiSelectFrame(model multiSelectModel, height int, headerLines ...s
 	if len(assistLines) > 0 {
 		extraAssistGap = 1
 	}
-	maxLines := listMaxLines(height, len(lines)+len(assistLines)+extraAssistGap, infoLines)
+	maxLines := listMaxLines(height, len(headerLines)+1+len(assistLines)+extraAssistGap, infoLines)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderRepoMultiSelectChoiceList(b, model.filtered, model.cursor, maxLines, selectedChoiceSet(model.selectedValues), model.confirming, model.useColor, model.theme)
 	})
-	frame.AppendInputsRaw(rawLines...)
+	frame.AppendStepRaw(rawLines...)
 	if len(assistLines) > 0 {
-		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(assistLines...)
+		frame.AppendStepRaw("")
+		frame.AppendStepRaw(assistLines...)
 	}
 
 	if hasError {
@@ -2024,12 +2022,12 @@ func (m branchInputModel) ViewWithHeader(headerLines ...string) string {
 	frame := NewFrame(m.theme, m.useColor)
 	lines := append([]string(nil), headerLines...)
 	if len(m.items) == 0 {
-		frame.SetInputsPrompt(lines...)
+		frame.SetContextPrompt(lines...)
 		return frame.Render()
 	}
 
 	if m.separateInputLine {
-		frame.SetInputsPrompt(lines...)
+		frame.SetContextPrompt(lines...)
 		maxIndex := m.index
 		if maxIndex > len(m.items)-1 {
 			maxIndex = len(m.items) - 1
@@ -2042,22 +2040,26 @@ func (m branchInputModel) ViewWithHeader(headerLines ...string) string {
 			} else if strings.TrimSpace(item.Label) != "" {
 				label = item.Label
 			}
-			frame.AppendInputsPrompt(label)
+			if i < m.index {
+				frame.AppendContextPrompt(label)
+			} else {
+				frame.SetStepPrompt(label)
+			}
 
 			if i < m.index {
 				value := m.selections[i].Branch
 				connector := mutedToken(m.theme, m.useColor, output.LogConnector)
-				frame.AppendInputsRaw(fmt.Sprintf("%s%s branch: %s", output.Indent+output.Indent, connector, value))
+				frame.AppendContextRaw(fmt.Sprintf("%s%s branch: %s", output.Indent+output.Indent, connector, value))
 				continue
 			}
 			if i == m.index && !m.done {
 				connector := mutedToken(m.theme, m.useColor, output.LogConnector)
-				frame.AppendInputsRaw(fmt.Sprintf("%s%s branch:", output.Indent+output.Indent, connector))
+				frame.AppendStepRaw(fmt.Sprintf("%s%s branch:", output.Indent+output.Indent, connector))
 			}
 		}
 		if !m.done {
-			frame.AppendInputsRaw("")
-			frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
+			frame.AppendStepRaw("")
+			frame.AppendStepRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
 		}
 		if m.errorLine != "" {
 			msg := m.errorLine
@@ -2088,7 +2090,7 @@ func (m branchInputModel) ViewWithHeader(headerLines ...string) string {
 			lines = append(lines, fmt.Sprintf("%s: %s", labelBranch, m.input.View()))
 		}
 	}
-	frame.SetInputsPrompt(lines...)
+	frame.SetContextPrompt(lines...)
 	if m.errorLine != "" {
 		msg := m.errorLine
 		if m.useColor {
@@ -2419,15 +2421,15 @@ func (m presetNameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m presetNameModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "preset name")
-	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
-	frame.AppendInputsRaw("")
-	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
+	frame.SetStepPrompt(renderPromptValueLine(label, ""))
+	frame.AppendStepRaw("")
+	frame.AppendStepRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
 	if m.errorLine != "" {
 		msg := m.errorLine
 		if m.useColor {
 			msg = m.theme.Error.Render(msg)
 		}
-		frame.AppendInputsRaw(fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
+		frame.AppendStepRaw(fmt.Sprintf("%s%s %s", output.Indent+output.Indent, mutedToken(m.theme, m.useColor, output.LogConnector), msg))
 	}
 	return frame.Render()
 }
@@ -2698,9 +2700,8 @@ func (m workspaceSelectModel) View() string {
 func (m workspaceSelectModel) ViewWithHeader(headerLines ...string) string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace id")
-	promptLines := append([]string(nil), headerLines...)
-	promptLines = append(promptLines, renderPromptValueLine(label, m.workspaceID))
-	frame.SetInputsPrompt(promptLines...)
+	frame.SetContextPrompt(headerLines...)
+	frame.SetStepPrompt(renderPromptValueLine(label, m.workspaceID))
 	var blockedLines []string
 	infoLines := 0
 	if len(m.blocked) > 0 {
@@ -2721,10 +2722,10 @@ func (m workspaceSelectModel) ViewWithHeader(headerLines ...string) string {
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceSingleSelectChoiceList(b, m.filtered, m.cursor, maxLines, m.workspaceID, m.confirming, m.useColor, m.theme)
 	})
-	frame.AppendInputsRaw(rawLines...)
+	frame.AppendStepRaw(rawLines...)
 	if len(assistLines) > 0 {
-		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(assistLines...)
+		frame.AppendStepRaw("")
+		frame.AppendStepRaw(assistLines...)
 	}
 	if len(m.blocked) > 0 {
 		frame.SetInfo("blocked workspaces")
@@ -2847,15 +2848,15 @@ func (m workspaceRepoSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m workspaceRepoSelectModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
-	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
+	frame.SetStepPrompt(renderPromptValueLine(label, ""))
 	assistLines := singleSelectAssistLines("select", m.input.View(), m.theme, m.useColor)
 	maxLines := listMaxLines(m.height, 1+len(assistLines)+1, 0)
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceRepoChoiceList(b, m.filtered, m.cursor, maxLines, m.useColor, m.theme)
 	})
-	frame.AppendInputsRaw(rawLines...)
-	frame.AppendInputsRaw("")
-	frame.AppendInputsRaw(assistLines...)
+	frame.AppendStepRaw(rawLines...)
+	frame.AppendStepRaw("")
+	frame.AppendStepRaw(assistLines...)
 	return frame.Render()
 }
 
@@ -3205,7 +3206,7 @@ func (m workspaceMultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m workspaceMultiSelectModel) View() string {
 	frame := NewFrame(m.theme, m.useColor)
 	label := promptLabel(m.theme, m.useColor, "workspace")
-	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
+	frame.SetStepPrompt(renderPromptValueLine(label, ""))
 	var blockedLines []string
 	infoLines := 0
 	if m.errorLine != "" {
@@ -3229,10 +3230,10 @@ func (m workspaceMultiSelectModel) View() string {
 	rawLines := collectLines(func(b *strings.Builder) {
 		renderWorkspaceMultiSelectChoiceList(b, m.filtered, m.cursor, maxLines, selectedWorkspaceSet(m.selectedIDs), m.confirming, m.useColor, m.theme)
 	})
-	frame.AppendInputsRaw(rawLines...)
+	frame.AppendStepRaw(rawLines...)
 	if len(assistLines) > 0 {
-		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(assistLines...)
+		frame.AppendStepRaw("")
+		frame.AppendStepRaw(assistLines...)
 	}
 
 	if m.errorLine != "" {

@@ -38,7 +38,11 @@ func (r *Renderer) Blank() {
 
 func (r *Renderer) Section(title string) {
 	switch strings.ToLower(strings.TrimSpace(title)) {
+	case "context":
+		debuglog.SetPhase("inputs")
 	case "inputs":
+		debuglog.SetPhase("inputs")
+	case "step":
 		debuglog.SetPhase("inputs")
 	case "info":
 		debuglog.SetPhase("info")
