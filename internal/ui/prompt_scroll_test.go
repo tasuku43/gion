@@ -836,14 +836,14 @@ func TestInputsModelPresetRows_ShowTreeAndSelectionMarkers(t *testing.T) {
 	renderChoiceList(&b, []string{"cwrds", "gion", "kra"}, 1, 10, "gion", false, false, DefaultTheme())
 
 	out := b.String()
-	if !strings.Contains(out, "○ ├─  cwrds") {
-		t.Fatalf("expected non-last preset row to use tree mid connector, got: %q", out)
+	if !strings.Contains(out, "○ cwrds") {
+		t.Fatalf("expected preset row to use flat selector formatting, got: %q", out)
 	}
-	if !strings.Contains(out, "> ● ├─  gion") {
+	if !strings.Contains(out, "> ● gion") {
 		t.Fatalf("expected focused selected preset row, got: %q", out)
 	}
-	if !strings.Contains(out, "○ └─  kra") {
-		t.Fatalf("expected last preset row to use tree last connector, got: %q", out)
+	if !strings.Contains(out, "○ kra") {
+		t.Fatalf("expected trailing preset row to use flat selector formatting, got: %q", out)
 	}
 }
 

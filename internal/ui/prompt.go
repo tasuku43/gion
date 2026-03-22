@@ -3372,15 +3372,11 @@ func renderChoiceList(b *strings.Builder, items []string, cursor int, maxVisible
 		if useColor && selected {
 			selectMark = theme.Accent.Render(selectMark)
 		}
-		connector := output.TreeBranchMid
-		if i == len(items)-1 {
-			connector = output.TreeBranchLast
-		}
 		display := item
 		if i == cursor && useColor && !confirming {
 			display = lipgloss.NewStyle().Bold(true).Render(display)
 		}
-		line := fmt.Sprintf("%s%s %s %s %s", output.Indent, focusMark, selectMark, mutedToken(theme, useColor, connector), display)
+		line := fmt.Sprintf("%s%s %s %s", output.Indent, focusMark, selectMark, display)
 		wrapped := wrapRawLineToWidth(line, width)
 		if confirming && !selected && useColor {
 			for i := range wrapped {
