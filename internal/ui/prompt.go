@@ -593,7 +593,7 @@ func (m createFlowModel) View() string {
 			renderPromptValueLine(labelDesc, ""),
 		)
 		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(renderTextInputAssistLines(m.descInput.Value(), m.theme, m.useColor)...)
+		frame.AppendInputsRaw(renderTextInputAssistLines(m.descInput.View(), m.theme, m.useColor)...)
 		return frame.Render()
 	}
 	if m.stage == createStagePresetBranch {
@@ -908,7 +908,7 @@ func (m inputsModel) ViewWithHeader(headerLines ...string) string {
 	}
 	if m.stage == stageWorkspace {
 		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(renderTextInputAssistLines(m.idInput.Value(), m.theme, m.useColor)...)
+		frame.AppendInputsRaw(renderTextInputAssistLines(m.idInput.View(), m.theme, m.useColor)...)
 	}
 
 	if m.stage == stageWorkspace && m.errorLine != "" {
@@ -1214,7 +1214,7 @@ func (m inputInlineModel) View() string {
 	}
 	frame.SetInputsPrompt(renderPromptValueLine(label+defaultText, ""))
 	frame.AppendInputsRaw("")
-	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.Value(), m.theme, m.useColor)...)
+	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
 	if strings.TrimSpace(m.errorLine) != "" {
 		errLine := m.errorLine
 		if m.useColor {
@@ -2055,7 +2055,7 @@ func (m branchInputModel) ViewWithHeader(headerLines ...string) string {
 			}
 		}
 		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(renderTextInputAssistLines(m.input.Value(), m.theme, m.useColor)...)
+		frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
 		if m.errorLine != "" {
 			msg := m.errorLine
 			if m.useColor {
@@ -2418,7 +2418,7 @@ func (m presetNameModel) View() string {
 	label := promptLabel(m.theme, m.useColor, "preset name")
 	frame.SetInputsPrompt(renderPromptValueLine(label, ""))
 	frame.AppendInputsRaw("")
-	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.Value(), m.theme, m.useColor)...)
+	frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
 	if m.errorLine != "" {
 		msg := m.errorLine
 		if m.useColor {
@@ -3338,10 +3338,9 @@ func renderTextInputAssistLines(value string, theme Theme, useColor bool) []stri
 }
 
 func renderTextInputLine(value string, theme Theme, useColor bool) string {
-	body := strings.TrimSpace(value)
-	line := fmt.Sprintf("%sinput: %s", output.Indent, body)
+	line := fmt.Sprintf("%sinput: %s", output.Indent, value)
 	if useColor {
-		line = theme.Muted.Render(output.Indent+"input: ") + body
+		line = theme.Muted.Render(output.Indent+"input: ") + value
 	}
 	return wrapRawLineToWidth(line, currentWrapWidth())[0]
 }
