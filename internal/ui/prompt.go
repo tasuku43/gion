@@ -2052,10 +2052,17 @@ func (m branchInputModel) ViewWithHeader(headerLines ...string) string {
 				value := m.selections[i].Branch
 				connector := mutedToken(m.theme, m.useColor, output.LogConnector)
 				frame.AppendInputsRaw(fmt.Sprintf("%s%s branch: %s", output.Indent+output.Indent, connector, value))
+				continue
+			}
+			if i == m.index && !m.done {
+				connector := mutedToken(m.theme, m.useColor, output.LogConnector)
+				frame.AppendInputsRaw(fmt.Sprintf("%s%s branch:", output.Indent+output.Indent, connector))
 			}
 		}
-		frame.AppendInputsRaw("")
-		frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
+		if !m.done {
+			frame.AppendInputsRaw("")
+			frame.AppendInputsRaw(renderTextInputAssistLines(m.input.View(), m.theme, m.useColor)...)
+		}
 		if m.errorLine != "" {
 			msg := m.errorLine
 			if m.useColor {

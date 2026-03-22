@@ -788,11 +788,39 @@ func TestBranchInputModel_SeparateInputLineKeepsBranchVisible(t *testing.T) {
 	model.separateInputLine = true
 
 	out := model.ViewWithHeader("repo: git@github.com:tasuku43/gion.git")
+	if !strings.Contains(out, "branch:") {
+		t.Fatalf("expected output to contain branch context line")
+	}
 	if !strings.Contains(out, "input: issue/96") {
 		t.Fatalf("expected output to contain bottom input line")
 	}
 	if !strings.Contains(out, "enter confirm  esc cancel") {
 		t.Fatalf("expected output to contain text input footer")
+	}
+}
+
+func TestBranchInputModel_SeparateInputLine_HidesInputAfterDone(t *testing.T) {
+	model := newBranchInputModel(
+		"title",
+		[]PromptChoice{{Label: "repo #1 (git@github.com:tasuku43/gion.git)", Value: "repo1"}},
+		func(index int, choice PromptChoice) string { return choice.Label },
+		func(choice PromptChoice) string { return "test" },
+		nil,
+		false,
+		DefaultTheme(),
+		false,
+	)
+	model.separateInputLine = true
+	model.selections[0] = BranchSelection{Value: "repo1", Label: "repo #1 (git@github.com:tasuku43/gion.git)", Branch: "test"}
+	model.index = 1
+	model.done = true
+
+	out := model.View()
+	if strings.Contains(out, "input:") {
+		t.Fatalf("expected bottom input line to be hidden after completion, got: %q", out)
+	}
+	if !strings.Contains(out, "branch: test") {
+		t.Fatalf("expected completed branch value to remain visible, got: %q", out)
 	}
 }
 
