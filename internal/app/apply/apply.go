@@ -17,6 +17,7 @@ import (
 	"github.com/tasuku43/gion/internal/domain/repo"
 	"github.com/tasuku43/gion/internal/domain/workspace"
 	"github.com/tasuku43/gion/internal/infra/gitcmd"
+	"github.com/tasuku43/gion/internal/infra/output"
 )
 
 type Options struct {
@@ -104,17 +105,21 @@ func applyWorkspaceAdd(ctx context.Context, rootDir string, desired manifest.Fil
 		fetch = false
 	}
 	for _, repoEntry := range ws.Repos {
-		logStep(opts.Step, fmt.Sprintf("worktree add %s", repoEntry.Alias))
+		beginRepoGroup(repoEntry.Alias, repoEntry.Branch)
 		if strings.EqualFold(strings.TrimSpace(ws.Mode), workspace.MetadataModeReview) {
 			if err := applyReviewRepoAdd(ctx, rootDir, change.WorkspaceID, repoEntry); err != nil {
+				endRepoGroup()
 				return err
 			}
+			endRepoGroup()
 			continue
 		}
 		_, createdBranch, baseBranch, err := add.AddRepo(ctx, rootDir, change.WorkspaceID, repoEntry.RepoKey, repoEntry.Alias, repoEntry.Branch, repoEntry.BaseRef, fetch)
 		if err != nil {
+			endRepoGroup()
 			return err
 		}
+		endRepoGroup()
 		if createdBranch {
 			baseBranchToRecord, baseBranchMixed = coreapplyplan.UpdateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 		}
@@ -170,25 +175,35 @@ func applyReviewRepoAdd(ctx context.Context, rootDir, workspaceID string, repoEn
 }
 
 func applyRepoRemovals(ctx context.Context, rootDir string, change manifestplan.WorkspaceChange, opts Options) error {
+	if !hasRepoRemovalChanges(change) {
+		return nil
+	}
+	logStep(opts.Step, fmt.Sprintf("update workspace %s", change.WorkspaceID))
 	for _, repoChange := range change.Repos {
 		switch repoChange.Kind {
 		case manifestplan.RepoRemove, manifestplan.RepoUpdate:
 			if coreapplyplan.IsInPlaceBranchRename(repoChange) {
 				continue
 			}
-			logStep(opts.Step, fmt.Sprintf("worktree remove %s", repoChange.Alias))
+			beginRepoGroup(repoChange.Alias, repoChange.FromBranch)
 			if err := remove_repo.RemoveRepo(ctx, rootDir, change.WorkspaceID, repoChange.Alias, remove_repo.Options{
 				AllowDirty:       opts.AllowDirty,
 				AllowStatusError: opts.AllowStatusError,
 			}); err != nil {
+				endRepoGroup()
 				return err
 			}
+			endRepoGroup()
 		}
 	}
 	return nil
 }
 
 func applyRepoBranchRenames(ctx context.Context, rootDir string, change manifestplan.WorkspaceChange, step func(text string)) error {
+	if !hasInPlaceBranchRenameChanges(change) {
+		return nil
+	}
+	logStep(step, fmt.Sprintf("update workspace %s", change.WorkspaceID))
 	for _, repoChange := range change.Repos {
 		if !coreapplyplan.IsInPlaceBranchRename(repoChange) {
 			continue
@@ -203,15 +218,21 @@ func applyRepoBranchRenames(ctx context.Context, rootDir string, change manifest
 			return fmt.Errorf("cannot rename branch: repo %q is on %q, want %q", repoChange.Alias, currentBranch, repoChange.FromBranch)
 		}
 
-		logStep(step, fmt.Sprintf("branch rename %s", repoChange.Alias))
+		beginRepoGroup(repoChange.Alias, repoChange.ToBranch)
 		if err := gitcmd.BranchMove(ctx, worktreePath, repoChange.FromBranch, repoChange.ToBranch); err != nil {
+			endRepoGroup()
 			return err
 		}
+		endRepoGroup()
 	}
 	return nil
 }
 
 func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, change manifestplan.WorkspaceChange, opts Options) error {
+	if !hasRepoAddChanges(change) {
+		return nil
+	}
+	logStep(opts.Step, fmt.Sprintf("update workspace %s", change.WorkspaceID))
 	baseBranchToRecord := ""
 	baseBranchMixed := false
 	fetch := true
@@ -221,12 +242,14 @@ func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, c
 	for _, repoChange := range change.Repos {
 		switch repoChange.Kind {
 		case manifestplan.RepoAdd:
-			logStep(opts.Step, fmt.Sprintf("worktree add %s", repoChange.Alias))
+			beginRepoGroup(repoChange.Alias, repoChange.ToBranch)
 			baseRef := desiredBaseRef(desired, change.WorkspaceID, repoChange.Alias)
 			_, createdBranch, baseBranch, err := add.AddRepo(ctx, rootDir, change.WorkspaceID, repoChange.ToRepo, repoChange.Alias, repoChange.ToBranch, baseRef, fetch)
 			if err != nil {
+				endRepoGroup()
 				return err
 			}
+			endRepoGroup()
 			if createdBranch {
 				baseBranchToRecord, baseBranchMixed = coreapplyplan.UpdateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 			}
@@ -234,12 +257,14 @@ func applyRepoAdds(ctx context.Context, rootDir string, desired manifest.File, c
 			if coreapplyplan.IsInPlaceBranchRename(repoChange) {
 				continue
 			}
-			logStep(opts.Step, fmt.Sprintf("worktree add %s", repoChange.Alias))
+			beginRepoGroup(repoChange.Alias, repoChange.ToBranch)
 			baseRef := desiredBaseRef(desired, change.WorkspaceID, repoChange.Alias)
 			_, createdBranch, baseBranch, err := add.AddRepo(ctx, rootDir, change.WorkspaceID, repoChange.ToRepo, repoChange.Alias, repoChange.ToBranch, baseRef, fetch)
 			if err != nil {
+				endRepoGroup()
 				return err
 			}
+			endRepoGroup()
 			if createdBranch {
 				baseBranchToRecord, baseBranchMixed = coreapplyplan.UpdateBaseBranchCandidate(baseBranchToRecord, baseBranchMixed, baseBranch)
 			}
@@ -259,6 +284,58 @@ func logStep(step func(text string), text string) {
 		return
 	}
 	step(text)
+}
+
+func beginRepoGroup(alias, branch string) {
+	output.BeginGroup(formatApplyRepoLabel(alias, branch))
+}
+
+func endRepoGroup() {
+	output.EndGroup()
+}
+
+func formatApplyRepoLabel(alias, branch string) string {
+	name := strings.TrimSpace(alias)
+	if name == "" {
+		name = "repo"
+	}
+	if strings.TrimSpace(branch) == "" {
+		return name
+	}
+	return fmt.Sprintf("%s (branch: %s)", name, strings.TrimSpace(branch))
+}
+
+func hasRepoRemovalChanges(change manifestplan.WorkspaceChange) bool {
+	for _, repoChange := range change.Repos {
+		if repoChange.Kind == manifestplan.RepoRemove {
+			return true
+		}
+		if repoChange.Kind == manifestplan.RepoUpdate && !coreapplyplan.IsInPlaceBranchRename(repoChange) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasInPlaceBranchRenameChanges(change manifestplan.WorkspaceChange) bool {
+	for _, repoChange := range change.Repos {
+		if coreapplyplan.IsInPlaceBranchRename(repoChange) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRepoAddChanges(change manifestplan.WorkspaceChange) bool {
+	for _, repoChange := range change.Repos {
+		if repoChange.Kind == manifestplan.RepoAdd {
+			return true
+		}
+		if repoChange.Kind == manifestplan.RepoUpdate && !coreapplyplan.IsInPlaceBranchRename(repoChange) {
+			return true
+		}
+	}
+	return false
 }
 
 func ensureNoIncompleteWorkspaceRemoval(rootDir, workspaceID string) error {

@@ -96,6 +96,9 @@ func RemoveWithOptions(ctx context.Context, rootDir, workspaceID string, opts Re
 		if repoLabel == "" {
 			repoLabel = filepath.Base(strings.TrimSpace(repo.WorktreePath))
 		}
+		if branch := strings.TrimSpace(repo.Branch); branch != "" {
+			repoLabel += fmt.Sprintf(" (branch: %s)", branch)
+		}
 		output.BeginGroup(repoLabel)
 		if force {
 			output.Log("$ git worktree remove --force")

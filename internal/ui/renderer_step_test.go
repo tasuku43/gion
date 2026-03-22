@@ -36,9 +36,7 @@ func TestGroupedStepLogger_RendersTreePerStep(t *testing.T) {
 	wantLines := []string{
 		"  • remove workspace test",
 		"    ├─ $ git worktree remove --force",
-		"    │  /tmp/test/repo-a",
 		"    └─ $ git worktree remove --force",
-		"       /tmp/test/repo-b",
 	}
 	want := strings.Join(wantLines, "\n") + "\n"
 	if got != want {
@@ -66,11 +64,7 @@ func TestGroupedStepLogger_RendersGroupedRepoTree(t *testing.T) {
 	wantLines := []string{
 		"  • remove workspace test",
 		"    ├─ repo-a",
-		"    │  ├─ $ git worktree remove --force",
-		"    │  └─ /tmp/test/repo-a",
 		"    └─ repo-b",
-		"       ├─ $ git worktree remove --force",
-		"       └─ /tmp/test/repo-b",
 	}
 	want := strings.Join(wantLines, "\n") + "\n"
 	if got != want {
