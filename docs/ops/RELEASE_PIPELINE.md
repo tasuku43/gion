@@ -59,7 +59,7 @@ sequenceDiagram
   GA->>PR: open PR to update Formula/gion.rb
   PR-->>GH: CI passes
   GH->>GH: auto-merge PR (stable tags only)
-  Brew->>GH: brew tap tasuku43/gion (pulls Formula/gion.rb)
+  Brew->>GH: brew tap tasuku43/tap (pulls Formula/gion.rb)
   Brew->>RLS: download tar.gz + verify sha256
   Brew->>Brew: install gion
   Mise->>RLS: download tar.gz + install (github backend)

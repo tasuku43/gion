@@ -59,13 +59,13 @@ jobs:
           app-id: ${{ secrets.HOMEBREW_APP_ID }}
           private-key: ${{ secrets.HOMEBREW_APP_KEY }}
           owner: tasuku43
-          repositories: homebrew-gion
+          repositories: homebrew-tap
 
       - name: Checkout Homebrew tap
         if: steps.channel.outputs.stable == 'true'
         uses: actions/checkout@v4
         with:
-          repository: tasuku43/homebrew-gion
+          repository: tasuku43/homebrew-tap
           token: ${{ steps.homebrew-token.outputs.token }}
           path: homebrew-tap
 

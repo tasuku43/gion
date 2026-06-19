@@ -24,7 +24,7 @@ For compatibility policy, see `docs/spec/core/COMPATIBILITY.md`.
 Homebrew uses GitHub Releases as the source of truth (stable tags only).
 
 Install:
-- `brew tap tasuku43/gion`
+- `brew tap tasuku43/tap`
 - `brew install gion`
 
 Notes:

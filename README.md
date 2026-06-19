@@ -47,7 +47,7 @@ Tip: `gion manifest` can be shortened to `gion m` or `gion man`.
 ### Homebrew
 
 ```bash
-brew tap tasuku43/gion
+brew tap tasuku43/tap
 brew install gion
 ```
 
